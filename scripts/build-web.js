@@ -14,7 +14,9 @@ for (const [pkg, fam, ws] of fonts) for (const w of ws) {
 }
 if (missing) console.warn(`Aviso: ${missing} arquivo(s) de fonte não encontrados (rode "npm install"). O app usará fontes do sistema.`);
 const body = rd('src/head.html').replace('{{FONTS}}', () => css).replace('{{CSS}}', () => rd('src/style.css')).replace('{{JS}}', () => js);
-/* Escala de interface: desenha o app numa largura virtual maior (como no Claude) e reduz para caber. Ajuste K para aumentar ou diminuir os textos (1 = tamanho nativo). */
-const SCALE = `<script>(function(){var K=1.29;window.TB_UI_SCALE=K;try{if(window.Capacitor&&K!==1){var w=Math.round(Math.min(screen.width,screen.height)*K),m=document.querySelector('meta[name=viewport]');m.setAttribute('content','width='+w+',viewport-fit=cover');}}catch(e){}})();</script>`;
+/* Escala de interface: no Claude o app é desenhado numa largura virtual maior e reduzido para caber. Aqui o mesmo efeito vem do CSS "zoom".
+   Ajuste K: valores maiores deixam tudo menor (1 = tamanho nativo do Android). */
+const K = 1.29;
+const SCALE = `<style>html{zoom:${(1 / K).toFixed(4)}}</style>`;
 fs.writeFileSync(path.join(out, 'index.html'), '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' + SCALE + '<meta name="theme-color" content="#0a090c"></head><body>' + body + '</body></html>');
 console.log('www/index.html', Math.round(fs.statSync(path.join(out, 'index.html')).size / 1024) + ' KB');
