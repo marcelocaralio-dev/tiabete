@@ -1,0 +1,8 @@
+{
+  "appId": "app.tiabete.glicose",
+  "appName": "TiaBete",
+  "webDir": "www",
+  "backgroundColor": "#0a090c",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}
