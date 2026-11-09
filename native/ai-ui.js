@@ -13,12 +13,46 @@ if (window.TB_PUBLIC && window.TB_AI) {
     } catch (e) { a.msg = 'Não foi possível ler as configurações guardadas.'; }
     if (S.route === 'ia') render();
   }
+
+  const GUIDE = {
+    openrouter: { t: 'OpenRouter (tem modelos gratuitos, o mais fácil para começar)', url: 'https://openrouter.ai/keys', link: 'openrouter.ai/keys', steps: [
+      'Toque em “Abrir a página da chave” abaixo. Entre com a sua conta Google (botão “Sign in”).',
+      'Toque em “Create Key”, dê qualquer nome (por exemplo TiaBete) e toque em “Create”.',
+      'Copie a chave que aparece (começa com sk-or-). Ela só é mostrada uma vez: copie agora.',
+      'Volte ao TiaBete, escolha o provedor “OpenRouter” e cole a chave no campo “Chave da API”.',
+      'Toque em “Carregar lista de modelos” e, no campo Modelo, escolha um que termine em “:free” (esses são gratuitos).',
+      'Marque a caixa de ciência, toque em “Salvar” e depois em “Testar conexão”.'], note: 'Os modelos “:free” têm limite de uso por dia e às vezes ficam lentos ou ocupados. Se um falhar, tente outro da lista.' },
+    gemini: { t: 'Google Gemini', url: 'https://aistudio.google.com/apikey', link: 'aistudio.google.com/apikey', steps: [
+      'Toque em “Abrir a página da chave” abaixo e entre com a sua conta Google.',
+      'Toque em “Criar chave de API” (Create API key). Se pedir um projeto, escolha o que já existe ou crie um novo.',
+      'Copie a chave (começa com AIza).',
+      'Volte ao TiaBete, escolha “Google Gemini”, cole a chave e toque em “Carregar lista de modelos”.',
+      'Escolha um modelo da lista (prefira os que têm “flash” no nome), marque a ciência, toque em “Salvar” e “Testar conexão”.'], note: 'O plano gratuito do Gemini pode usar o conteúdo para melhorar produtos do Google e, em algumas contas e regiões, não funciona. Se der erro em qualquer modelo, use o OpenRouter.' },
+    anthropic: { t: 'Claude (Anthropic)', url: 'https://console.anthropic.com/settings/keys', link: 'console.anthropic.com', steps: [
+      'Toque em “Abrir a página da chave” abaixo e crie uma conta (ou entre) no console da Anthropic.',
+      'Em “Plans & Billing” (cobrança), adicione crédito. O mínimo costuma ser poucos dólares e dura bastante para uso pessoal.',
+      'Em “API keys”, toque em “Create Key”, dê um nome e copie a chave (começa com sk-ant-).',
+      'Volte ao TiaBete, escolha “Claude (Anthropic)” e cole a chave. O modelo sugerido já vem preenchido.',
+      'Marque a ciência, toque em “Salvar” e “Testar conexão”.'], note: 'A assinatura do Claude (Pro ou Max) não vale aqui: a API é uma conta separada, paga por uso.' },
+    openai: { t: 'ChatGPT (OpenAI)', url: 'https://platform.openai.com/api-keys', link: 'platform.openai.com/api-keys', steps: [
+      'Toque em “Abrir a página da chave” abaixo e entre na plataforma da OpenAI.',
+      'Em “Billing”, adicione crédito (a API é paga por uso, separada da assinatura do ChatGPT).',
+      'Em “API keys”, toque em “Create new secret key”, dê um nome e copie a chave (começa com sk-).',
+      'Volte ao TiaBete, escolha “ChatGPT (OpenAI)”, cole a chave e toque em “Carregar lista de modelos”.',
+      'Escolha um modelo pequeno (por exemplo com “mini” no nome), marque a ciência, toque em “Salvar” e “Testar conexão”.'], note: '' },
+    custom: { t: 'Outro serviço compatível', url: '', link: '', steps: ['Informe o endereço https:// da API do serviço, o nome do modelo e a chave que ele fornecer.', 'Marque a ciência, toque em “Salvar” e “Testar conexão”.'], note: 'Serve para serviços compatíveis com o formato da OpenAI. Endereços sem https:// não são aceitos.' },
+  };
+  const aiGuide = p => { const g = GUIDE[p]; return `<div class="stack" style="gap:10px"><p style="margin:0"><b>${esc(g.t)}</b></p><ol class="plain" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">${g.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>${g.note ? `<p class="hint" style="margin:0">${esc(g.note)}</p>` : ''}${g.url ? `<button class="btn full" data-act="ai-open" data-url="${esc(g.url)}">Abrir a página da chave (${esc(g.link)})</button>` : ''}</div>`; };
   VIEWS.ia = function () {
     const a = A(); if (!a.loaded) aiLoad();
     const P = TB_PROVIDERS[a.provider], ph = { openai: 'ex.: gpt-4o-mini', gemini: 'ex.: gemini-2.0-flash', openrouter: 'ex.: openai/gpt-4o-mini', custom: 'nome do modelo', anthropic: 'claude-haiku-5-5' }[a.provider];
     const status = a.hasKey ? `<span class="pill ok">Configurada</span>` : `<span class="pill">Sem chave</span>`;
     return banners() + `
     <div class="card"><p class="hint" style="margin:0">A IA do TiaBete usa <b>a sua própria chave</b> de um provedor à sua escolha. Ela alimenta a análise de exames, as perguntas sobre seus registros e o cálculo de carboidratos dos alimentos. O uso é cobrado pelo provedor na sua conta, não pelo TiaBete. Estado: ${status}</p></div>
+    <h2 class="sec">Qual escolher?</h2>
+    <div class="card"><p class="hint" style="margin:0"><b>Mais fácil e gratuito:</b> OpenRouter (modelos “:free”). <b>Mais estável:</b> Claude ou ChatGPT, que cobram por uso (centavos por consulta, com crédito pré-pago). <b>Gemini</b> tem plano gratuito, mas pode falhar conforme a conta e a região. Escolha o provedor abaixo e siga o passo a passo.</p></div>
+    <h2 class="sec">Passo a passo da chave</h2>
+    <div class="card">${aiGuide(a.provider)}</div>
     <h2 class="sec">Provedor e modelo</h2>
     <div class="card"><div class="stack" style="gap:12px">
       <div class="field"><label class="fl" for="ai-prov">Provedor</label><select class="in" id="ai-prov">${Object.entries(TB_PROVIDERS).map(([k, v]) => `<option value="${k}" ${k === a.provider ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></div>
@@ -58,11 +92,12 @@ if (window.TB_PUBLIC && window.TB_AI) {
     const el = e.target.closest('[data-act^="ai-"]'); if (!el) return;
     const act = el.dataset.act, a = A(), { key } = grab();
     try {
+      if (act === 'ai-open') { const B = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.Browser; if (B) await B.open({ url: el.dataset.url }); else window.open(el.dataset.url, '_blank'); return; }
       if (act === 'ai-models') {
         const k = key || await TB_SECURE.get('ai-key'), err = check(a.base, a.provider);
         if (err) { return done(false, err); }
         a.busy = true; a.msg = ''; render();
-        try { a.models = await TB_AI.listModels(a.provider, a.base, k); done(true, a.models.length ? a.models.length + ' modelos carregados. Toque no campo Modelo para escolher.' : 'Nenhum modelo retornado. Digite o nome do modelo à mão.'); }
+        try { a.models = await TB_AI.listModels(a.provider, a.base, k); if (a.provider === 'openrouter') a.models.sort((x, y) => (/:free$/.test(y) ? 1 : 0) - (/:free$/.test(x) ? 1 : 0) || x.localeCompare(y)); done(true, a.models.length ? a.models.length + ' modelos carregados. Toque no campo Modelo para escolher.' : 'Nenhum modelo retornado. Digite o nome do modelo à mão.'); }
         catch (x) { done(false, x.aiMsg || 'Não foi possível carregar a lista.'); }
       } else if (act === 'ai-save') {
         const err = check(a.base, a.provider); if (err) return done(false, err);

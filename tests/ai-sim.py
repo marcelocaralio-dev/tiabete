@@ -49,6 +49,7 @@ async def main():
         # sem configuração
         e = await pg.evaluate("(async()=>{try{const s=await window.claude.use('sample');await s('oi')}catch(e){return e.code+'|'+e.aiMsg}})()"); print('sem config:', e)
         await pg.evaluate("go('ia')"); await pg.wait_for_timeout(500)
+        print('guia:', 'Passo a passo da chave' in await T() and 'Create Key' in await T()); await pg.select_option('#ai-prov','openrouter'); await pg.wait_for_timeout(200); print('guia openrouter:', ':free' in await T()); await pg.select_option('#ai-prov','anthropic'); await pg.wait_for_timeout(200)
         await pg.fill('#ai-key','sk-ant-SEGREDO123'); await pg.click('[data-act=ai-save]'); await pg.wait_for_timeout(300); print('sem consentimento:', 'Marque a caixa' in await T())
         await pg.click('#ai-consent'); await pg.fill('#ai-key','sk-ant-SEGREDO123'); await pg.click('[data-act=ai-save]'); await pg.wait_for_timeout(500); print('salvo:', 'Configuração salva' in await T())
         await pg.fill('#ai-key','sk-ant-SEGREDO123') ; await pg.click('[data-act=ai-test]'); await pg.wait_for_timeout(500); print('teste:', 'Conexão funcionando' in await T())

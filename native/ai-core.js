@@ -87,11 +87,11 @@
   function httpErr(r) {
     const st = r.status, d = r.data, m = d && (d.error && (d.error.message || d.error) || d.message) || '';
     const txt = (typeof m === 'string' ? m : JSON.stringify(m)).slice(0, 200);
-    if (st === 401 || st === 403) return Object.assign({}, ERR.auth, { detail: txt });
+    if (st === 401 || st === 403) return Object.assign({}, ERR.auth, { aiMsg: ERR.auth.aiMsg + (txt ? ' Resposta do provedor: ' + txt : ''), detail: txt });
     if (st === 402 || /credit|billing|quota|insufficient/i.test(txt)) return st === 429 && !/credit|billing|insufficient/i.test(txt) ? ERR.rate : Object.assign({}, ERR.bill, { detail: txt });
     if (st === 429) return ERR.rate;
     if (st >= 500 || /high demand|overloaded|unavailable|try again later/i.test(txt)) return { code: 'ai_busy', aiMsg: 'O modelo escolhido está sobrecarregado no provedor neste momento (isso costuma passar em minutos). Tente de novo ou escolha outro modelo em Mais → Inteligência artificial.', detail: txt };
-    if (st === 404) return Object.assign({}, ERR.model, { detail: txt });
+    if (st === 404) return Object.assign({}, ERR.model, { aiMsg: ERR.model.aiMsg + (txt ? ' Resposta do provedor: ' + txt : ''), detail: txt });
     if (st === 413) return ERR.big;
     return { code: 'ai_http', aiMsg: 'O provedor de IA recusou o pedido' + (txt ? ': ' + txt : ' (erro ' + st + ').'), detail: txt };
   }
