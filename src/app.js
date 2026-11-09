@@ -350,7 +350,7 @@ function viewHistorico() {
   const f = S.hist;
   const opt = (obj, cur, all) => `<option value="">${all}</option>` + Object.entries(obj).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v}</option>`).join('');
   const active = [f.from, f.to, f.band, f.ctx, f.meal, f.mark].filter(Boolean).length;
-  return banners() + labelBanner() + `<input class="in" id="h-q" type="search" placeholder="Buscar valor, nota, etiqueta, refeição…" value="${esc(f.q)}" aria-label="Buscar registros">
+  return banners() + labelBanner() + `<h2 class="sec">Buscar e filtrar</h2><input class="in" id="h-q" type="search" placeholder="Buscar valor, nota, etiqueta, refeição…" value="${esc(f.q)}" aria-label="Buscar registros">
   <details class="more" style="margin-top:10px" ${active ? 'open' : ''}><summary>Filtros${active ? ` · ${active} ativo${active > 1 ? 's' : ''}` : ''}</summary><div class="form-grid">
     <div class="field"><label class="fl" for="h-from">De</label><input class="in" type="date" id="h-from" value="${f.from}"></div>
     <div class="field"><label class="fl" for="h-to">Até</label><input class="in" type="date" id="h-to" value="${f.to}"></div>
@@ -360,7 +360,7 @@ function viewHistorico() {
     <div class="field"><label class="fl" for="h-mark">Marcação</label><select class="in" id="h-mark">${opt(MARKS, f.mark, 'Todas')}</select></div>
     <div class="full"><button class="btn sm" data-act="clear-filters">Limpar filtros</button></div></div></details>
   ${histJumpBar()}
-  <div id="h-list" style="margin-top:6px">${histListHTML()}</div>`;
+  <h2 class="sec">Medições</h2><div id="h-list" style="margin-top:6px">${histListHTML()}</div>`;
 }
 
 /* ---------- Registro (formulário) ---------- */
@@ -750,6 +750,7 @@ const MI = {
   esquemas: '<path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/>',
   relatorios: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',
   backup: '<path d="M7 18a4 4 0 0 1-.500-8 6 6 0 0 1 11.500 1.500A3.500 3.500 0 0 1 17.500 18zM12 11v6M9.500 13.500L12 11l2.500 2.500"/>',
+  ia: '<path d="M12 3l1.8 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800zM19 16l.8 2.200L22 19l-2.200.8L19 22l-.8-2.200L16 19l2.200-.8z"/>',
   aparencia: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.400 1.400M17.600 17.600L19 19M5 19l1.400-1.400M17.600 6.400L19 5"/>',
   sobre: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500h.01"/>'
 };
@@ -757,7 +758,7 @@ function viewMais() {
   const mi = k => `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[k]}</svg></i>`;
   const it = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${mi(r)}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
   const hypo = `<button class="menu-item" data-act="hypo-open">${mi('hypo')}<div>Protocolo de hipoglicemia<span>Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + `<div class="stack">${it('bolus', 'Cálculo de bolus', 'Alimentos, refeições e bolus por dia')}${it('hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico')}${hypo}${it('insulinas', 'Histórico de insulinas', 'Horários da basal e da insulina rápida, média e variação')}${it('refeicoes', 'Refeições salvas', 'Atalhos para registrar refeições que você repete')}${it('conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180')}${it('padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas')}${HAS_CLAUDE ? it('exames', 'Exames laboratoriais', 'Enviar PDFs, notas, contexto e comparação') : ''}${it('classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições')}${HAS_CLAUDE ? it('perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros') : ''}${it('importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia')}${it('eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos')}${it('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${it('esquemas', 'Esquemas de tratamento', 'Cadastro e comparação')}${it('relatorios', 'Relatórios', 'PDF e Excel por período')}${it('backup', 'Backup e dados', 'Exportar, restaurar, CSV')}${it('aparencia', 'Aparência', 'Tema claro, escuro ou automático')}${it('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos')}</div>`;
+  return banners() + `<div class="stack">${it('bolus', 'Cálculo de bolus', 'Alimentos, refeições e bolus por dia')}${it('hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico')}${hypo}${it('insulinas', 'Histórico de insulinas', 'Horários da basal e da insulina rápida, média e variação')}${it('refeicoes', 'Refeições salvas', 'Atalhos para registrar refeições que você repete')}${it('conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180')}${it('padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas')}${HAS_CLAUDE ? it('exames', 'Exames laboratoriais', 'Enviar PDFs, notas, contexto e comparação') : ''}${it('classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições')}${HAS_CLAUDE ? it('perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros') : ''}${VIEWS.ia ? it('ia', 'Inteligência artificial', 'Escolha o provedor e informe a sua chave') : ''}${it('importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia')}${it('eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos')}${it('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${it('esquemas', 'Esquemas de tratamento', 'Cadastro e comparação')}${it('relatorios', 'Relatórios', 'PDF e Excel por período')}${it('backup', 'Backup e dados', 'Exportar, restaurar, CSV')}${it('aparencia', 'Aparência', 'Tema claro, escuro ou automático')}${it('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos')}</div>`;
 }
 function viewAparencia() { return banners() + themeCard(); }
 

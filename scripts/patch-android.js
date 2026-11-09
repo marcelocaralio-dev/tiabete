@@ -5,6 +5,11 @@ if (!fs.existsSync(f)) { console.error('AndroidManifest.xml não encontrado. Rod
 let x = fs.readFileSync(f, 'utf8');
 const perms = ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED'];
 for (const p of perms) if (!x.includes(p)) x = x.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
+/* Retorno do login Google (backup no Drive): o app recebe app.tiabete.glicose:/oauth2redirect */
+if (!x.includes('app.tiabete.glicose"')) {
+  const filt = '\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="app.tiabete.glicose" />\n            </intent-filter>\n        ';
+  const i = x.indexOf('</activity>'); if (i > 0) x = x.slice(0, i) + filt.replace(/\s+$/, '\n        ') + x.slice(i); else console.warn('Não achei </activity> no manifesto; login Google não configurado.');
+}
 if (/android:allowBackup="true"/.test(x)) x = x.replace('android:allowBackup="true"', 'android:allowBackup="false"');
 fs.writeFileSync(f, x);
 console.log('AndroidManifest.xml ajustado.');

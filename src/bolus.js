@@ -116,7 +116,7 @@ async function blAi(meal) {
     } else msg = `${ex ? 'Já existia' : 'Salvo'}: ${f.name} (100 g: ${blN(f.carb)} g carb., ${blN(f.fiber)} g fibras, ${blN(f.prot)} g prot., ${blN(f.fat)} g gord., ${blN(f.kcal, 0)} kcal).`;
     S.blUi.msg[k] = { t: msg }; blSave();
   } catch (e) {
-    const c = e && e.code; S.blUi.msg[k] = { err: 1, t: c === 'rate_limited' ? 'Muitas consultas seguidas. Tente de novo em instantes.' : (c === 'not_granted' || c === 'capability_disabled' || c === 'sampling_disabled') ? 'Não consegui usar o Claude aqui. Cadastre à mão abaixo.' : c === 'refused' || c === 'invalid_json' || c === 'empty_completion' ? 'Não consegui calcular esse alimento. Tente descrevê-lo de outro jeito.' : 'Falha ao calcular. Tente novamente.' };
+    const c = e && e.code; S.blUi.msg[k] = { err: 1, t: e && e.aiMsg ? e.aiMsg : c === 'rate_limited' ? 'Muitas consultas seguidas. Tente de novo em instantes.' : (c === 'not_granted' || c === 'capability_disabled' || c === 'sampling_disabled') ? 'Não consegui usar o Claude aqui. Cadastre à mão abaixo.' : c === 'refused' || c === 'invalid_json' || c === 'empty_completion' ? 'Não consegui calcular esse alimento. Tente descrevê-lo de outro jeito.' : 'Falha ao calcular. Tente novamente.' };
   } finally { S.blUi.busy = false; render(); }
 }
 

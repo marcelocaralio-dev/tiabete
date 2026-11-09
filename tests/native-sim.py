@@ -20,9 +20,9 @@ async def main(web):
             if await pg.query_selector('#rw-ok'): await pg.click('#rw-ok'); await pg.wait_for_timeout(200)
         await pg.evaluate("go('mais')"); await pg.wait_for_timeout(300)
         t = await pg.evaluate("document.body.innerText")
-        print('menu sem Claude:', 'Perguntar ao Claude' not in t and 'Exames laboratoriais' not in t, '| tem Alertas e notificações:', 'Alertas e notificações' in t)
+        print('menu com IA:', 'Perguntar à IA' in t and 'Exames laboratoriais' in t and 'Inteligência artificial' in t, '| tem Alertas e notificações:', 'Alertas e notificações' in t)
         await pg.evaluate("go('backup')"); await pg.wait_for_timeout(300)
-        print('sem card Drive:', 'Google Drive' not in await pg.evaluate("document.body.innerText"))
+        print('card Drive presente:', 'Google Drive' in await pg.evaluate("document.body.innerText"))
         if web:
             print('web puro: sem download nativo (só funciona no Claude ou no APK)')
         else:

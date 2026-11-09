@@ -16,6 +16,7 @@ const exSorted = () => [...S.exams].sort((a, b) => (b.date || '').localeCompare(
 /* ---------- acesso ao Claude (capacidade "sample") ---------- */
 async function getSample() { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } }
 function sampleErrMsg(e) {
+  if (e && e.aiMsg) return e.aiMsg;
   const c = e && e.code;
   if (c === 'not_granted' || c === 'sampling_disabled' || c === 'not_declared' || c === 'capability_disabled' || c === 'capability_removed') return 'O Claude não está liberado para este app (a permissão foi negada ou não existe neste visualizador).';
   if (c === 'rate_limited') return 'Muitas consultas seguidas. Aguarde um pouco e tente de novo.';

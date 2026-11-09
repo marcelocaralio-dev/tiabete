@@ -58,3 +58,9 @@ Sugestões e correções são bem-vindas por issue ou pull request. Não inclua 
 ## Licença
 
 MIT. Veja [LICENSE](LICENSE).
+
+
+## IA e Google Drive (v0.3)
+- `native/ai-core.js`, `native/ai-ui.js`: IA com chave própria (Claude, OpenAI, Gemini, OpenRouter, outro compatível com OpenAI).
+- `native/drive.js`: backup no Google Drive. Guia de configuração: `docs/GOOGLE-DRIVE.md`.
+- Testes simulados: `python3 tests/ai-sim.py` (servindo `www/` na porta 8766).

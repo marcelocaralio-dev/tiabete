@@ -1,8 +1,20 @@
 // Monta www/index.html (um único arquivo) a partir de src/ + native/native.js, com fontes locais (@fontsource).
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..'), rd = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
-const order = ['src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'native/native.js', 'src/init.js'];
-const js = 'window.TB_PUBLIC = true;\n' + order.map(f => rd(f)).join('\n');
+const order = ['native/ai-core.js', 'src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'native/native.js', 'native/ai-ui.js', 'native/drive.js', 'src/init.js'];
+/* ID do cliente Google (OAuth) para o backup no Drive: arquivo config/google-client-id.txt (não é segredo). Se não existir, o app pede para colar na tela. */
+let gid = ''; try { gid = rd('config', 'google-client-id.txt').trim().split(/\s+/)[0] || ''; } catch (e) { }
+/* Textos do app web que citam o Claude viram textos neutros: no APK a IA é a que o usuário configurar. */
+const APK_TEXT = [
+  [/Perguntar ao Claude/g, 'Perguntar à IA'], [/Pergunte ao Claude/g, 'Pergunte à IA'],
+  [/ao Claude da sua conta/g, 'ao provedor de IA que você configurou (Mais → Inteligência artificial)'],
+  [/Leitura comparativa do Claude/g, 'Leitura comparativa da IA'],
+  [/ao Claude/g, 'à IA'], [/do Claude/g, 'da IA'], [/pelo Claude/g, 'pela IA'], [/O Claude/g, 'A IA'], [/o Claude/g, 'a IA'],
+  [/<h2 class="sec">Versão web<\/h2><div class="card"><p class="hint" style="margin:0">[^<]*<\/p><\/div>/, '<h2 class="sec">Aplicativo Android</h2><div class="card"><p class="hint" style="margin:0">Aplicativo instalável do TiaBete. Os dados ficam só neste aparelho (banco local). Recursos opcionais: IA com a sua própria chave (Mais → Inteligência artificial) e backup no seu Google Drive (Mais → Backup e dados). Ambos só enviam dados quando você pede.</p></div>'],
+];
+let js = order.map(f => rd(f)).join('\n');
+for (const [a, b] of APK_TEXT) js = js.replace(a, b);
+js = 'window.TB_PUBLIC = true;\nwindow.TB_GOOGLE_CLIENT_ID = ' + JSON.stringify(gid) + ';\n' + js;
 const fonts = [['unbounded', 'Unbounded', [500, 700]], ['manrope', 'Manrope', [400, 500, 600, 700, 800]], ['jetbrains-mono', 'JetBrains Mono', [400, 500]]];
 const out = path.join(root, 'www'); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
 let css = '', missing = 0;

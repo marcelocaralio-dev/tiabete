@@ -430,7 +430,7 @@ applyTheme();
 try { window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (S.theme === 'auto') applyTheme(); }); } catch (e) { }
 function themeCard() {
   const o = [['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Escuro']];
-  return `<div class="card" style="margin-bottom:12px"><div class="eyebrow">Aparência</div><div class="seg" role="group" aria-label="Tema" style="display:flex;margin-top:10px">${o.map(([k, t]) => `<button class="grow" data-act="theme" data-v="${k}" aria-pressed="${S.theme === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">“Automático” segue o modo claro ou escuro do seu aparelho. O botão no topo alterna na hora.</p></div>`;
+  return `<h2 class="sec">Tema do aplicativo</h2><div class="card" style="margin-bottom:12px"><div class="seg" role="group" aria-label="Tema" style="display:flex">${o.map(([k, t]) => `<button class="grow" data-act="theme" data-v="${k}" aria-pressed="${S.theme === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">“Automático” segue o modo claro ou escuro do seu aparelho. O botão no topo alterna na hora.</p></div>`;
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('#thm, [data-act="theme"]'); if (!el) return;
@@ -442,12 +442,14 @@ document.addEventListener('click', async e => {
 /* ---------- Tópicos expansíveis / retráteis ---------- */
 S.acc = {};
 const ACC_ALL = /[?&]all\b/.test(location.search); // gancho de teste: abre todos os tópicos
-const ACC_OPEN = { painel: ['hoje', 'insulinas'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
+const ACC_OPEN = { painel: ['hoje', 'insulinas'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
 try { const a = JSON.parse(localStorage.getItem('tb-acc') || '{}'); if (a && typeof a === 'object') S.acc = a; } catch (e) { }
 const accSave = () => { try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } try { Store.put('meta', { id: 'acc', value: S.acc }); } catch (e) { } };
 const accKey = (route, h2, i) => route + '|' + (route === 'painel' && i === 0 ? 'hoje' : norm(h2.textContent).trim().split('·')[0].trim().slice(0, 40)); // 1º tópico do Painel muda de rótulo (Hoje/Ontem/data)
 function makeAccordions(view) {
-  const route = S.route, kids = [...view.children];
+  const route = S.route, bl = view.querySelector(':scope > #bl');
+  if (bl) view = bl.querySelector(':scope > .stack') || bl; // o Cálculo de bolus fica dentro de um contêiner próprio
+  const kids = [...view.children];
   const isHead = e => e.matches && (e.matches('h2.sec') || (e.matches('div.row') && e.firstElementChild && e.firstElementChild.matches('h2.sec')));
   const heads = kids.filter(isHead); if (!heads.length) return;
   const many = heads.length >= 3, dflt = ACC_OPEN[route];
@@ -686,9 +688,9 @@ function viewConquistas() {
       return got ? `<button class="rw-bd on" data-act="rw-play" data-k="${k}" data-n="${N}" aria-label="${RW_LBL[N]}, conquistado em ${fmtDate(got)}. Toque para rever a comemoração"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>${fmtDate(got).slice(0, 5)}</small></button>`
         : `<div class="rw-bd" aria-label="${RW_LBL[N]}, ainda não conquistado"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>bloqueado</small></div>`;
     }).join('');
-    return `<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><b style="font-size:16px">${c.t}</b><div class="dim" style="font-size:12.5px">${c.d}</div></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:var(--good)">${e.streak}</div><div class="dim" style="font-size:11.5px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
+    return `<h2 class="sec">${c.t}</h2><div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:12.5px">${c.d}</div></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:var(--good)">${e.streak}</div><div class="dim" style="font-size:11.5px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
   }).join('');
-  return banners() + `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses. Contam só os seus registros reais (os dados de exemplo ficam de fora) e exigem medições em pelo menos 70% dos dias do período, para a sequência refletir o que foi de fato medido. ${nGot ? `Você já tem <b>${nGot}</b> de 12 conquistas.` : 'Você ainda não tem conquistas — a primeira sai com 7 dias seguidos.'}</p><div class="stack" style="gap:12px">${cards}</div><p class="hint" style="margin:12px 0 0">É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica.</p>`;
+  return banners() + `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses. Contam só os seus registros reais (os dados de exemplo ficam de fora) e exigem medições em pelo menos 70% dos dias do período, para a sequência refletir o que foi de fato medido. ${nGot ? `Você já tem <b>${nGot}</b> de 12 conquistas.` : 'Você ainda não tem conquistas — a primeira sai com 7 dias seguidos.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica.</p>${cards}`;
 }
 
 /* ---------- Unidades das chaves -> medição correspondente do histórico ---------- */
@@ -851,7 +853,7 @@ document.addEventListener('click', async e => {
 function viewPadroes() {
   const notes = patternNotes(S.records, MARKS, isoDate(new Date()));
   return banners() + `<p class="hint" style="margin:0 0 12px">Observações calculadas no seu aparelho a partir dos seus registros reais (os de exemplo ficam de fora). Aparecem só quando há medições suficientes. Mostram coincidências nos números, não causas, e não são orientação de tratamento.</p>
-  <div class="stack" style="gap:10px">${notes.length ? notes.map(x => `<div class="card"><b>${esc(x.t)}</b><p style="margin:6px 0 0">${esc(x.d)}</p><div class="dim" style="font-size:12px;margin-top:6px">Base: ${x.n} medições</div></div>`).join('') : '<div class="card"><p class="hint" style="margin:0">Ainda não há medições suficientes para mostrar padrões. Eles precisam de pelo menos 3 ocorrências de cada situação comparada.</p></div>'}</div>
+  ${notes.length ? notes.map(x => `<h2 class="sec">${esc(x.t)}</h2><div class="card"><p style="margin:0">${esc(x.d)}</p><div class="dim" style="font-size:12px;margin-top:6px">Base: ${x.n} medições</div></div>`).join('') : '<div class="card"><p class="hint" style="margin:0">Ainda não há medições suficientes para mostrar padrões. Eles precisam de pelo menos 3 ocorrências de cada situação comparada.</p></div>'}</div>
   ${HAS_CLAUDE ? '<button class="btn pri full" style="margin-top:14px" data-act="go" data-r="perguntas">Perguntar ao Claude sobre meus registros</button>' : ''}`;
 }
 
@@ -946,8 +948,8 @@ const histDays = () => [...new Set(histItems().map(i => i.date))];
 function histJumpBar() {
   const days = histDays(); if (days.length < 2) return '';
   const today = isoDate(new Date());
-  return `<div class="card hj" style="margin-top:10px;padding:12px"><div class="eyebrow">Ir para um dia ou horário</div>
-  <div class="row" style="gap:8px;margin-top:8px;align-items:flex-end"><div class="field" style="flex:1;min-width:0"><label class="fl" for="hj-d">Dia</label><input class="in" type="date" id="hj-d" value="${S.hjD || ''}" max="${today}"></div><div class="field" style="width:112px;flex:none"><label class="fl" for="hj-t">Hora</label><input class="in" type="time" id="hj-t" value="${S.hjT || ''}"></div><button class="btn pri" data-act="hj-go" style="flex:none">Ir</button></div>
+  return `<h2 class="sec">Ir para um dia ou horário</h2><div class="card hj" style="margin-top:10px;padding:12px">
+  <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1;min-width:0"><label class="fl" for="hj-d">Dia</label><input class="in" type="date" id="hj-d" value="${S.hjD || ''}" max="${today}"></div><div class="field" style="width:112px;flex:none"><label class="fl" for="hj-t">Hora</label><input class="in" type="time" id="hj-t" value="${S.hjT || ''}"></div><button class="btn pri" data-act="hj-go" style="flex:none">Ir</button></div>
 </div>`;
 }
 function histScrollTo(date, time, quiet) {
@@ -1044,11 +1046,13 @@ const DRV = 'Google Drive', DRV_FOLDER = 'TiaBete Backups', DRV_GAP = 20 * 3600 
 S.drv = { auto: false, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0 };
 async function drvMcp() { try { return window.claude && window.claude.use ? await window.claude.use('mcp') : null; } catch (e) { return null; } }
 async function drvCall(tool, input) {
+  if (window.TB_DRV) return window.TB_DRV.call(tool, input); // APK: API do Drive com a conta Google do usuário
   const m = await drvMcp(); if (!m) throw { code: 'no_mcp' };
   const r = await m.callTool(DRV, tool, input, { cache: false });
   return r && r.payload !== undefined ? r.payload : r;
 }
 function drvErrTxt(e) {
+  if (e && e.aiMsg) return e.aiMsg;
   const c = e && e.code;
   if (c === 'no_mcp' || c === 'not_granted' || c === 'capability_disabled') return 'O backup no Drive só funciona quando o app é aberto dentro do Claude.';
   if (c === 'server_not_connected' || c === 'selection_required') return 'Conecte o Google Drive em Configurações → Conectores no claude.ai.';
@@ -1106,16 +1110,20 @@ async function drvLoad(id) {
     d.busy = false; await readBackupFile(new Blob([s], { type: 'application/json' }));
   } catch (e) { d.msg = drvErrTxt(e); d.busy = false; render(); }
 }
-function driveCard() {
-  if (!HAS_CLAUDE) return '';
+function driveCardBody(intro) {
   const d = S.drv, when = d.lastTs ? new Date(d.lastTs).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : null;
   const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^tiabete-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
-  return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0 0 12px">Salva uma cópia do backup completo na pasta <b>${DRV_FOLDER}</b> do seu Drive, pelo conector do Claude. Só funciona com o app aberto dentro do Claude. Seus dados de saúde vão para o <b>seu</b> Drive, e só você os acessa.</p>
+  return `<p class="hint" style="margin:0 0 12px">${intro}</p>
     <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled' : ''}>${d.busy ? 'Aguarde…' : 'Fazer backup no Drive agora'}</button>
     <label class="chk"><input type="checkbox" id="drv-auto" ${d.auto ? 'checked' : ''}><span>Backup automático (no máximo 1 por dia, ao abrir o app)</span></label>
     <button class="btn full" data-act="drv-list" ${d.busy ? 'disabled' : ''}>Ver backups no Drive para restaurar</button></div>${list}
     <p class="hint" style="margin:12px 0 0">Último backup no Drive: <b>${when || 'nenhum ainda'}</b>.${d.msg && d.msg !== 'ok' ? `</p><p class="hint" style="margin:6px 0 0;color:var(--red-t)" role="alert">${esc(d.msg)}` : ''}</p>
-    <p class="hint" style="margin:6px 0 0">O app não apaga backups antigos do Drive. Apague-os por lá quando quiser.</p></div>`;
+    <p class="hint" style="margin:6px 0 0">O app não apaga backups antigos do Drive. Apague-os por lá quando quiser.</p>`;
+}
+function driveCard() {
+  if (!HAS_CLAUDE) return '';
+  if (window.TB_DRV) return window.TB_DRV.card(S.drv, driveCardBody);
+  return `<h2 class="sec">Google Drive</h2><div class="card">${driveCardBody(`Salva uma cópia do backup completo na pasta <b>${DRV_FOLDER}</b> do seu Drive, pelo conector do Claude. Só funciona com o app aberto dentro do Claude. Seus dados de saúde vão para o <b>seu</b> Drive, e só você os acessa.`)}</div>`;
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="drv-"]'); if (!el) return;

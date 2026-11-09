@@ -615,3 +615,12 @@ h2.sec.acc-h { margin-top: 18px; margin-bottom: 4px; }
 .al-sel { width: auto; min-width: 0; flex: none; }
 .al-time { display: flex; align-items: center; gap: 6px; color: var(--mut); font-size: 13px; }
 .al-tm { width: auto; min-width: 0; padding: 8px 10px; }
+
+/* Tópicos das páginas em evidência (não afeta os itens principais do menu Mais) */
+h2.sec { font-family: var(--f-display); font-size: 14px; font-weight: 600; letter-spacing: .03em; text-transform: none; color: var(--fg); margin: 24px 0 10px; line-height: 1.25; }
+h2.sec.acc-h { padding: 12px 14px; margin-top: 16px; margin-bottom: 6px; background: var(--s1); border: 1px solid var(--line); border-radius: 14px; position: relative; padding-left: 22px; gap: 10px; }
+h2.sec.acc-h::before { content: ""; position: absolute; left: 9px; top: 50%; width: 4px; height: 18px; margin-top: -9px; border-radius: 3px; background: var(--red); }
+h2.sec.acc-h::after { width: 10px; height: 10px; border-width: 2.5px; color: var(--red-l); }
+h2.sec.acc-h:hover { background: var(--s2); }
+.acc-top.closed + .acc-b + h2.sec, .acc-top.closed + .acc-b + .acc-top { margin-top: 10px; }
+.acc-b { margin-bottom: 6px; }
