@@ -641,6 +641,7 @@ async function commitImport() {
 
 /* ---------- Aviso: últimas medições sem antes/depois ---------- */
 function labelBanner() {
+  if (!alCfg().bLabel) return '';
   const recs = S.records.filter(r => !isEx(r)), scope = recs.slice(-Math.max(1, S.ruleN || 180));
   const pend = scope.filter(r => !r.context && targetFor(r, 'horario')).length;
   if (!pend) return '';

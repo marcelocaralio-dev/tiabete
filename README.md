@@ -64,3 +64,8 @@ MIT. Veja [LICENSE](LICENSE).
 - `native/ai-core.js`, `native/ai-ui.js`: IA com chave própria (Claude, OpenAI, Gemini, OpenRouter, outro compatível com OpenAI).
 - `native/drive.js`: backup no Google Drive. Guia de configuração: `docs/GOOGLE-DRIVE.md`.
 - Testes simulados: `python3 tests/ai-sim.py` (servindo `www/` na porta 8766).
+
+## Notificações (v0.5)
+- Lista única em Mais → Alertas e notificações, com chave liga/desliga para cada aviso.
+- Lembretes de 2 h após refeição ou glicemia, que somem após 10 min sem medição (plugin nativo `TbExpire`, criado por `scripts/patch-android.js`).
+- Diagnóstico e teste de notificação na mesma tela. Teste simulado: `python3 tests/notif-sim.py`.

@@ -3,7 +3,7 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 
 /* ---------- 1. Lembrete de backup ---------- */
 const BK_DAYS = 7;
-const AL_DEF = { backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
+const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postGlu: true, postMeal: true, backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
 S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
@@ -219,6 +219,7 @@ function basalInfo() {
   return { el, rem, st: rem <= 0 ? 'over' : rem <= 3600e3 ? 'soon' : 'ok' };
 }
 function basalBanner() {
+  if (!alCfg().bBasal) return '';
   const b = basalInfo(); if (!b || b.st === 'ok' || skipped('basal')) return '';
   return `<div class="banner warn"><span><b>Basal.</b> ${b.st === 'over' ? 'Já passaram 24 h desde a última dose de basal.' : `Faltam ${Math.max(1, Math.ceil(b.rem / 60000))} min para completar 24 h da última basal.`}</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
 }
@@ -230,6 +231,7 @@ function preDinner() {
 const dinnerOpen = () => { const pd = preDinner(); return !!(pd && pd.glucose >= S.ins.dinnerMin); };
 const isLocked = k => k === 'dinner' && !S.ins.dinner && !dinnerOpen();
 function dinnerBanner() {
+  if (!alCfg().bPre) return '';
   insRoll(); if (S.ins.dinner || skipped('dinner') || !dinnerOpen()) return '';
   const pd = preDinner();
   return `<div class="banner warn"><span><b>Pré-jantar.</b> Sua medição das ${pd.time} foi <b class="num">${f0(pd.glucose)}</b> mg/dL, no limite de ${S.ins.dinnerMin} ou acima. A chave da insulina rápida do jantar está liberada.</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
@@ -244,6 +246,7 @@ function remPending() {
   return has ? null : { ...w, key: day + w.k };
 }
 function remBanner() {
+  if (!alCfg().bMiss) return '';
   if (S.route !== 'painel') return ''; const r = remPending(); S._rk = r ? r.key : '';
   return r ? `<div class="banner"><span><b>Medição.</b> Ainda sem glicemia ${r.t} hoje (janela ${hhmm(r.a)}–${hhmm(r.b)}).</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="new" data-ctx="${r.ctx}" data-meal="${r.meal}">Registrar</button><button class="btn sm" data-act="rem-off" data-k="${r.key}">Dispensar</button></span></div>` : '';
 }
@@ -517,6 +520,7 @@ function hypoNextTxt(st) {
   return rem > 0 ? 'Próxima medição em <b class="num">' + (m => pad(Math.floor(m / 60)) + ':' + pad(m % 60))(Math.ceil(rem / 1000)) + '</b>' : '<b>⏱ Já passaram 15 min: meça de novo agora.</b>';
 }
 function hypoBanner() {
+  if (!alCfg().bHypo) return '';
   const st = hypoState(); if (!st || S.hypoOff[st.id]) return '';
   const g = st.last.glucose;
   return `<div class="banner hypo" role="alert"><div><b>⚠ Hipoglicemia:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
@@ -580,6 +584,7 @@ function hyperState() {
   return last && last.glucose > LIM.vhigh && Date.now() - last.ts <= 4 * 3600e3 ? last : null;
 }
 function hyperBanner() {
+  if (!alCfg().bHyper) return '';
   const r = hyperState(); if (!r || S.hyperOff[r.id]) return '';
   return `<div class="banner hyper" role="alert"><div><b>▲ Glicemia muito elevada:</b> <b class="num">${f0(r.glucose)}</b> mg/dL às ${r.time}.<div style="margin-top:4px">Acima de ${LIM.vhigh} mg/dL. Siga o plano combinado com seu médico. Com mal-estar, vômitos, sede intensa ou respiração acelerada, procure atendimento.</div></div><button class="btn sm" data-act="hyper-off">Dispensar</button></div>`;
 }
@@ -803,13 +808,21 @@ function icsDefault(k) {
 function alertsPanel() {
   const c = alCfg(), sw = (k, on) => `<input type="checkbox" class="al-on" data-k="${k}" ${on ? 'checked' : ''}>`, opt = (arr, v, f) => arr.map(x => `<option value="${x}" ${+x === +v ? 'selected' : ''}>${f(x)}</option>`).join('');
   const row = (k, on, t, d, extra) => `<div class="al-row"><label class="al-l">${sw(k, on)}<span><b>${t}</b><small>${d}</small></span></label>${extra || ''}</div>`;
-  return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card">
+  return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card"><p class="hint" style="margin:0 0 8px">Faixas e telas que aparecem com o app aberto. Ligue ou desligue cada uma.</p>
   ${row('backup', c.backup, 'Lembrar de fazer backup', 'Faixa no topo quando o último backup está velho.', `<select class="in al-sel" data-k="backupDays" aria-label="Intervalo do backup">${opt([3, 7, 14, 30], c.backupDays, x => 'a cada ' + x + ' dias')}</select>`)}
-  ${row('rewards', c.rewards, 'Avisar conquistas', 'Mostrar a tela de comemoração ao atingir um marco.')}</div>
+  ${row('rewards', c.rewards, 'Avisar conquistas', 'Mostrar a tela de comemoração ao atingir um marco.')}
+  ${row('bBasal', c.bBasal, 'Insulina basal', 'Faixa quando se aproxima ou passa de 24 h da última dose de basal.')}
+  ${row('bPre', c.bPre, 'Pré-jantar', 'Faixa com a medição pré-jantar quando ela está no limite.')}
+  ${row('bMiss', c.bMiss, 'Medição esquecida', 'Faixa quando ainda não há glicemia na janela do horário habitual.')}
+  ${row('bLabel', c.bLabel, 'Medições sem etiqueta', 'Aviso de medições sem jejum, antes ou depois da refeição.')}
+  ${row('bHypo', c.bHypo, 'Faixa de hipoglicemia', 'Alerta vermelho quando a última medição está abaixo de 70 mg/dL. É um aviso de segurança: desligue só se tiver certeza.')}
+  ${row('bHyper', c.bHyper, 'Faixa de glicemia muito alta', 'Alerta quando a última medição está muito elevada.')}</div>
   <h2 class="sec">Notificações com o app fechado</h2><div class="card al-card">
-  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' minutos')}</select>`)}
+  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
+  ${row('postMeal', c.postMeal, 'Medir 2 h após uma refeição', 'Notifica exatamente 2 horas depois de registrar uma refeição. Se você não registrar uma glicemia pós-prandial em até 10 minutos, a notificação some e o aviso é ignorado.')}
+  ${row('postGlu', c.postGlu, 'Medir 2 h após uma glicemia', 'Notifica 2 horas depois de registrar uma glicemia (exceto as de depois da refeição, ao deitar e madrugada). Some sozinha após 10 minutos sem medição.')}
   ${row('quiet', c.quiet, 'Silenciar à noite', 'Não notificar neste intervalo (o aviso de hipoglicemia continua).', `<span class="al-time"><input class="in al-tm" data-k="qFrom" type="time" value="${c.qFrom}" aria-label="Início do silêncio"><span>às</span><input class="in al-tm" data-k="qTo" type="time" value="${c.qTo}" aria-label="Fim do silêncio"></span>`)}
-  <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica sozinho: use o arquivo de calendário abaixo.'}</p></div>
+  <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete. Os lembretes diários de horário estão logo abaixo, cada um com sua chave.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica com o app fechado.'}</p></div>
   <h2 class="sec">Lembretes de horário</h2>`;
 }
 document.addEventListener('change', async e => {
