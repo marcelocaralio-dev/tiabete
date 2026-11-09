@@ -17,7 +17,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
         pg = await (await b.new_context(viewport={'width':400,'height':860})).new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e))); await pg.add_init_script(MOCK)
-        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_timeout(1000)
+        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_selector('#tb-splash', state='detached', timeout=8000); await pg.wait_for_timeout(1000)
         if await pg.query_selector('#gate-skip'): await pg.click('#gate-skip'); await pg.wait_for_timeout(300)
         for i in range(6):
             if await pg.query_selector('#rw-ok'): await pg.click('#rw-ok'); await pg.wait_for_timeout(200)
