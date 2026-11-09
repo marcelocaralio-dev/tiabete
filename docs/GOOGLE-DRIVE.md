@@ -17,7 +17,7 @@ Dados do app para preencher abaixo:
 ## 3. Tela de consentimento
 1. **APIs e serviços** → **Tela de permissão OAuth** (ou "Google Auth Platform").
 2. Tipo de usuário: **Externo**. Nome do app: `TiaBete`. E-mail de suporte: o seu. Salve.
-3. Em **Escopos / Acesso a dados**, adicione `.../auth/drive.file` ("Ver, editar, criar e excluir somente os arquivos do Google Drive que você usa com este app").
+3. Em **Escopos / Acesso a dados**, adicione `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile` (para o login mostrar seu nome e e-mail) e `.../auth/drive.file` ("Ver, editar, criar e excluir somente os arquivos do Google Drive que você usa com este app").
 4. Em **Público**, clique em **Publicar app** (mudar de "Teste" para "Produção"). Sem isso, o login expira a cada 7 dias. Como o escopo `drive.file` não é restrito, não exige verificação demorada; pode aparecer um aviso de "app não verificado" no login, e é normal para um app pessoal (Avançado → Continuar).
 
 ## 4. Criar o ID do cliente Android

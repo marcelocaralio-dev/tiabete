@@ -14,6 +14,7 @@
   try { const ac = (await Store.all('meta')).find(x => x.id === 'acc'); if (ac && ac.value && typeof ac.value === 'object') { S.acc = ac.value; try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } } } catch (e) { }
   try { const rw = (await Store.all('meta')).find(x => x.id === 'rewards'); if (rw && rw.value) S.rw = { got: {}, act: {}, init: false, ...rw.value }; } catch (e) { }
   try { const am = (await Store.all('meta')).find(x => x.id === 'alerts'); if (am && am.value) S.alerts = { ...AL_DEF, ...am.value }; } catch (e) { }
+  try { const pm = (await Store.all('meta')).find(x => x.id === 'profile'); if (pm && pm.value) S.profile = pfClean(pm.value); } catch (e) { }
   try { const bm = (await Store.all('meta')).find(x => x.id === 'bolus'); if (bm) blLoad(bm.value); } catch (e) { }
   try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }

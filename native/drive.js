@@ -3,9 +3,9 @@
    O token de renovação fica cifrado no aparelho. Os dados vão do aparelho direto ao Drive do usuário. */
 if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   const SEC = window.TB_SECURE, http = window.TB_HTTP;
-  const REDIRECT = 'app.tiabete.glicose:/oauth2redirect', SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const REDIRECT = 'app.tiabete.glicose:/oauth2redirect', SCOPE = 'openid email profile https://www.googleapis.com/auth/drive.file';
   const API = 'https://www.googleapis.com/drive/v3', UP = 'https://www.googleapis.com/upload/drive/v3', TOK = 'https://oauth2.googleapis.com/token';
-  const G = { conn: false, loaded: false, access: null, exp: 0, pending: null, cid: (window.TB_GOOGLE_CLIENT_ID || '').trim(), baked: !!(window.TB_GOOGLE_CLIENT_ID || '').trim(), busy: false, msg: '' };
+  const G = { conn: false, profile: null, loaded: false, access: null, exp: 0, pending: null, cid: (window.TB_GOOGLE_CLIENT_ID || '').trim(), baked: !!(window.TB_GOOGLE_CLIENT_ID || '').trim(), busy: false, msg: '' };
   const P = n => (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins[n]) || null;
   const E = (code, aiMsg) => ({ code, aiMsg });
   const reauth = () => E('needs_reauth', 'A conexão com o Google expirou. Toque em “Conectar conta Google” de novo.');
@@ -15,9 +15,10 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
 
   async function load() {
     G.loaded = true;
-    try { if (!G.baked) G.cid = ((await SEC.getCfg('g-client')) || '').trim(); G.conn = await SEC.has('g-refresh'); } catch (e) { }
+    try { if (!G.baked) G.cid = ((await SEC.getCfg('g-client')) || '').trim(); G.conn = await SEC.has('g-refresh'); G.profile = await SEC.getCfg('g-profile'); } catch (e) { }
     if (S.route === 'backup') render();
   }
+  const notify = () => { try { window.dispatchEvent(new Event('tb-auth')); } catch (e) { } };
   async function tokenCall(params) {
     const r = await http(TOK, Object.assign({ method: 'POST' }, form(Object.assign({ client_id: G.cid }, params))));
     return r;
@@ -69,10 +70,11 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       }
       throw E('tool_error', 'Operação não suportada.');
     },
+    signIn: () => connect(), state: G,
     card(drv, body) {
       if (!G.loaded) load();
       const intro = `Salva uma cópia do backup completo na pasta <b>TiaBete Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
-      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${body(intro)}<div class="stack" style="margin-top:12px"><button class="btn full" data-act="g-out" ${G.busy ? 'disabled' : ''}>Desconectar conta Google</button></div></div>`;
+      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px"><button class="btn full" data-act="g-out" ${G.busy ? 'disabled' : ''}>Sair da conta Google</button></div></div>`;
       const idField = G.baked ? '' : `<div class="field" style="margin-top:12px"><label class="fl" for="g-cid">ID do cliente Google (OAuth)</label><input class="in" id="g-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid)}"></div>`;
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}
         <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="g-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Conectar conta Google'}</button></div>
@@ -82,14 +84,14 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   };
 
   async function connect() {
-    const cidEl = document.getElementById('g-cid'); if (cidEl) { G.cid = cidEl.value.trim(); if (G.cid) await SEC.setCfg('g-client', G.cid); }
-    if (!G.cid) { G.msg = 'Informe o ID do cliente Google.'; return render(); }
+    const cidEl = document.getElementById('g-cid') || document.getElementById('gate-cid'); if (cidEl) { G.cid = cidEl.value.trim(); if (G.cid) await SEC.setCfg('g-client', G.cid); }
+    if (!G.cid) { G.msg = 'Informe o ID do cliente Google.'; render(); notify(); return; }
     const B = P('Browser'); if (!B) { G.msg = 'O navegador do sistema não está disponível neste aparelho.'; return render(); }
     const verifier = rnd(48), state = rnd(16);
     const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-    G.pending = { verifier, state }; G.msg = ''; G.busy = true; render();
+    G.pending = { verifier, state }; G.msg = ''; G.busy = true; render(); notify();
     const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: G.cid, redirect_uri: REDIRECT, response_type: 'code', scope: SCOPE, code_challenge: ch, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent' });
-    try { await B.open({ url }); } catch (e) { G.busy = false; G.msg = 'Não foi possível abrir o navegador.'; render(); }
+    try { await B.open({ url }); } catch (e) { G.busy = false; G.msg = 'Não foi possível abrir o navegador.'; render(); notify(); }
   }
   async function onUrl(url) {
     if (!url || !url.startsWith('app.tiabete.glicose:')) return;
@@ -101,16 +103,17 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       const r = await tokenCall({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: pend.verifier, redirect_uri: REDIRECT });
       if (r.status >= 300 || !r.data || !r.data.refresh_token) throw E('x', 'Não foi possível concluir o login' + (r.data && r.data.error_description ? ': ' + r.data.error_description : '.'));
       await SEC.set('g-refresh', r.data.refresh_token); G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; G.conn = true; G.msg = '';
+      try { const pl = JSON.parse(decodeURIComponent(escape(atob(String(r.data.id_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); G.profile = { email: pl.email || '', name: pl.name || '' }; await SEC.setCfg('g-profile', G.profile); } catch (e) { }
       toast('Conta Google conectada.');
     } catch (e) { G.msg = e.aiMsg || 'Falha ao conectar.'; }
-    G.busy = false; render();
+    G.busy = false; render(); notify();
   }
   async function disconnect() {
     G.busy = true; render();
     try { const rt = await SEC.get('g-refresh'); if (rt) await http('https://oauth2.googleapis.com/revoke', Object.assign({ method: 'POST' }, form({ token: rt }))); } catch (e) { }
-    await SEC.del('g-refresh'); G.conn = false; G.access = null; G.busy = false; G.msg = '';
+    await SEC.del('g-refresh'); await SEC.setCfg('g-profile', null); await SEC.setCfg('login-skip', false); G.profile = null; G.conn = false; G.access = null; G.busy = false; G.msg = '';
     S.drv.auto = false; S.drv.folderId = null; S.drv.list = null; try { await drvSavePref(); } catch (e) { }
-    toast('Conta Google desconectada.'); render();
+    toast('Você saiu da conta Google.'); render(); notify();
   }
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act="g-in"],[data-act="g-out"]'); if (!el) return;
@@ -118,6 +121,6 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   });
   const A = P('App'); if (A && A.addListener) A.addListener('appUrlOpen', d => onUrl(d && d.url));
   /* se o usuário fechar o navegador sem concluir, o botão volta ao normal ao retornar ao app */
-  if (A && A.addListener) A.addListener('resume', () => setTimeout(() => { if (G.busy && G.pending) { G.busy = false; G.pending = null; if (S.route === 'backup') render(); } }, 4000));
+  if (A && A.addListener) A.addListener('resume', () => setTimeout(() => { if (G.busy && G.pending) { G.busy = false; G.pending = null; if (S.route === 'backup') render(); notify(); } }, 4000));
   window.TB_DRV_STATE = G;
 }

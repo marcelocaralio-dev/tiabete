@@ -5,6 +5,7 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 const BK_DAYS = 7;
 const AL_DEF = { backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
+S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
 async function alSave() { try { await Store.put('meta', { id: 'alerts', value: S.alerts }); } catch (e) { } }
 const hasRealData = () => S.records.some(r => !isEx(r)) || S.exams.length > 0 || S.hba.some(x => !isEx(x) && x.source !== 'exame');
@@ -719,6 +720,7 @@ async function insLink() {
 /* ---------- estado do app dentro do backup (insulinas, conquistas, refeições salvas) ---------- */
 async function applyBackupState(st, replace) {
   if (!st) return;
+  try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
   try {
@@ -1136,4 +1138,39 @@ document.addEventListener('change', async e => {
   S.drv.auto = e.target.checked; S.drv.failAt = 0; await drvSavePref();
   if (S.drv.auto) { const ok = await drvBackup(true); if (!ok) { S.drv.auto = false; await drvSavePref(); render(); } }
   else toast('Backup automático desligado.');
+});
+
+
+/* ================= Perfil (cadastro opcional, só neste aparelho) ================= */
+const PF_TYPES = ['MODY', 'Tipo 1', 'Tipo 2', 'Gestacional', 'Outro', 'Prefiro não informar'];
+const pfClean = p => ({ name: String(p.name || '').slice(0, 80), birth: /^\d{4}-\d\d-\d\d$/.test(p.birth || '') ? p.birth : '', type: PF_TYPES.includes(p.type) ? p.type : '', team: String(p.team || '').slice(0, 80) });
+async function pfSave() { try { await Store.put('meta', { id: 'profile', value: S.profile }); } catch (e) { } }
+function pfLine() {
+  const p = S.profile; if (!p) return '';
+  const parts = [p.name && 'Paciente: ' + p.name, p.birth && 'Nascimento: ' + fmtDate(p.birth), p.type && p.type !== 'Prefiro não informar' && 'Diabetes: ' + p.type, p.team && 'Equipe: ' + p.team].filter(Boolean);
+  return parts.join('  ·  ');
+}
+function viewPerfil() {
+  const p = S.profile || {}, first = S.profPrompt, gp = window.TB_DRV_STATE && TB_DRV_STATE.profile;
+  const name = p.name != null && S.profile ? p.name : (gp && gp.name) || '';
+  return banners() + `<div class="card"><p class="hint" style="margin:0">${first ? '<b>Cadastro opcional.</b> ' : ''}Estas informações ficam <b>só neste aparelho</b> (e no seu backup). Servem para personalizar o app e para o cabeçalho dos relatórios que você leva ao médico. Não mudam nenhum cálculo nem faixa de glicemia.</p></div>
+  <h2 class="sec">Seus dados</h2><div class="card"><form id="pf-form" class="stack" style="gap:12px">
+    <div class="field"><label class="fl" for="pf-name">Nome</label><input class="in" id="pf-name" autocomplete="off" maxlength="80" value="${esc(name)}"></div>
+    <div class="field"><label class="fl" for="pf-birth">Data de nascimento (opcional)</label><input class="in" id="pf-birth" type="date" max="${isoDate(new Date())}" value="${esc(p.birth || '')}"></div>
+    <div class="field"><label class="fl" for="pf-type">Tipo de diabetes</label><select class="in" id="pf-type"><option value="">Não informado</option>${PF_TYPES.map(t => `<option ${p.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label class="fl" for="pf-team">Médico ou equipe de saúde (opcional)</label><input class="in" id="pf-team" autocomplete="off" maxlength="80" value="${esc(p.team || '')}"></div>
+    <button class="btn pri full" type="submit">Salvar</button>
+    ${first ? '<button class="btn full" type="button" data-act="pf-skip">Agora não</button>' : ''}
+    ${S.profile ? '<button class="btn full" type="button" data-act="pf-clear">Apagar meu perfil deste aparelho</button>' : ''}
+  </form></div>`;
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'pf-form') return; e.preventDefault();
+  const v = id => document.getElementById(id).value.trim();
+  S.profile = pfClean({ name: v('pf-name'), birth: v('pf-birth'), type: v('pf-type'), team: v('pf-team') }); S.profPrompt = false; await pfSave(); toast('Perfil salvo.'); go('mais');
+});
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="pf-skip"],[data-act="pf-clear"]'); if (!el) return;
+  if (el.dataset.act === 'pf-skip') { S.profPrompt = false; try { await Store.put('meta', { id: 'profile-skip', value: true }); } catch (x) { } go('painel'); }
+  else { S.profile = null; try { await Store.put('meta', { id: 'profile', value: null }); } catch (x) { } toast('Perfil apagado.'); render(); }
 });

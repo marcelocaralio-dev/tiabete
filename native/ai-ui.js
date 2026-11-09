@@ -79,7 +79,13 @@ if (window.TB_PUBLIC && window.TB_AI) {
         if (!k || !a.model) return done(false, 'Informe o modelo e a chave antes de testar.');
         a.busy = true; a.msg = ''; render();
         try { await TB_AI.test(a.provider, a.base, k, a.model); done(true, 'Conexão funcionando. Lembre-se de salvar.'); }
-        catch (x) { done(false, x.aiMsg || 'Falha no teste.'); }
+        catch (x) {
+          if (x && x.code === 'ai_model') {
+            try { a.models = await TB_AI.listModels(a.provider, a.base, k); } catch (y) { }
+            return done(false, 'Este modelo não existe mais ou não está liberado para a sua chave (modelos antigos são desativados pelo provedor).' + (a.models.length ? ' Carreguei ' + a.models.length + ' modelos disponíveis: toque no campo Modelo, apague o texto e escolha um da lista.' : ' Toque em “Carregar lista de modelos” e escolha um.'));
+          }
+          done(false, x.aiMsg || 'Falha no teste.');
+        }
       } else if (act === 'ai-del') {
         await TB_SECURE.del('ai-key'); a.hasKey = false; done(true, 'Chave removida deste aparelho.');
       }
