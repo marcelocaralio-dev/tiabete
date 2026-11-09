@@ -100,7 +100,7 @@ if (NATIVE) {
       await ln.schedule({ notifications: [{ id: HYPO_ID, title: 'TiaBete · medir de novo', body: 'Passaram ' + c.hypoMin + ' minutos da glicemia baixa. Meça novamente e siga o protocolo do seu médico. Emergência: 192 (SAMU).', channelId: 'hipo', schedule: { at: new Date(at), allowWhileIdle: true } }] });
     } catch (e) { console.error(e); }
   }
-  /* ---- Lembretes condicionais: medir 2 h depois de uma refeição/glicemia; some sozinho se passar 10 min sem medir ---- */
+  /* ---- Lembretes condicionais: medir 2 h depois da insulina rápida pré-prandial; some sozinho se passar 10 min sem medir ---- */
   const POST_MIN = 120, POST_WIN = 10, TBX = () => capP('TbExpire');
   const postId = ts => 310000 + (Math.floor(ts / 60000) % 100000);
   const rmDelivered = async ids => { try { if (ids.length) await LN().removeDeliveredNotifications({ notifications: ids.map(id => ({ id })) }); } catch (e) { } };
@@ -111,14 +111,12 @@ if (NATIVE) {
     try {
       const c = alCfg(), now = Date.now(), recs = S.records.filter(r => !isEx(r) && !r.noTime && r.ts && r.glucose != null);
       const mm = (await Store.all('meta')).find(x => x.id === 'post-sched'), map = (mm && mm.value) || {};
-      const want = {};
-      for (const r of recs) {
-        if (r.ts < now - (POST_MIN + POST_WIN + 5) * 60000 || r.ts > now + 60000) continue;
-        const meal = !!(r.meal || r.carbs > 0 || r.insMeal > 0);
-        if (r.context === 'depois') continue;
-        if (meal ? !c.postMeal : (!c.postGlu || r.context === 'deitar' || r.context === 'madrugada')) continue;
-        const at = r.ts + POST_MIN * 60000, done = recs.some(q => q.id !== r.id && q.ts >= at - 20 * 60000 && q.ts <= at + POST_WIN * 60000);
-        want[postId(r.ts)] = { at, meal, done };
+      const want = {}, KEY = { fast: 'postFast', lunch: 'postLunch', dinner: 'postDinner' };
+      for (const x of S.inslog) {
+        if (!KEY[x.kind] || !c[KEY[x.kind]] || !x.ts) continue;
+        if (x.ts < now - (POST_MIN + POST_WIN + 5) * 60000 || x.ts > now + 60000) continue;
+        const at = x.ts + POST_MIN * 60000, done = recs.some(q => q.ts >= at - 20 * 60000 && q.ts <= at + POST_WIN * 60000);
+        want[postId(x.ts)] = { at, kind: x.kind, done };
       }
       const drop = [];
       for (const [id, v] of Object.entries(map)) {
@@ -130,11 +128,11 @@ if (NATIVE) {
       for (const [id, w] of Object.entries(want)) {
         if (w.done || map[id] || w.at <= now + 3000) continue;
         const d = new Date(w.at); if (inQuiet(d.getHours(), d.getMinutes())) continue;
-        add.push({ id: +id, at: w.at, meal: w.meal });
+        add.push({ id: +id, at: w.at, kind: w.kind });
       }
       if (add.length && (await ensurePerm())) {
-        try { await ln.createChannel({ id: 'pos', name: 'Medir 2 horas depois', description: 'Lembrete para medir a glicemia 2 horas após uma refeição ou glicemia', importance: 4, vibration: true }); } catch (e) { }
-        await ln.schedule({ notifications: add.map(a => ({ id: a.id, title: 'TiaBete · hora de medir', body: a.meal ? 'Faz 2 horas desde a refeição. Meça a glicemia pós-prandial e registre no app.' : 'Faz 2 horas desde a última glicemia. Meça de novo e registre no app.', channelId: 'pos', schedule: { at: new Date(a.at), allowWhileIdle: true } })) });
+        try { await ln.createChannel({ id: 'pos', name: 'Medir 2 horas depois', description: 'Lembrete para medir a glicemia 2 horas após a insulina rápida pré-prandial', importance: 4, vibration: true }); } catch (e) { }
+        await ln.schedule({ notifications: add.map(a => ({ id: a.id, title: 'TiaBete · hora de medir', body: 'Faz 2 horas desde a insulina ' + ({ fast: 'do jejum', lunch: 'do almoço', dinner: 'do jantar' }[a.kind]) + '. Meça a glicemia pós-prandial e registre no app.', channelId: 'pos', schedule: { at: new Date(a.at), allowWhileIdle: true } })) });
         for (const a of add) { map[a.id] = { at: a.at }; try { const x = TBX(); if (x) await x.schedule({ id: String(a.id), at: String(a.at + POST_WIN * 60000) }); } catch (e) { } }
       }
       await Store.put('meta', { id: 'post-sched', value: map });

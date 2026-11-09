@@ -26,24 +26,24 @@ async def main():
         add = lambda id, mins, **kw: pg.evaluate("""async([id,mins,kw])=>{const ts=Date.now()-mins*60000,d=new Date(ts),p=n=>String(n).padStart(2,'0'),date=isoDate(d);await Store.put('records',Object.assign({id,date,time:p(d.getHours())+':'+p(d.getMinutes()),ts,glucose:110,source:'manual'},kw));await loadAll();}""",[id,mins,kw])
         # 1) painel de alertas
         await pg.evaluate("go('lembretes')"); await pg.wait_for_timeout(400); await pg.click('text=Expandir tudo'); await pg.wait_for_timeout(300); t = await T()
-        print('chaves:', await pg.evaluate("document.querySelectorAll('.al-on').length"), all(x in t for x in ['Insulina basal','Faixa de hipoglicemia','Medir 2 h após uma refeição','Medir 2 h após uma glicemia','Diagnóstico das notificações']))
+        print('chaves:', await pg.evaluate("document.querySelectorAll('.al-on').length"), all(x in t for x in ['Insulina basal','Faixa de hipoglicemia','Medir 2 h após a insulina do almoço','Medir 2 h após a insulina do jantar','Diagnóstico das notificações']))
         print('diagnóstico:', await pg.evaluate("document.getElementById('nt-status').innerText.replace(/\\n/g,' | ')"))
         await pg.click('[data-act=nt-test]'); await pg.wait_for_timeout(500); print('teste agendado:', [x for x in await L('sched') if x[1]==999])
-        # 2) refeição 30 min atrás -> agenda +2h
-        await add('m1', 30, meal='almoco', carbs=60, context='antes'); await pg.wait_for_timeout(600)
-        s = [x for x in await L('sched') if x[2]=='pos']; print('agendou 2h após refeição:', len(s), 'em ~', round((s[0][3]-await pg.evaluate("Date.now()"))/60000) if s else None, 'min')
+        ins = lambda id, kind, mins: pg.evaluate("""async([id,kind,mins])=>{const ts=Date.now()-mins*60000;await Store.put('inslog',{id,kind,ts,date:isoDate(new Date(ts)),at:Date.now()});S.inslog.push({id,kind,ts,date:isoDate(new Date(ts)),at:Date.now()});await loadAll();}""",[id,kind,mins])
+        # 2) insulina do almoço 30 min atrás -> agenda +2h
+        await ins('i1','lunch',30); await pg.wait_for_timeout(700)
+        s = [x for x in await L('sched') if x[2]=='pos']; print('agendou 2h após insulina:', len(s), 'em ~', round((s[0][3]-await pg.evaluate("Date.now()"))/60000) if s else None, 'min')
         ex = await L('expire'); print('expiração +10min:', len(ex), round((ex[0][2]-s[0][3])/60000) if ex and s else None)
-        # 3) glicemia pós-prandial perto das 2h cancela
-        await add('m2', 0, context='depois'); await pg.wait_for_timeout(300)
-        await pg.evaluate("(async()=>{const r=S.records.find(x=>x.id==='m1');await Store.put('records',Object.assign({},r,{ts:Date.now()-118*60000,date:isoDate(new Date(Date.now()-118*60000))}));await loadAll();})()"); await pg.wait_for_timeout(600)
+        # 3) glicemia perto das 2h cancela
+        await pg.evaluate("(async()=>{const r=S.inslog.find(x=>x.id==='i1');r.ts=Date.now()-118*60000;await Store.put('inslog',r);})()"); await add('m2', 0, context='depois'); await pg.wait_for_timeout(700)
         print('cancelou ao medir:', len(await L('expcancel'))>0, 'pendentes pos:', await pg.evaluate("Object.values(__pend).filter(n=>n.channelId==='pos').length"))
-        # 4) interruptores
-        await pg.evaluate("S.alerts.postGlu=false;S.alerts.postMeal=false;"); await pg.evaluate("__log.length=0"); await add('g1', 5, context='antes'); await pg.wait_for_timeout(500)
+        # 4) chave desligada não agenda; basal não conta
+        await pg.evaluate("S.alerts.postDinner=false;__log.length=0"); await ins('i2','dinner',5); await pg.wait_for_timeout(500)
         print('desligado não agenda:', len([x for x in await L('sched') if x[2]=='pos'])==0)
-        await pg.evaluate("S.alerts.postGlu=true"); await add('g2', 6, context='jejum'); await pg.wait_for_timeout(500)
-        print('glicemia isolada agenda:', len([x for x in await L('sched') if x[2]=='pos'])>=1)
-        # 5) pós-prandial não gera novo lembrete; banner desligável
-        await pg.evaluate("__log.length=0"); await add('g3', 2, context='depois'); await pg.wait_for_timeout(400); print('depois da refeição não gera:', len([x for x in await L('sched') if x[2]=='pos'])==0)
+        await pg.evaluate("S.alerts.postDinner=true"); await ins('i3','dinner',6); await pg.wait_for_timeout(500)
+        print('religado agenda:', len([x for x in await L('sched') if x[2]=='pos'])>=1)
+        await pg.evaluate("__log.length=0"); await ins('i4','basal',3); await pg.wait_for_timeout(400); print('basal não gera:', len([x for x in await L('sched') if x[2]=='pos'])==0)
+        print('chaves em forma de interruptor:', await pg.evaluate("getComputedStyle(document.querySelector('.al-on')).appearance"))
         print('permissão pedida na abertura:', await pg.evaluate("__perm"))
         print('erros', errs); await b.close()
 asyncio.run(main())

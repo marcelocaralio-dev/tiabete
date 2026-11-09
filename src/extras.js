@@ -3,7 +3,7 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 
 /* ---------- 1. Lembrete de backup ---------- */
 const BK_DAYS = 7;
-const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postGlu: true, postMeal: true, backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
+const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
 S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
@@ -806,7 +806,7 @@ function icsDefault(k) {
   return ICS_ITEMS.find(x => x.k === k).d;
 }
 function alertsPanel() {
-  const c = alCfg(), sw = (k, on) => `<input type="checkbox" class="al-on" data-k="${k}" ${on ? 'checked' : ''}>`, opt = (arr, v, f) => arr.map(x => `<option value="${x}" ${+x === +v ? 'selected' : ''}>${f(x)}</option>`).join('');
+  const c = alCfg(), sw = (k, on) => `<input type="checkbox" class="al-on swt" role="switch" data-k="${k}" ${on ? 'checked' : ''}>`, opt = (arr, v, f) => arr.map(x => `<option value="${x}" ${+x === +v ? 'selected' : ''}>${f(x)}</option>`).join('');
   const row = (k, on, t, d, extra) => `<div class="al-row"><label class="al-l">${sw(k, on)}<span><b>${t}</b><small>${d}</small></span></label>${extra || ''}</div>`;
   return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card"><p class="hint" style="margin:0 0 8px">Faixas e telas que aparecem com o app aberto. Ligue ou desligue cada uma.</p>
   ${row('backup', c.backup, 'Lembrar de fazer backup', 'Faixa no topo quando o último backup está velho.', `<select class="in al-sel" data-k="backupDays" aria-label="Intervalo do backup">${opt([3, 7, 14, 30], c.backupDays, x => 'a cada ' + x + ' dias')}</select>`)}
@@ -819,8 +819,9 @@ function alertsPanel() {
   ${row('bHyper', c.bHyper, 'Faixa de glicemia muito alta', 'Alerta quando a última medição está muito elevada.')}</div>
   <h2 class="sec">Notificações com o app fechado</h2><div class="card al-card">
   ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
-  ${row('postMeal', c.postMeal, 'Medir 2 h após uma refeição', 'Notifica exatamente 2 horas depois de registrar uma refeição. Se você não registrar uma glicemia pós-prandial em até 10 minutos, a notificação some e o aviso é ignorado.')}
-  ${row('postGlu', c.postGlu, 'Medir 2 h após uma glicemia', 'Notifica 2 horas depois de registrar uma glicemia (exceto as de depois da refeição, ao deitar e madrugada). Some sozinha após 10 minutos sem medição.')}
+  ${row('postFast', c.postFast, 'Medir 2 h após a insulina do jejum', 'Notifica exatamente 2 horas depois de registrar a insulina rápida do jejum. Se você não registrar uma glicemia em até 10 minutos depois da hora, a notificação some e o aviso é ignorado.')}
+  ${row('postLunch', c.postLunch, 'Medir 2 h após a insulina do almoço', 'Notifica 2 horas depois de registrar a insulina rápida do almoço. Some sozinha após 10 minutos sem medição.')}
+  ${row('postDinner', c.postDinner, 'Medir 2 h após a insulina do jantar', 'Notifica 2 horas depois de registrar a insulina rápida do jantar. Some sozinha após 10 minutos sem medição.')}
   ${row('quiet', c.quiet, 'Silenciar à noite', 'Não notificar neste intervalo (o aviso de hipoglicemia continua).', `<span class="al-time"><input class="in al-tm" data-k="qFrom" type="time" value="${c.qFrom}" aria-label="Início do silêncio"><span>às</span><input class="in al-tm" data-k="qTo" type="time" value="${c.qTo}" aria-label="Fim do silêncio"></span>`)}
   <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete. Os lembretes diários de horário estão logo abaixo, cada um com sua chave.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica com o app fechado.'}</p></div>
   <h2 class="sec">Lembretes de horário</h2>`;
@@ -836,7 +837,7 @@ document.addEventListener('change', async e => {
 function viewLembretes() {
   const sv = S.icsPref || {};
   return banners() + alertsPanel() + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário: abra o arquivo no celular e o seu calendário cria alarmes que se repetem todo dia. Escolha os horários.</p>
-  <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on" data-k="${x.k}" ${on ? 'checked' : ''} style="width:22px;height:22px;flex:none"><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
+  <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row-reverse;justify-content:space-between;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on swt" role="switch" data-k="${x.k}" ${on ? 'checked' : ''}><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
   <div class="field" style="margin-top:14px"><label class="fl" for="ics-adv">Avisar com antecedência</label><select class="in" id="ics-adv"><option value="0">Na hora</option><option value="5">5 minutos antes</option><option value="10">10 minutos antes</option><option value="15">15 minutos antes</option></select></div></div>
   <button class="btn pri full" style="margin-top:12px" data-act="ics-make">Gerar arquivo de calendário</button>
   <p class="hint" style="margin:10px 0 0">O horário da basal vem da sua média registrada, quando existe. Para parar os lembretes, apague os eventos “TiaBete” do calendário. Os horários são só avisos seus: o app não indica doses.</p>`;
