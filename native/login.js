@@ -6,13 +6,11 @@ if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
   /* Abertura: logo centralizado com animação; só depois entra a tela de login (ou direto o app, para quem já entrou). */
   const SPLASH_MS = 1900, t0 = Date.now();
   const splash = document.createElement('div'); splash.id = 'tb-splash'; splash.setAttribute('role', 'img'); splash.setAttribute('aria-label', 'TiaBete');
-  splash.innerHTML = '<svg class="sp-drop" viewBox="0 0 100 100" width="96" height="96" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg><div class="sp-name">Tia<b>Bete</b></div><div class="sp-sub">GLICOSE CONTROL</div>';
+  splash.innerHTML = '<svg class="sp-drop" viewBox="0 0 100 100" width="176" height="176" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg>';
   document.body.appendChild(splash);
   const hideSplash = () => { const w = Math.max(0, SPLASH_MS - (Date.now() - t0)); setTimeout(() => { splash.classList.add('out'); setTimeout(() => splash.remove(), 450); }, w); };
-  const css0 = `#tb-splash{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .45s ease}#tb-splash.out{opacity:0;pointer-events:none}
-  #tb-splash .sp-drop{animation:sp-in .7s cubic-bezier(.2,.9,.3,1.2) both,sp-pulse 1.6s ease-in-out .7s infinite;filter:drop-shadow(0 6px 22px rgba(255,46,62,.45))}
-  #tb-splash .sp-name{font-family:var(--f-display);font-size:34px;font-weight:700;color:var(--fg);animation:sp-up .6s ease .35s both}#tb-splash .sp-name b{color:var(--red)}
-  #tb-splash .sp-sub{font-family:var(--f-mono);font-size:11px;letter-spacing:.28em;color:var(--mut);animation:sp-up .6s ease .55s both}
+  const css0 = `#tb-splash{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .45s ease}#tb-splash.out{opacity:0;pointer-events:none}
+  #tb-splash .sp-drop{animation:sp-in .7s cubic-bezier(.2,.9,.3,1.2) both,sp-pulse 1.6s ease-in-out .7s infinite;width:min(46vw,200px);height:auto;overflow:visible;filter:drop-shadow(0 8px 28px rgba(255,46,62,.5))}
   @keyframes sp-in{from{opacity:0;transform:translateY(-26px) scale(.6)}to{opacity:1;transform:none}}@keyframes sp-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes sp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
   @media (prefers-reduced-motion:reduce){#tb-splash *{animation:none!important}}`;
   const css = css0 + `#tb-gate{position:fixed;inset:0;z-index:2000;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;justify-content:center;gap:18px;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));overflow:auto;font-family:var(--f-body)}
@@ -20,7 +18,7 @@ if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
   #tb-gate p{margin:0;color:var(--mut);font-size:15px;line-height:1.5}#tb-gate .gb{display:flex;flex-direction:column;gap:10px}
   #tb-gate .gl{background:none;border:0;color:var(--mut);text-decoration:underline;font:inherit;font-size:14px;padding:10px;cursor:pointer}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-  const drop = '<svg viewBox="0 0 100 100" width="46" height="46" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg>';
+  const drop = '<svg viewBox="0 0 100 100" width="46" height="46" overflow="visible" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg>';
   const need = async () => !(await SEC.getCfg('g-profile')) && !(await SEC.getCfg('login-skip')) && !(await SEC.has('g-refresh'));
   function paint() {
     if (!gate) { gate = document.createElement('div'); gate.id = 'tb-gate'; gate.setAttribute('role', 'dialog'); gate.setAttribute('aria-label', 'Entrar no TiaBete'); document.body.appendChild(gate); }
