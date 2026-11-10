@@ -29,8 +29,8 @@ const BL_TPL = {
   almoco: [{ f: 'arroz', q: 100 }, { f: 'feijao', q: 125 }, { f: 'macarrao', q: 275 }], jantar: [], lanche: []
 };
 const blClone = o => JSON.parse(JSON.stringify(o));
-function blDefault() { if (BL_PUBLIC) return { v: 1, ratio: null, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: [], tpl: { sem: { cafe: [], almoco: [], jantar: [], lanche: [] }, fds: { cafe: [], almoco: [], jantar: [], lanche: [] } }, days: {} };
-  return { v: 1, ratio: 15, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: blClone(BL_FOODS), tpl: { sem: blClone(BL_TPL), fds: blClone(BL_TPL) }, days: {} }; }
+function blDefault() { if (BL_PUBLIC) return { v: 1, ratio: null, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: [], tpl: { sem: { cafe: [], almoco: [], jantar: [], lanche: [] }, fds: { cafe: [], almoco: [], jantar: [], lanche: [] } }, days: {}, meals: [] };
+  return { v: 1, ratio: 15, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: blClone(BL_FOODS), tpl: { sem: blClone(BL_TPL), fds: blClone(BL_TPL) }, days: {}, meals: [] }; }
 S.bl = blDefault();
 S.blUi = { tab: 'cafe', date: null, pend: null, busy: false, msg: {} };
 let blTimer = null;
@@ -38,11 +38,12 @@ function blSave() { clearTimeout(blTimer); blTimer = setTimeout(blFlush, 120); }
 function blFlush() { clearTimeout(blTimer); try { Store.put('meta', { id: 'bolus', value: S.bl }); } catch (e) { } }
 document.addEventListener('visibilitychange', () => { if (document.hidden) blFlush(); });
 window.addEventListener('pagehide', blFlush);
-function blHasData() { return Object.keys(S.bl.days || {}).length > 0; }
+function blHasData() { return Object.keys(S.bl.days || {}).length > 0 || (S.bl.meals || []).length > 0; }
+function blCleanMeals(l) { return (Array.isArray(l) ? l : []).filter(m => m && typeof m.id === 'string' && typeof m.ts === 'number' && /^\d{4}-\d{2}-\d{2}$/.test(m.date) && typeof m.net === 'number').map(m => ({ id: m.id, ts: m.ts, date: m.date, time: String(m.time || '').slice(0, 5), meal: BL_MEALS.some(x => x.id === m.meal) ? m.meal : 'lanche', net: m.net, carb: +m.carb || 0, fiber: +m.fiber || 0, prot: +m.prot || 0, fat: +m.fat || 0, kcal: +m.kcal || 0, ui: typeof m.ui === 'number' ? m.ui : null, ratio: +m.ratio || null })); }
 function blLoad(v) {
   if (!v || typeof v !== 'object' || !Array.isArray(v.foods) || !v.tpl || typeof v.tpl !== 'object') return;
   const d = blDefault(), ok = x => x && typeof x === 'object';
-  S.bl = { v: 1, ratio: v.ratio >= 1 && v.ratio <= 200 ? v.ratio : (BL_PUBLIC ? null : 15), bolusOn: { ...d.bolusOn, ...(ok(v.bolusOn) ? v.bolusOn : {}) }, foods: v.foods.filter(f => f && f.id && typeof f.name === 'string'), tpl: { sem: ok(v.tpl.sem) ? v.tpl.sem : d.tpl.sem, fds: ok(v.tpl.fds) ? v.tpl.fds : d.tpl.fds }, days: ok(v.days) ? v.days : {} };
+  S.bl = { v: 1, ratio: v.ratio >= 1 && v.ratio <= 200 ? v.ratio : (BL_PUBLIC ? null : 15), bolusOn: { ...d.bolusOn, ...(ok(v.bolusOn) ? v.bolusOn : {}) }, foods: v.foods.filter(f => f && f.id && typeof f.name === 'string'), tpl: { sem: ok(v.tpl.sem) ? v.tpl.sem : d.tpl.sem, fds: ok(v.tpl.fds) ? v.tpl.fds : d.tpl.fds }, days: ok(v.days) ? v.days : {}, meals: blCleanMeals(v.meals) };
 }
 const blToday = () => isoDate(new Date());
 const blDate = () => S.blUi.date || blToday();
@@ -69,6 +70,62 @@ function blSum(id, mm) {
 const blDose = net => blRule() ? Math.round(net / S.bl.ratio) : 0;
 const blOn = id => !!S.bl.bolusOn[id];
 const blIc = k => `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${k === 'dia' ? '<path d="M5 20V10M12 20V4M19 20v-7"/>' : k === 'alimentos' ? '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>' : MIC[k]}</svg>`;
+
+
+/* ---- Refeição feita: card no histórico (sem lista de alimentos) ---- */
+const blMeals = () => S.bl.meals || (S.bl.meals = []);
+function histMealItems() {
+  const f = S.hist; if (f.band || f.ctx || f.mark) return [];
+  const q = norm(f.q);
+  return blMeals().filter(x => {
+    if (f.meal && x.meal !== f.meal) return false;
+    if (f.from && x.date < f.from) return false; if (f.to && x.date > f.to) return false;
+    if (q) { const hay = norm(['refeicao refeicoes feita carboidratos liquidos bolus', (blMeal(x.meal) || {}).name, fmtDate(x.date), x.date, x.time, blN(x.net, 0) + ' g', x.ui != null ? x.ui + ' ui unidades' : ''].join(' ')); if (!hay.includes(q)) return false; }
+    return true;
+  });
+}
+function mealLogHTML(m, where) {
+  const meal = blMeal(m.meal) || { name: 'Refeição', ic: 'refeicao' };
+  return `<button class="rec meal" data-key="m${m.id}" data-ts="${m.ts}" data-act="mlog-edit" data-id="${m.id}"><span class="tm num ic"><svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC[meal.ic] || MIC.refeicao}</svg><i class="mi-l">${esc(m.time)}</i></span>
+    <span class="info"><span class="badge meal-b">${esc(meal.name)}</span><span class="chips">${m.ui != null ? `<span class="tag">bolus ${m.ui} Ui</span>` : ''}<span class="tag">tot. ${blN(m.carb, 0)} g</span><span class="tag">fibras ${blN(m.fiber, 0)} g</span><span class="tag">${blN(m.kcal, 0)} kcal</span></span></span>
+    <span class="gl num">${blN(m.net, 0)}<small>g líq.</small></span></button>`;
+}
+function blMealsOf(d, id) { return blMeals().filter(x => x.date === d && (!id || x.meal === id)).sort((a, b) => a.ts - b.ts); }
+function blDoneHTML(id) {
+  const t = blSum(id), list = blMealsOf(blDate(), id), meal = blMeal(id);
+  return `<button class="btn pri full" data-bl="mealdone" data-meal="${id}" ${t.rows.length ? '' : 'disabled'}>✓ Refeição feita · adicionar ao histórico</button>
+    <p class="hint" style="margin:10px 0 0">${t.rows.length ? `Guarda no histórico o horário e os totais desta refeição (${blN(t.net)} g líquidos${blOn(id) && blRule() ? ', bolus ' + blDose(t.net) + ' Ui' : ''}), sem a lista de alimentos.` : 'Adicione alimentos para poder registrar a refeição.'}</p>
+    ${list.length ? `<div class="stack" style="gap:8px;margin-top:12px">${list.map(m => mealLogHTML(m)).join('')}</div>` : ''}
+    <button class="btn full" style="margin-top:10px" data-act="meal-fromcalc" data-meal="${id}" ${t.rows.length ? '' : 'disabled'}>Salvar como refeição salva</button>`;
+}
+function mealLogForm(m, id) {
+  const now = new Date(), mm = m || {}, d = m ? m.date : blDate(), tm = m ? m.time : (d === isoDate(now) ? HM(now.getTime()) : '12:00'), mid = m ? m.meal : id, meal = blMeal(mid);
+  const net = m ? m.net : blSum(mid).net;
+  return `<h2>${m ? 'Editar refeição' : 'Refeição feita'}</h2><p class="hint" style="margin:0 0 12px">${esc(meal ? meal.name : '')} · <b class="num">${blN(net)} g</b> de carboidratos líquidos${m && m.ui != null ? ' · bolus ' + m.ui + ' Ui' : ''}. Os alimentos não ficam no histórico.</p>
+    <form id="mlog-form" data-id="${m ? m.id : ''}" data-meal="${mid}" novalidate><div class="form-grid">
+    <div class="field"><label class="fl" for="ml-dt">Data</label><input class="in" type="date" id="ml-dt" value="${d}" max="${isoDate(now)}" ${m ? '' : 'disabled'}></div>
+    <div class="field"><label class="fl" for="ml-tm">Horário</label><input class="in" type="time" id="ml-tm" value="${tm}" ${m ? '' : 'autofocus'}></div></div>
+    <p class="err" id="mlog-err" role="alert"></p><div class="stack" style="margin-top:10px"><button class="btn pri full" type="submit">${m ? 'Salvar' : 'Adicionar ao histórico'}</button>${m ? `<button class="btn full" type="button" data-act="mlog-del-ask" data-id="${m.id}">Excluir refeição</button>` : ''}<button class="btn full" type="button" data-act="close">Cancelar</button></div></form>`;
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return; const a = el.dataset.act;
+  if (a === 'mlog-edit') { const m = blMeals().find(x => x.id === el.dataset.id); if (m) openSheet(mealLogForm(m)); }
+  else if (a === 'mlog-del-ask') { el.dataset.act = 'mlog-del-do'; el.textContent = 'Toque de novo para excluir'; el.classList.add('pri'); }
+  else if (a === 'mlog-del-do') { S.bl.meals = blMeals().filter(x => x.id !== el.dataset.id); blSave(); closeSheet(); render(); toast('Refeição excluída.'); }
+  else if (a === 'meal-fromcalc') { const id = el.dataset.meal, meal = blMeal(id), t = blSum(id); if (!meal || !t.rows.length) return; openSheet(mealForm({ name: meal.name, meal: id, carbs: Math.round(t.net * 10) / 10 })); }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'mlog-form') return; e.preventDefault();
+  const f = e.target, tm = $('#ml-tm').value, dt = $('#ml-dt').value || blDate();
+  if (!/^\d{2}:\d{2}$/.test(tm)) { $('#mlog-err').textContent = 'Informe o horário da refeição.'; return; }
+  const ts = mkTs(dt, tm); if (ts > Date.now() + 60000) { $('#mlog-err').textContent = 'O horário não pode estar no futuro.'; return; }
+  if (f.dataset.id) { const m = blMeals().find(x => x.id === f.dataset.id); if (m) { m.date = dt; m.time = tm; m.ts = ts; } }
+  else {
+    const id = f.dataset.meal, t = blSum(id); if (!t.rows.length) { closeSheet(); return; }
+    blMeals().push({ id: uid(), ts, date: dt, time: tm, meal: id, net: t.net, carb: t.carb, fiber: t.fiber, prot: t.prot, fat: t.fat, kcal: t.kcal, ui: blOn(id) && blRule() ? blDose(t.net) : null, ratio: S.bl.ratio || null });
+  }
+  blSave(); closeSheet(); render(); toast(f.dataset.id ? 'Refeição atualizada.' : 'Refeição adicionada ao histórico.');
+});
 
 function blChips(c) { return `<span class="chip good">líq. ${blN(c.net)} g</span><span class="chip">tot. ${blN(c.carb)} g</span><span class="chip">fibras ${blN(c.fiber)} g</span><span class="chip">prot. ${blN(c.prot)} g</span><span class="chip">gord. ${blN(c.fat)} g</span><span class="chip">${blN(c.kcal, 0)} kcal</span>`; }
 function blFacts(t, note) {
@@ -133,13 +190,14 @@ function blMealView(id) {
       <div class="row" style="flex-wrap:nowrap"><input class="in bl-q num" type="number" inputmode="decimal" step="any" min="0" id="bl-q-${id}-${i}" data-meal="${id}" data-idx="${i}" value="${it.q || ''}" placeholder="0" aria-label="Quantidade de ${esc(f.name)}">${blUnitCtl(id, i, it, f)}</div><div class="bl-chips" id="bl-ch-${id}-${i}">${blChips(c)}</div></div>`;
   }).join('');
   return `<div id="bl-hero">${blHero(meal, t)}</div>
+    <h2 class="sec">Refeição feita</h2><div class="card" id="bl-done">${blDoneHTML(id)}</div>
     <h2 class="sec">Total da refeição</h2><div class="card" id="bl-facts">${t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos abaixo para ver os totais.</p>'}</div>
     <h2 class="sec">Alimentos</h2><div class="card">${items ? `<div class="bl-items">${items}</div>` : '<p class="hint" style="margin:0">Nenhum alimento ainda.</p>'}
       <div class="bl-add"><select class="in" id="bl-add-${id}" aria-label="Alimento para adicionar">${S.bl.foods.map(f => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join('')}</select><button class="btn pri full" data-bl="add" data-meal="${id}">Adicionar alimento</button><button class="btn full" data-bl="reset" data-meal="${id}">${pend === id ? 'Confirmar: voltar ao padrão' : 'Voltar ao padrão'}</button></div>${blAiBlock(id)}</div>`;
 }
 function blRefresh(id) {
   const meal = blMeal(id), t = blSum(id);
-  $('#bl-hero').innerHTML = blHero(meal, t);
+  $('#bl-hero').innerHTML = blHero(meal, t); const dn = $('#bl-done'); if (dn) dn.innerHTML = blDoneHTML(id);
   $('#bl-facts').innerHTML = t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos abaixo para ver os totais.</p>';
   (blM()[id] || []).forEach((it, i) => { const el = $('#bl-ch-' + id + '-' + i), c = blCalc(it); if (el && c) el.innerHTML = blChips(c); });
 }
@@ -155,6 +213,7 @@ function blDayView() {
   return `<div class="card red hero bl-hero"><div class="hr-top"><div class="eyebrow">Bolus do dia</div></div><div class="bl-big"><span class="num">${ui}</span><small>Ui</small></div><div class="bl-hl"><span>${esc(parts.join(' + ')) || 'nenhuma refeição com bolus'}</span></div></div>
     <h2 class="sec">Total do dia</h2><div class="card">${blFacts(tot, true)}</div>
     <h2 class="sec">Por refeição</h2><div class="card bl-mrows">${rows}</div>
+    <h2 class="sec">Refeições feitas</h2><div class="card">${blMealsOf(blDate()).length ? `<div class="stack" style="gap:8px">${blMealsOf(blDate()).map(m => mealLogHTML(m)).join('')}</div>` : '<p class="hint" style="margin:0">Nenhuma refeição registrada neste dia. Na aba de cada refeição, use "Refeição feita".</p>'}</div>
     <h2 class="sec">Registro do dia</h2><div class="card"><p class="hint" style="margin:0 0 12px">${com ? 'Este dia está salvo no histórico.' : `Este dia mostra o padrão de ${tn} e ainda não está no histórico. Qualquer alteração que você fizer o registra.`}</p><div class="stack" style="gap:8px">${com ? `<button class="btn full" data-bl="daydel">${pend === 'day-del' ? 'Confirmar: apagar registro' : 'Apagar registro do dia'}</button>` : `<button class="btn pri full" data-bl="daycommit">Registrar este dia</button>`}<button class="btn full" data-bl="daytpl">${pend === 'day-tpl' ? 'Confirmar: trocar o padrão' : 'Usar como padrão de ' + tn}</button></div></div>
     <h2 class="sec">Histórico</h2><div class="card">${days.length ? days.map(k => { let u = 0, net = 0; const ps = []; BL_MEALS.forEach(m => { const t = blSum(m.id, S.bl.days[k]); net += t.net; if (blOn(m.id)) { const b = blDose(t.net); u += b; ps.push(`${m.short} ${b}`); } }); const dt = k.split('-').map(Number), w = WD[new Date(dt[0], dt[1] - 1, dt[2]).getDay()];
       return `<button class="bl-h ${k === d ? 'cur' : ''}" data-bl="goto" data-date="${k}"><span><b>${w} · ${fmtDate(k)}</b><small class="dim">${esc(ps.join(' · '))} · ${blN(net)} g líq.</small></span><span class="tag bl-dose">${u} Ui</span></button>`; }).join('') : '<p class="hint" style="margin:0">Nenhum dia registrado ainda. Registre o dia de hoje acima.</p>'}</div>`;
@@ -164,11 +223,12 @@ function blFoodsView() {
   const rule = `<h2 class="sec">Regra do bolus</h2><div class="card"><p class="hint" style="margin:0 0 12px">Defina a regra combinada com a sua equipe de saúde. O app só faz a conta com ela: não usa glicemia nem fator de correção.</p>
     <div class="field"><label class="fl" for="bl-ratio">1 Ui cobre quantos gramas de carboidrato líquido?</label><input class="in num" id="bl-ratio" type="number" inputmode="decimal" step="any" min="1" max="200" value="${S.bl.ratio || ''}" placeholder="Combine com sua equipe de saúde"></div>
     <div class="fl" style="margin:14px 0 8px">Refeições com bolus</div><div class="row">${BL_MEALS.map(m => `<label class="bl-chk"><input type="checkbox" data-blon="${m.id}" ${blOn(m.id) ? 'checked' : ''}><span>${m.short}</span></label>`).join('')}</div></div>`;
+  const sv = S.saved || [], saved = `<h2 class="sec">Refeições salvas</h2><div class="card"><p class="hint" style="margin:0 0 12px">Atalhos com nome e carboidratos para preencher o registro de uma medição com um toque. Use "Salvar como refeição salva" na aba de uma refeição. O app só preenche carboidratos e descrição, sem sugerir dose.</p><div class="stack" style="gap:8px">${sv.map(m => `<button class="menu-item" data-act="meal-edit" data-id="${m.id}"><div>${esc(m.name)}<span>${[m.meal ? MEALS[m.meal] : '', m.carbs != null ? fn(m.carbs, 0) + ' g de carboidratos' : '', m.desc || ''].filter(Boolean).map(esc).join(' · ') || 'Sem detalhes'}</span></div><svg viewBox="0 0 24 24">${IC.chev}</svg></button>`).join('')}<button class="btn full" data-act="meal-new">Nova refeição salva</button></div></div>`;
   const cards = S.bl.foods.map(f => `<div class="bl-food"><div class="row" style="flex-wrap:nowrap"><input class="in" data-food="${f.id}" data-field="name" value="${esc(f.name)}" aria-label="Nome"><button class="btn danger sm" data-bl="delfood" data-food="${f.id}">Excluir</button></div>
     <div class="row" style="margin-top:10px"><label class="bl-fl">Base<select class="in" data-food="${f.id}" data-field="basis"><option value="g"${f.basis === 'g' ? ' selected' : ''}>100 g</option><option value="un"${f.basis === 'un' ? ' selected' : ''}>Unidade</option></select></label>${f.basis === 'un' ? `<label class="bl-fl">Unidade<input class="in" data-food="${f.id}" data-field="unit" value="${esc(f.unit || '')}"></label><label class="bl-fl">g por unidade<input class="in num" type="number" inputmode="decimal" step="any" min="0" data-food="${f.id}" data-field="gpu" value="${f.gpu || 0}"></label>` : ''}</div>
     <label class="bl-chk" style="margin-top:10px"><input type="checkbox" data-food="${f.id}" data-field="est" ${f.est ? 'checked' : ''}><span>Valores estimados</span></label><p class="hint" style="margin:8px 0">Valores ${f.basis === 'g' ? 'por 100 g' : 'por ' + esc(f.unit || 'unidade')}</p>
     <div class="bl-grid">${blNum(f.id, 'carb', 'Carb. tot. (g)', f.carb)}${blNum(f.id, 'fiber', 'Fibras (g)', f.fiber)}${blNum(f.id, 'prot', 'Prot. (g)', f.prot)}${blNum(f.id, 'fat', 'Gord. (g)', f.fat)}${blNum(f.id, 'kcal', 'kcal', f.kcal)}</div></div>`).join('');
-  return rule + `<h2 class="sec">Seus alimentos</h2><p class="hint" style="margin:0 2px 10px">Valores por 100 g ou por unidade. Itens estimados vêm de tabelas médias: troque pelos números do rótulo.</p><div class="stack">${cards}</div>
+  return rule + saved + `<h2 class="sec">Seus alimentos</h2><p class="hint" style="margin:0 2px 10px">Valores por 100 g ou por unidade. Itens estimados vêm de tabelas médias: troque pelos números do rótulo.</p><div class="stack">${cards}</div>
     <h2 class="sec">Novo alimento</h2><div class="card">${blAiBlock(null)}<form id="bl-new" class="stack" style="gap:10px;${HAS_CLAUDE ? 'margin-top:14px' : ''}">${HAS_CLAUDE ? '<p class="hint" style="margin:0">Ou preencha à mão:</p>' : ''}<input class="in" id="bl-nf-name" placeholder="Nome do alimento" required><div class="row"><select class="in" id="bl-nf-basis" style="flex:1 1 120px"><option value="g">Por 100 g</option><option value="un">Por unidade</option></select><input class="in" id="bl-nf-unit" placeholder="Unidade (ex.: fatia)" style="flex:1 1 120px"><input class="in num" type="number" inputmode="decimal" step="any" min="0" id="bl-nf-gpu" placeholder="g por unidade" style="flex:1 1 120px"></div>
     <div class="bl-grid">${['carb:Carb. tot. (g)', 'fiber:Fibras (g)', 'prot:Prot. (g)', 'fat:Gord. (g)', 'kcal:kcal'].map(x => { const [k, l] = x.split(':'); return `<label class="bl-fl">${l}<input class="in num" type="number" inputmode="decimal" step="any" min="0" id="bl-nf-${k}" value="0"></label>`; }).join('')}</div><button class="btn pri full" type="submit">Salvar alimento</button></form></div>`;
 }
@@ -189,6 +249,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('#bl [data-bl]'); if (!b) return; e.stopPropagation();
   const a = b.dataset.bl, m = b.dataset.meal, U = S.blUi;
   if (a === 'ai') { blAi(m || null); return; }
+  if (a === 'mealdone') { if (!blSum(m).rows.length) return; openSheet(mealLogForm(null, m)); return; }
   if (a === 'tab') { U.tab = b.dataset.tab; U.pend = null; render(); return; }
   if (a === 'prev') U.date = blAdd(blDate(), -1); else if (a === 'next') U.date = blAdd(blDate(), 1); else if (a === 'today') U.date = null;
   else if (a === 'goto') { U.date = b.dataset.date; U.tab = 'dia'; window.scrollTo(0, 0); }

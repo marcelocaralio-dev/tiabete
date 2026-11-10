@@ -252,9 +252,18 @@ function remBanner() {
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const r = remPending(), k = r ? r.key : ''; if (k !== (S._rk || '')) render(); } }, 5000);
 document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el) return; S.remOff[el.dataset.k] = 1; render(); });
+S.ud = {};
+const udOk = k => { const u = parseUnits(S.ud[k] || ''); return typeof u === 'number' && u > 0; };
+const draftUnits = k => `<div class="un-row"><label for="ud-${k}">Unidades a tomar</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(S.ud[k] || '')}" aria-label="Unidades a tomar"><b>Ui</b></span></div><div class="dim" id="udh-${k}" style="font-size:12px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>`;
+document.addEventListener('input', e => {
+  const el = e.target.closest && e.target.closest('input.un-draft'); if (!el) return;
+  const k = el.dataset.k; S.ud[k] = el.value; const ok = udOk(k), b = document.querySelector('.tgl[data-k="' + k + '"]'), h = document.getElementById('udh-' + k);
+  if (h) h.style.display = ok ? 'none' : '';
+  if (b && !b.dataset.lk) { b.disabled = !ok; b.setAttribute('aria-disabled', String(!ok)); b.style.opacity = ok ? '' : '.35'; }
+});
 function swRow(k, title, sub, extra = '') {
   const on = S.ins[k], lk = isLocked(k), sk = skipped(k) && !on;
-  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:12.5px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : ''}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
+  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:12.5px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : (lk || sk ? '' : draftUnits(k))}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
 }
 function insCard() {
   insRoll();
@@ -271,7 +280,7 @@ function insCard() {
   const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:12.5px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
   return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="eyebrow">Basal · lembrete de 24 h</div><div style="margin-top:10px">${basalShow}</div>${b && !skB ? unitsInline('basal') : ''}
     <div class="stack" style="margin-top:14px;gap:10px"><button class="btn ${b && b.st === 'ok' ? '' : 'pri'} full" data-act="ins-basal">Tomei a basal agora</button><div class="row"><button class="btn grow" data-act="ins-basal-at">Outro horário</button><button class="btn grow" data-act="ins-skip" data-k="basal">${skB ? 'Desfazer pulo' : 'Pular hoje'}</button></div>${b ? '<button class="btn full" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div></div>
-  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas. Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
+  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas e só liberam depois que você informa as unidades (Ui). Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
     ${swRow('fast', 'Jejum', '')}${swRow('lunch', 'Pré-prandial do almoço', '')}${swRow('dinner', 'Pré-prandial do jantar', '', dn)}
     <button class="btn full" style="margin-top:12px" data-act="go" data-r="insulinas">Ver histórico de insulinas</button>
     <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>`;
@@ -291,7 +300,7 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="ins-"]'); if (!el) return;
   const act = el.dataset.act;
   try {
-    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const r = await logAdd(k, Date.now()); S.ins[k] = r.ts; } await insSave(); render(); }
+    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const inp = document.getElementById('ud-' + k), u = parseUnits(inp ? inp.value : (S.ud[k] || '')); if (typeof u !== 'number' || !(u > 0)) { toast('Informe as unidades (Ui) antes de marcar.'); return; } const r = await logAdd(k, Date.now(), u); S.ins[k] = r.ts; S.ud[k] = ''; } await insSave(); render(); }
     else if (act === 'ins-basal') {
       const b = basalInfo();
       if (b && b.st === 'ok' && Date.now() - basalConfirm > 5000) { basalConfirm = Date.now(); el.textContent = 'Toque de novo para confirmar nova dose'; el.classList.add('pri'); setTimeout(() => { basalConfirm = 0; if (el.isConnected) render(); }, 5000); return; }
@@ -333,7 +342,7 @@ document.addEventListener('submit', async e => {
     e.preventDefault(); const t = parseTime($('#it-t').value); if (!t) { $('#it-err').textContent = 'Informe um horário válido.'; return; }
     const un = parseUnits($('#it-u').value); if (un === 'bad') { $('#it-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
     const ts = mkTs(isoDate(new Date()), t); if (ts > Date.now() + 60000) { $('#it-err').textContent = 'Esse horário ainda não chegou hoje.'; return; }
-    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } await logDayClear(kk); await logAdd(kk, ts, un); S.ins[kk] = ts; setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
+    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } await logDayClear(kk); await logAdd(kk, ts, u2); S.ins[kk] = ts; setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
   } else if (e.target.id === 'ins-log-form') {
     e.preventDefault(); const id = e.target.dataset.id, old = id ? S.inslog.find(x => x.id === id) : null;
     const kind = old ? old.kind : $('#il-k').value, d = $('#il-d').value, t = parseTime($('#il-t').value);
@@ -728,6 +737,7 @@ async function applyBackupState(st, replace) {
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
+  try { if (st.bolus && Array.isArray(st.bolus.meals)) { const have = new Set(blMeals().map(m => m.id)), add = blCleanMeals(st.bolus.meals).filter(m => !have.has(m.id)); if (add.length) { S.bl.meals = blMeals().concat(add); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
   try {
     const i = st.insulin;
     if (i && typeof i === 'object') {
@@ -1188,3 +1198,32 @@ document.addEventListener('click', async e => {
   if (el.dataset.act === 'pf-skip') { S.profPrompt = false; try { await Store.put('meta', { id: 'profile-skip', value: true }); } catch (x) { } go('painel'); }
   else { S.profile = null; try { await Store.put('meta', { id: 'profile', value: null }); } catch (x) { } toast('Perfil apagado.'); render(); }
 });
+
+
+/* ================= Escala da tela (acessibilidade) ================= */
+const SCALES = [[1, 'Padrão'], [1.15, 'Grande'], [1.3, 'Maior'], [1.5, 'Máximo']];
+S.scale = 1;
+const scaleOk = v => v <= 1.3 || window.innerWidth / v >= 300; /* em telas estreitas só os níveis que cabem, para nada ficar desconfigurado */
+const BASE_ZOOM = (() => { try { return parseFloat(getComputedStyle(document.documentElement).zoom) || 1; } catch (e) { return 1; } })();
+function applyScale() { try { const v = scaleOk(S.scale) ? S.scale : 1.3; document.documentElement.style.zoom = v === 1 ? '' : String(+(BASE_ZOOM * v).toFixed(4)); } catch (e) { } }
+function scaleCard() {
+  return `<h2 class="sec">Tamanho da tela</h2><div class="card" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">Aumenta textos e botões para enxergar melhor. “Padrão” é o tamanho original do app.</p><div class="seg" role="group" aria-label="Tamanho da tela" style="display:flex">${SCALES.filter(([v]) => scaleOk(v)).map(([v, t]) => `<button class="grow" data-act="scale" data-v="${v}" aria-pressed="${S.scale === v}">${t}<br><small>${Math.round(v * 100)}%</small></button>`).join('')}</div></div>`;
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="scale"]'); if (!el) return;
+  const v = +el.dataset.v; if (!SCALES.some(x => x[0] === v)) return;
+  S.scale = v; applyScale(); try { await Store.put('meta', { id: 'ui-scale', value: v }); } catch (x) { } render();
+});
+
+/* ================= Configurações (tudo que o usuário pode ajustar) ================= */
+function viewConfig() {
+  const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
+  return banners() + themeCard() + scaleCard() + `
+  <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
+    <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
+    <div class="row sp"><span><b>Limite da insulina do jantar</b><br><span class="dim" style="font-size:12.5px">Hoje: ${S.ins.dinnerMin} mg/dL (definido por você e seu médico)</span></span><button class="btn sm" data-act="ins-min">Alterar</button></div>
+    <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
+  </div></div>
+  <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
+}
+document.addEventListener('click', e => { if (e.target.closest('#cfg')) go('config'); });

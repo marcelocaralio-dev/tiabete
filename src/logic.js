@@ -1,6 +1,8 @@
 /* ================= TiaBete · lógica pura (sem DOM) ================= */
 const APP_VERSION = '0.2';
 const SCHEMA_VERSION = 5;
+const BUILD_RAW = '__BUILD_DATE__', BUILD_DATE = BUILD_RAW.startsWith('__') ? '' : BUILD_RAW;
+const APP_INFO = { dev: 'Marcelo Gomes Chaves', assist: 'Claude (Anthropic)', repo: 'github.com/marcelocaralio-dev/tiabete' };
 const LIM = { vlow: 54, low: 70, high: 180, vhigh: 250 };
 const FAST = { low: 70, high: 130 };  /* faixa considerada normal em jejum */
 const GLU_MIN = 10, GLU_MAX = 1000;

@@ -1,5 +1,5 @@
 /* Conceito: painel noturno preto, vermelho como único sinal. Navegação inferior, cards por papel, números grandes em Unbounded. */
-:root {
+:root { --meal-y: #E8B923;
   color-scheme: dark;
   --bg: #08070A; --s1: #120F12; --s2: #1A1519; --line: #2A2227;
   --red: #E31E2C; --red-rgb: 227,30,44; --red-d: #5B0D16; --red-d2: #2B0B11; --red-l: #FF8E98;
@@ -259,9 +259,9 @@ tr.xr { cursor: pointer; } tr.xr:active td { background: var(--s2); }
 .logo { gap: 9px; }
 .logo svg { flex: none; display: block; }
 .logo .lw { display: flex; flex-direction: column; line-height: 1; gap: 4px; }
-.logo .ln { font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+.logo .ln { font-family: var(--f-display); font-weight: 700; font-size: 20.4px; letter-spacing: -.01em; }
 .logo .ln b { color: var(--red-t); }
-.logo .ls { font-family: var(--f-display); font-weight: 400; font-size: 6.8px; letter-spacing: .3em; color: var(--mut); white-space: nowrap; }
+.logo .ls { font-family: var(--f-display); font-weight: 400; font-size: 8.2px; letter-spacing: .3em; color: var(--mut); white-space: nowrap; }
 
 /* linha do gráfico do cartão principal acompanha a faixa */
 .hero.b-low, .hero.b-vlow { --sp: #FFB3BA; }
@@ -444,10 +444,10 @@ h2.sec.acc-h { margin-top: 18px; margin-bottom: 4px; }
 .rw-card .btn.pri { background: linear-gradient(145deg, #22c55e, #15803d); border-color: #15803d; color: #fff; box-shadow: 0 6px 18px rgba(22,163,74,.4); }
 .banner.rwb { align-items: center; }
 
-.lxs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.lxs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .lx { min-width: 0; }
-.lx-l { font-size: 11.5px; font-weight: 700; letter-spacing: .02em; }
-.lx b { font-size: 20px; font-weight: 600; }
+.lx-l { font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
+.lx b { font-size: 19px; display: block; font-weight: 600; }
 .lx b small { font-size: 11px; font-weight: 400; color: var(--mut); }
 .lx-d { font-size: 12.5px; color: var(--mut); margin-top: 2px; }
 
@@ -631,3 +631,33 @@ input.swt:checked { background: var(--good-bg2); border-color: var(--good-bd); }
 input.swt:checked::before { transform: translateX(24px); background: var(--good-st); }
 input.swt:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { input.swt, input.swt::before { transition: none; } }
+
+.about-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.about-logo svg { flex: none; }
+.about-logo .lw { display: flex; flex-direction: column; gap: 6px; line-height: 1; }
+.about-logo .ln { font-family: var(--f-display); font-weight: 700; font-size: 32px; letter-spacing: -.01em; }
+.about-logo .ln b { color: var(--red-t); }
+.about-logo .ls { font-family: var(--f-display); font-size: 11px; letter-spacing: .3em; color: var(--mut); }
+
+.gauge-sm { max-width: 170px; margin: 4px 0 0; }
+/* fora de 70–180: vermelho esmaecido */
+.card.red.hero.oor { background: linear-gradient(160deg, #3C2327 0%, #231A1D 58%, var(--s1) 100%); border-color: #4A3235; }
+.hero.oor::after { background: radial-gradient(circle, rgba(255,142,152,.14), transparent 68%); }
+.hero.oor .hero-n small { color: #E3A4AA; }
+.hero.oor { --sp: #E3A4AA; }
+:root[data-theme="light"] .card.red.hero.oor { background: linear-gradient(160deg, #F6E1E3 0%, #FBF1F2 60%, var(--s1) 100%); border-color: #E2C0C4; }
+:root[data-theme="light"] .hero.oor::after { background: radial-gradient(circle, rgba(212,22,42,.07), transparent 68%); }
+:root[data-theme="light"] .hero.oor .hero-n small { color: #9E4650; }
+:root[data-theme="light"] .hero.oor { --sp: #9E4650; }
+
+.day-g { text-align: center; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.day-g .lb { text-align: left; }
+.gauge-md { max-width: 300px; margin: 2px auto 0; }
+
+/* card de refeição feita: traçado amarelo */
+.rec.meal { border-color: var(--meal-y); }
+.rec.meal .mi { stroke: var(--meal-y); }
+.badge.meal-b { color: var(--fg); border-color: var(--meal-y); background: color-mix(in srgb, var(--meal-y) 12%, transparent); white-space: normal; max-width: 100%; }
+.rec.meal .gl { min-width: 44px; }
+:root[data-theme="light"] { --meal-y: #B98900; }
+.bl-done .btn[disabled], #bl-done .btn[disabled] { opacity: .5; }

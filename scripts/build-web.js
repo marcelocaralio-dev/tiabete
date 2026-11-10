@@ -14,6 +14,9 @@ const APK_TEXT = [
 ];
 let js = order.map(f => rd(f)).join('\n');
 for (const [a, b] of APK_TEXT) js = js.replace(a, b);
+/* Data/hora da compilação (horário de Brasília) para a tela Sobre */
+const BR = new Date(Date.now() - 3 * 3600e3), p2 = n => String(n).padStart(2, '0');
+js = js.replace('__BUILD_DATE__', `${p2(BR.getUTCDate())}/${p2(BR.getUTCMonth() + 1)}/${BR.getUTCFullYear()} ${p2(BR.getUTCHours())}:${p2(BR.getUTCMinutes())}`);
 js = 'window.TB_PUBLIC = true;\nwindow.TB_GOOGLE_CLIENT_ID = ' + JSON.stringify(gid) + ';\n' + js;
 const fonts = [['unbounded', 'Unbounded', [500, 700]], ['manrope', 'Manrope', [400, 500, 600, 700, 800]], ['jetbrains-mono', 'JetBrains Mono', [400, 500]]];
 const out = path.join(root, 'www'); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
