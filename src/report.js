@@ -147,7 +147,7 @@ async function makePDFInner() {
     doc.text('TiaBete ' + APP_VERSION + ' · Dados armazenados localmente · Não substitui avaliação médica', M, H - 26);
     doc.text(`Página ${i} de ${pages}`, W - M, H - 26, { align: 'right' });
   }
-  const ok = await saveFile(`tiabete-relatorio-${D.from}_${D.to}.pdf`, doc.output('arraybuffer'));
+  const ok = await outFile(`tiabete-relatorio-${D.from}_${D.to}.pdf`, doc.output('arraybuffer'));
   if (status) status.textContent = ok ? 'PDF gerado.' : '';
 }
 

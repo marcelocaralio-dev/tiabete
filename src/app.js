@@ -137,9 +137,9 @@ function mealIcon(r) {
   const k = c === 'jejum' ? 'jejum' : (c === 'antes' || c === 'depois') ? (r.meal && MIC[r.meal] ? r.meal : 'refeicao') : (MIC[c] ? c : 'outro');
   return `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC[k]}</svg>${ph ? `<i class="mi-l">${ph}</i>` : ''}`;
 }
-function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : 'Rápida'}</i>`; }
+function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { config: 'Configurações', perfil: 'Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas' };
+const TITLES = { config: 'Configurações', perfil: 'Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', 'g-trat': 'Insulina e tratamento', 'g-exames': 'Exames e HbA1c', 'g-analises': 'Padrões e conquistas', 'g-ia': 'Inteligência artificial', 'g-dados': 'Dados e relatórios', 'g-ajustes': 'Ajustes e conta' };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
@@ -181,7 +181,7 @@ const curRange = () => periodRanges(S.period, Date.now());
 function banners() {
   let h = '';
   if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte um backup antes de sair.</span></div>`;
-  h += hypoBanner() + hyperBanner() + rwBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner();
+  h += hypoBanner() + hyperBanner() + rwBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner();
   if (hasExamples()) h += `<div class="banner"><span><b>Dados de exemplo.</b> Eles somem sozinhos quando você importar ou registrar a primeira medição real.</span><button class="btn sm" data-act="rm-examples">Remover agora</button></div>`;
   return h;
 }
@@ -215,7 +215,7 @@ function todayBlock() {
       const dv = r.glucose - rs[i - 1].glucose, sym = dv > 0 ? '▲' : dv < 0 ? '▼' : '■', gap = (!r.noTime && !rs[i - 1].noTime) ? ' · ' + gapFmt((r.ts - rs[i - 1].ts) / 60000) + ' depois' : '';
       delta = `<span class="tag ${dv > 0 ? 'up' : ''}">${sym} ${stepFmt(dv)} mg/dL${gap}</span>`;
     }
-    h += `<button class="rec" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${delta}${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`;
+    h += `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${delta}${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`;
   });
   return h + `</div>`;
 }
@@ -257,7 +257,7 @@ function viewPainel() {
     <div class="gauge-box">${gaugeSvg(last.glucose, gAnim, gLbl)}</div>
     <div class="hr-state">${badge(last.glucose, last.context)}</div>
     <div class="hr-info"><div class="hr-d num">${WD[new Date(last.ts).getDay()]} · ${fmtDate(last.date)}${last.noTime ? '' : ' · ' + last.time}</div><div class="chips" style="justify-content:center">${recChips(last)}</div></div>${lastExtremes(all)}</div>`;
-  h += todayBlock() + insCard() + hbaCard();
+  h += todayBlock() + treatmentCard() + hbaCard();
   const { cur, prev } = curRange();
   const rc = inRange(all, cur[0], cur[1]), rp = inRange(all, prev[0], prev[1]);
   const sc = stats(rc), sp = stats(rp), cmp = compareStats(sc, sp);
@@ -315,7 +315,7 @@ function histInsItems() {
     return true;
   });
 }
-function insLabel(x) { return x.kind === 'basal' ? 'Insulina basal tomada' : 'Insulina rápida tomada · ' + { fast: 'jejum', lunch: 'pré-almoço', dinner: 'pré-jantar' }[x.kind]; }
+function insLabel(x) { return x.kind === 'basal' ? 'Insulina basal tomada' : x.kind === 'extra' ? 'Outra insulina tomada · ' + (x.name || '') : 'Insulina rápida tomada · ' + { fast: 'jejum', lunch: 'pré-almoço', dinner: 'pré-jantar' }[x.kind]; }
 function histItems() {
   const fr = filteredRecs(), eps = hypoEpisodes(fr), inEp = new Set(eps.flatMap(e => e.members.map(m => m.id)));
   const recs = fr.filter(r => !inEp.has(r.id)).map(r => ({ t: 'r', ts: r.ts, date: r.date, r })).concat(eps.map(e => ({ t: 'e', ts: e.ts, date: e.date, e }))), ins = histInsItems().map(x => ({ t: 'i', ts: x.ts, date: x.date, x }));
@@ -342,8 +342,8 @@ function histListHTML() {
     its.forEach(i => {
       if (i.t === 'e') h += epiHTML(i.e);
       else if (i.t === 'm') h += mealLogHTML(i.m, 'hist');
-      else if (i.t === 'r') { const r = i.r; h += `<button class="rec" data-key="r${r.id}" data-ts="${r.ts}" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`; }
-      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal tomada' : 'Rápida tomada'}</span>${x.kind === 'basal' ? '' : `<span class="chips"><span class="tag">${{ fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span></span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
+      else if (i.t === 'r') { const r = i.r; h += `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-key="r${r.id}" data-ts="${r.ts}" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`; }
+      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal tomada' : x.kind === 'extra' ? esc(x.name || 'Outra insulina') : 'Rápida tomada'}</span>${x.kind === 'basal' ? '' : `<span class="chips"><span class="tag">${x.kind === 'extra' ? 'Dose extra' : { fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span></span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
     });
   }
   if (items.length > shown.length) h += `<button class="btn full" data-act="more">Mostrar mais (${items.length - shown.length})</button>`;
@@ -572,7 +572,7 @@ function schemeStats(sc) {
   return { ...st, days, perDay: st.n / days, recs };
 }
 function viewEsquemas() {
-  let h = banners() + `<p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha feita no registro). O app só compara resultados e não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
+  let h = banners() + planCards() + `<h2 class="sec">Esquemas anteriores e comparação</h2><p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha feita no registro). O app só compara resultados e não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
   if (!S.schemes.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Nenhum esquema', 'Cadastre o esquema atual e os anteriores para poder compará-los.')}</div>`;
   h += `<h2 class="sec">Esquemas cadastrados</h2><div class="stack">` + [...S.schemes].reverse().map(x => {
     const act = !x.end || x.end >= isoDate(new Date());
@@ -701,7 +701,7 @@ function viewRelatorios() {
     <div class="row" style="margin-top:12px">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias']].map(([d, l]) => `<button class="btn sm" data-act="rep-quick" data-d="${d}">${l}</button>`).join('')}</div></div>
     <h2 class="sec">O que entra</h2><div class="card"><div class="grid3"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:22px">${st.n}</div></div><div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div><div class="tile"><div class="lb">&lt;70 / acima</div><div class="v num" style="font-size:22px">${st.hypo}/${st.hyper}</div></div></div>
     <ul class="plain"><li>Resumo, estatísticas, gráfico de medições e distribuição por faixa</li><li>Comparação com o período anterior de mesma duração</li><li>Episódios de hipoglicemia e hiperglicemia</li><li>Resultados laboratoriais de HbA1c (sem estimativas)</li><li>Esquemas de tratamento e comparação</li><li>Histórico completo de medições</li></ul></div>
-    <div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rep-pdf" ${st.n ? '' : 'disabled'}>Gerar PDF</button><button class="btn full" data-act="rep-xlsx" ${st.n ? '' : 'disabled'}>Gerar Excel</button><button class="btn full" data-act="rep-summary">Resumo para a consulta (PDF, últimos 90 dias)</button></div>
+    <div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rep-pdf" ${st.n ? '' : 'disabled'}>Gerar PDF</button><button class="btn full" data-act="rep-xlsx" ${st.n ? '' : 'disabled'}>Gerar Excel</button><button class="btn full" data-act="rep-summary">Resumo para a consulta (PDF, últimos 90 dias)</button><button class="btn full" data-act="sh-open">Enviar ao meu médico…</button></div>
     ${st.n ? '' : '<p class="hint">Não há medições neste intervalo.</p>'}<p class="hint" id="rep-status" role="status"></p>`;
 }
 
@@ -760,11 +760,46 @@ const MI = {
   aparencia: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.400 1.400M17.600 17.600L19 19M5 19l1.400-1.400M17.600 6.400L19 5"/>',
   sobre: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500h.01"/>'
 };
-function viewMais() {
-  const mi = k => `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[k]}</svg></i>`;
-  const it = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${mi(r)}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
+/* Mais: tópicos agrupados em submenus. Cada grupo é uma tela (g-...) que lista os itens correspondentes. */
+const mi = k => `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[k] || MI.sobre}</svg></i>`;
+const menuItem = (r, t, d, act) => `<button class="menu-item" data-act="${act || 'go'}" ${act ? '' : `data-r="${r}"`}>${mi(r)}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
+MI['g-trat'] = MI.esquemas; MI['g-exames'] = MI.exames; MI['g-analises'] = MI.padroes; MI['g-ia'] = MI.ia; MI['g-dados'] = MI.backup; MI['g-ajustes'] = MI.config;
+function menuGroups() {
+  const G = {
+    'g-trat': { t: 'Insulina e tratamento', d: 'Histórico de insulinas e esquemas de tratamento', items: [['insulinas', 'Histórico de insulinas', 'Horários da basal e da insulina rápida, média e variação'], ['esquemas', 'Esquemas de tratamento', 'Cadastro e comparação']] },
+    'g-exames': { t: 'Exames e HbA1c', d: 'Hemoglobina glicada e exames laboratoriais', items: [['hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico'], HAS_CLAUDE ? ['exames', 'Exames laboratoriais', 'Enviar PDFs, notas, contexto e comparação'] : null] },
+    'g-analises': { t: 'Padrões e conquistas', d: 'Padrões, conquistas, classificação de medições e eventos', items: [['padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180'], ['classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições'], ['eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos']] },
+    'g-ia': { t: 'Inteligência artificial', d: 'Perguntas sobre o seu histórico e provedor de IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor de IA e informe a sua chave'] : null] },
+    'g-dados': { t: 'Dados e relatórios', d: 'Relatórios, importação do mySugr, backup e restauração', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia'], ['backup', 'Backup e dados', 'Exportar, restaurar, CSV']] },
+    'g-ajustes': { t: 'Ajustes e conta', d: 'Configurações, alertas, perfil e aparência', items: [['config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes'], ['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno'], ['perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde'], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático']] }
+  };
+  for (const g of Object.values(G)) g.items = g.items.filter(Boolean);
+  return G;
+}
+const hubOf = r => { if (r === 'perguntas' || r === 'ia') return 'g-ia'; const G = menuGroups(); for (const [k, g] of Object.entries(G)) if (g.items.some(x => x[0] === r)) return k; return null; };
+const hubView = k => () => { const g = menuGroups()[k]; return banners() + `<div class="stack">${g.items.map(x => menuItem(x[0], x[1], x[2])).join('')}</div>`; };
+const MAIS_KW = { bolus: 'refeicao refeicoes alimentos carboidrato calculo insulina rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'nome idade nascimento tipo diabetes equipe medico', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+function maisIndex() {
+  const G = menuGroups(), out = [{ r: 'bolus', t: 'Cálculo de bolus', d: 'Alimentos, refeições salvas, refeições feitas e bolus por dia', g: '' }, { r: 'hypo', t: 'Protocolo de hipoglicemia', d: 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', g: '', act: 'hypo-open' }];
+  for (const g of Object.values(G)) for (const x of g.items) out.push({ r: x[0], t: x[1], d: x[2], g: g.t });
+  out.push({ r: 'sobre', t: 'Sobre e limites', d: 'Privacidade, métodos e avisos', g: '' });
+  return out;
+}
+function maisResults(q) {
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  const list = maisIndex().filter(x => { const hay = norm([x.t, x.d, x.g, MAIS_KW[x.r] || ''].join(' ')); return words.every(w => hay.includes(w)); });
+  return list.length ? list.map(x => menuItem(x.r, x.t, (x.g ? x.g + ' › ' : '') + x.d, x.act)).join('') : `<div class="card"><p class="hint" style="margin:0">Nada encontrado para “${esc(q)}”. Tente outra palavra, como “backup”, “tema”, “insulina” ou “perfil”.</p></div>`;
+}
+document.addEventListener('input', e => { if (e.target.id !== 'mais-q') return; S.maisQ = e.target.value; const l = document.getElementById('mais-list'); if (l) l.innerHTML = S.maisQ.trim() ? maisResults(S.maisQ) : maisMenu(); });
+document.addEventListener('click', e => { const c = e.target.closest('[data-act="mais-clear"]'); if (!c) return; S.maisQ = ''; const i = document.getElementById('mais-q'); if (i) { i.value = ''; i.focus(); } const l = document.getElementById('mais-list'); if (l) l.innerHTML = maisMenu(); });
+function maisMenu() {
+  const G = menuGroups(), grp = k => G[k].items.length > 1 ? menuItem(k, G[k].t, G[k].d) : G[k].items.length ? menuItem(G[k].items[0][0], G[k].items[0][1], G[k].items[0][2]) : '';
   const hypo = `<button class="menu-item" data-act="hypo-open">${mi('hypo')}<div>Protocolo de hipoglicemia<span>Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + `<div class="stack">${it('bolus', 'Cálculo de bolus', 'Alimentos, refeições salvas, refeições feitas e bolus por dia')}${it('hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico')}${hypo}${it('insulinas', 'Histórico de insulinas', 'Horários da basal e da insulina rápida, média e variação')}${it('conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180')}${it('padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas')}${HAS_CLAUDE ? it('exames', 'Exames laboratoriais', 'Enviar PDFs, notas, contexto e comparação') : ''}${it('classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições')}${HAS_CLAUDE ? it('perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros') : ''}${VIEWS.ia ? it('ia', 'Inteligência artificial', 'Escolha o provedor e informe a sua chave') : ''}${it('importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia')}${it('eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos')}${it('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${it('esquemas', 'Esquemas de tratamento', 'Cadastro e comparação')}${it('relatorios', 'Relatórios', 'PDF e Excel por período')}${it('backup', 'Backup e dados', 'Exportar, restaurar, CSV')}${it('config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes')}${it('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${it('aparencia', 'Aparência', 'Tema claro, escuro ou automático')}${it('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos')}</div>`;
+  return menuItem('bolus', 'Cálculo de bolus', 'Alimentos, refeições salvas, refeições feitas e bolus por dia') + hypo + grp('g-trat') + grp('g-exames') + grp('g-analises') + grp('g-ia') + grp('g-dados') + grp('g-ajustes') + menuItem('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos');
+}
+function viewMais() {
+  const q = S.maisQ || '';
+  return banners() + `<div class="mais-s"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="in" id="mais-q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Buscar em Mais…" aria-label="Buscar em Mais" value="${esc(q)}">${q ? '<button class="mais-x" data-act="mais-clear" aria-label="Limpar busca">×</button>' : ''}</div><div class="stack" id="mais-list">${q.trim() ? maisResults(q) : maisMenu()}</div>`;
 }
 function viewAparencia() { return banners() + themeCard() + scaleCard(); }
 
@@ -783,12 +818,12 @@ function viewSobre() {
 
 /* ================= Roteamento e renderização ================= */
 
-const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar };
+const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, 'g-trat': hubView('g-trat'), 'g-exames': hubView('g-exames'), 'g-analises': hubView('g-analises'), 'g-ia': hubView('g-ia'), 'g-dados': hubView('g-dados'), 'g-ajustes': hubView('g-ajustes') };
 function render() {
   const route = VIEWS[S.route] ? S.route : 'painel';
   const back = !['painel', 'historico', 'analise', 'mais'].includes(route);
   const view = $('#view');
-  view.innerHTML = `<h1 class="pg">${back ? `<button class="btn sm" data-act="go" data-r="${route === 'exame' || route === 'comparar' ? 'exames' : route === 'insulinas' ? 'painel' : 'mais'}" style="margin-right:10px;vertical-align:middle" aria-label="Voltar">←</button>` : ''}${TITLES[route]}</h1>` + VIEWS[route]();
+  view.innerHTML = `<h1 class="pg">${back ? `<button class="btn sm" data-act="go" data-r="${backOf(route)}" style="margin-right:10px;vertical-align:middle" aria-label="Voltar">←</button>` : ''}${TITLES[route]}</h1>` + VIEWS[route]();
   $('#nav').innerHTML = navHTML();
   makeAccordions(view);
   attachCharts(view);
@@ -800,7 +835,8 @@ function navHTML() {
   const cur = navGroup(S.route), b = (r, i, l) => `<button data-act="go" data-r="${r}" ${cur === r ? 'aria-current="page"' : ''}>${ic(i)}${l}</button>`;
   return `<div class="nav-in">${b('painel', 'home', 'Painel')}${b('historico', 'list', 'Histórico')}<button class="fab" data-act="new" aria-label="Nova medição">${ic('plus')}</button>${b('analise', 'chart', 'Análise')}${b('mais', 'menu', 'Mais')}</div>`;
 }
-function go(r) { S.route = r; if (location.hash !== '#' + r) { try { location.hash = r; } catch (e) { } } render(); window.scrollTo(0, 0); }
+function backOf(r) { return r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : hubOf(r) || 'mais'; }
+function go(r) { if (r !== S.route) S.prevRoute = S.route; S.route = r; if (location.hash !== '#' + r) { try { location.hash = r; } catch (e) { } } render(); window.scrollTo(0, 0); }
 function routeFromHash() { const h = location.hash.replace('#', ''); return h === 'exame' ? (S.exams.some(x => x.id === S.ex.id) ? 'exame' : 'exames') : VIEWS[h] ? h : 'painel'; }
 
 /* ================= Eventos ================= */
@@ -911,7 +947,7 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blHasData() || JSON.stringify(S.bl.foods) !== JSON.stringify(BL_FOODS) ? S.bl : null } };
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blHasData() || JSON.stringify(S.bl.foods) !== JSON.stringify(BL_FOODS) ? S.bl : null, plan: plHas() ? S.plan : undefined } };
   if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blHasData()) return null;
   return JSON.stringify(payload, null, 1);
 }

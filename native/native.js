@@ -25,6 +25,17 @@ if (NATIVE) {
     }
   };
 
+  const diagCard = () => `<h2 class="sec">Diagnóstico das notificações</h2><div class="card"><p class="hint" id="nt-status" style="margin:0 0 10px">Verificando…</p><div class="stack" style="gap:8px"><button class="btn full" data-act="nt-perm">Permitir notificações</button><button class="btn full" data-act="nt-exact">Permitir horários exatos</button><button class="btn pri full" data-act="nt-test">Enviar notificação de teste (em 10 segundos)</button></div><p class="hint" style="margin:10px 0 0">Se o teste não chegar: Configurações do Android → Apps → TiaBete → Notificações (ligadas) e Bateria → “Sem restrições”. Alguns celulares (Xiaomi, Samsung, Motorola) fecham apps em segundo plano e impedem avisos.</p></div>`;
+  async function diagFill() {
+    const el = document.getElementById('nt-status'), ln = LN(); if (!el) return;
+    if (!ln) { el.textContent = 'Notificações não estão disponíveis neste aparelho.'; return; }
+    try {
+      const p = (await ln.checkPermissions()).display; let ex = 'não se aplica', n = '?';
+      try { const r = await ln.checkExactNotificationSetting(); ex = r.exact_alarm === 'granted' ? 'permitidos' : 'não permitidos (podem atrasar alguns minutos)'; } catch (e) { }
+      try { n = (await ln.getPending()).notifications.length; } catch (e) { }
+      el.innerHTML = `Permissão de notificações: <b>${p === 'granted' ? 'concedida' : p === 'denied' ? 'negada' : 'ainda não pedida'}</b><br>Horários exatos: <b>${ex}</b><br>Notificações agendadas: <b>${n}</b>`;
+    } catch (e) { el.textContent = 'Não foi possível verificar.'; }
+  }
   const REM_ID = { jejum: 101, almoco: 102, jantar: 103, deitar: 104, basal: 105 }, HYPO_ID = 201;
   const remIntro = 'Estes lembretes diários tocam nos horários escolhidos, mesmo com o app fechado.';
   VIEWS.lembretes = function () {
@@ -32,6 +43,8 @@ if (NATIVE) {
     const k = h.indexOf('Os avisos dentro do app só aparecem'), a = h.lastIndexOf('<p', k), b = h.indexOf('</p>', k) + 4;
     if (k >= 0) h = h.slice(0, a) + `<p class="hint" style="margin:0 0 12px">${remIntro}</p>` + h.slice(b);
     h = h.replace('data-act="ics-make">Gerar arquivo de calendário</button>', 'data-act="rem-on">Ativar lembretes neste aparelho</button><button class="btn full" style="margin-top:8px" data-act="rem-off">Desligar todos os lembretes</button>');
+    h = h.replace('<h2 class="sec">Lembretes de horário</h2>', diagCard() + '<h2 class="sec">Lembretes de horário</h2>');
+    setTimeout(diagFill, 60);
     h = h.replace('Para parar os lembretes, apague os eventos “TiaBete” do calendário.', 'Para parar, use “Desligar todos os lembretes”.');
     return h;
   };
@@ -87,10 +100,107 @@ if (NATIVE) {
       await ln.schedule({ notifications: [{ id: HYPO_ID, title: 'TiaBete · medir de novo', body: 'Passaram ' + c.hypoMin + ' minutos da glicemia baixa. Meça novamente e siga o protocolo do seu médico. Emergência: 192 (SAMU).', channelId: 'hipo', schedule: { at: new Date(at), allowWhileIdle: true } }] });
     } catch (e) { console.error(e); }
   }
+  /* ---- Lembretes condicionais: medir 2 h depois da insulina rápida pré-prandial; some sozinho se passar 10 min sem medir ---- */
+  const POST_MIN = 120, POST_WIN = 10, TBX = () => capP('TbExpire');
+  const postId = ts => 310000 + (Math.floor(ts / 60000) % 100000);
+  const rmDelivered = async ids => { try { if (ids.length) await LN().removeDeliveredNotifications({ notifications: ids.map(id => ({ id })) }); } catch (e) { } };
+  const expCancel = async id => { try { const x = TBX(); if (x) await x.cancel({ id: String(id) }); } catch (e) { } };
+  let postBusy = false;
+  async function postSync() {
+    const ln = LN(); if (!ln || postBusy) return; postBusy = true;
+    try {
+      const c = alCfg(), now = Date.now(), recs = S.records.filter(r => !isEx(r) && !r.noTime && r.ts && r.glucose != null);
+      const mm = (await Store.all('meta')).find(x => x.id === 'post-sched'), map = (mm && mm.value) || {};
+      const want = {}, KEY = { fast: 'postFast', lunch: 'postLunch', dinner: 'postDinner' };
+      for (const x of S.inslog) {
+        if (!KEY[x.kind] || !c[KEY[x.kind]] || !x.ts) continue;
+        if (x.ts < now - (POST_MIN + POST_WIN + 5) * 60000 || x.ts > now + 60000) continue;
+        const at = x.ts + POST_MIN * 60000, done = recs.some(q => q.ts >= at - 20 * 60000 && q.ts <= at + POST_WIN * 60000);
+        want[postId(x.ts)] = { at, kind: x.kind, done };
+      }
+      const drop = [];
+      for (const [id, v] of Object.entries(map)) {
+        const w = want[id];
+        if (!w || w.done || w.at !== v.at || now > v.at + POST_WIN * 60000) { drop.push(+id); delete map[id]; }
+      }
+      if (drop.length) { try { await ln.cancel({ notifications: drop.map(id => ({ id })) }); } catch (e) { } await rmDelivered(drop); for (const id of drop) await expCancel(id); }
+      const add = [];
+      for (const [id, w] of Object.entries(want)) {
+        if (w.done || map[id] || w.at <= now + 3000) continue;
+        const d = new Date(w.at); if (inQuiet(d.getHours(), d.getMinutes())) continue;
+        add.push({ id: +id, at: w.at, kind: w.kind });
+      }
+      if (add.length && (await ensurePerm())) {
+        try { await ln.createChannel({ id: 'pos', name: 'Medir 2 horas depois', description: 'Lembrete para medir a glicemia 2 horas após a insulina rápida pré-prandial', importance: 4, vibration: true }); } catch (e) { }
+        await ln.schedule({ notifications: add.map(a => ({ id: a.id, title: 'TiaBete · hora de medir', body: 'Faz 2 horas desde a insulina ' + ({ fast: 'do jejum', lunch: 'do almoço', dinner: 'do jantar' }[a.kind]) + '. Meça a glicemia pós-prandial e registre no app.', channelId: 'pos', schedule: { at: new Date(a.at), allowWhileIdle: true } })) });
+        for (const a of add) { map[a.id] = { at: a.at }; try { const x = TBX(); if (x) await x.schedule({ id: String(a.id), at: String(a.at + POST_WIN * 60000) }); } catch (e) { } }
+      }
+      await Store.put('meta', { id: 'post-sched', value: map });
+    } catch (e) { console.error(e); } finally { postBusy = false; }
+  }
+  /* se a notificação já passou dos 10 minutos e o app estava fechado sem o relógio nativo, limpa ao voltar */
+  async function postClean() {
+    const ln = LN(); if (!ln) return;
+    try {
+      const mm = (await Store.all('meta')).find(x => x.id === 'post-sched'), map = (mm && mm.value) || {}, now = Date.now(), old = Object.entries(map).filter(([, v]) => now > v.at + POST_WIN * 60000).map(([id]) => +id);
+      if (old.length) await rmDelivered(old);
+    } catch (e) { }
+  }
+  /* Alarmes do "Meu tratamento": insulina, remédios, medições (diários) e troca do cateter da bomba (no dia) */
+  let planBusy = false;
+  const planId = key => { let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 500000 + (h % 400000); };
+  async function planSync() {
+    const ln = LN(); if (!ln || planBusy || typeof planAlarms !== 'function') return; planBusy = true;
+    try {
+      const mm = (await Store.all('meta')).find(x => x.id === 'plan-sched'), old = (mm && mm.value) || [];
+      if (old.length) { try { await ln.cancel({ notifications: old.map(id => ({ id })) }); } catch (e) { } }
+      const ids = [], list = [];
+      if (alCfg().plan) {
+        const p = S.plan, on = k => p.types.includes(k), day = isoDate(new Date()), seen = new Set();
+        const add = (sec, items, enabled) => { if (enabled) for (const it of items) { if (!it.alarm) continue; for (const t of it.times) { if (!parseTime(t)) continue; const key = it.id + '@' + t; if (seen.has(key)) continue; seen.add(key); const [h, m] = t.split(':').map(Number); if (inQuiet(h, m)) continue; const id = planId(key); ids.push(id); list.push({ id, title: sec === 'Medição' ? 'TiaBete · hora de medir' : 'TiaBete · hora do tratamento', body: (it.name || sec) + ' · ' + t + (it.dose && sec !== 'Medição' ? ' · ' + it.dose : ''), channelId: 'tratamento', schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } }); } } };
+        add('Insulina', p.insulin, on('insulina')); add('Remédio', p.meds, on('remedios')); add('Medição', p.checks, true);
+        if (on('bomba') && p.pump.alarm && p.pump.lastChange) {
+          const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))), at = mkTs(due, p.pump.siteTime || '08:00');
+          if (at > Date.now() && !inQuiet(new Date(at).getHours(), new Date(at).getMinutes())) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter/set de infusão.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
+        }
+      }
+      if (list.length && (await ensurePerm())) {
+        try { await ln.createChannel({ id: 'tratamento', name: 'Meu tratamento', description: 'Horários de insulina, remédios, medições e troca do cateter', importance: 4, vibration: true }); } catch (e) { }
+        await ln.schedule({ notifications: list });
+      }
+      await Store.put('meta', { id: 'plan-sched', value: ids });
+    } catch (e) { console.error(e); } finally { planBusy = false; }
+  }
+  { const _put = Store.put; Store.put = function (st, v) { const r = _put.apply(this, arguments); if (st === 'meta' && v && (v.id === 'plan' || v.id === 'alerts')) setTimeout(planSync, 150); return r; }; }
+  async function notifInit() {
+    const ln = LN(); if (!ln) return;
+    try {
+      const done = (await Store.all('meta')).some(x => x.id === 'perm-asked' && x.value);
+      const p = (await ln.checkPermissions()).display;
+      if (p !== 'granted' && !done) { await Store.put('meta', { id: 'perm-asked', value: true }); await ln.requestPermissions(); }
+    } catch (e) { }
+    remResync(); postSync(); postClean(); planSync();
+  }
+  setTimeout(notifInit, 5000);
+  setInterval(() => { postClean(); postSync(); }, 60000);
+  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); });
   const _loadAll = loadAll;
-  loadAll = async function () { const r = await _loadAll.apply(this, arguments); hypoSync(); return r; };
+  loadAll = async function () { const r = await _loadAll.apply(this, arguments); hypoSync(); postSync(); return r; };
   setTimeout(hypoSync, 2000);
-  document.addEventListener('change', e => { if (e.target.closest('.al-on, .al-sel, .al-tm')) setTimeout(() => { hypoSync(); remResync(); }, 60); });
+  document.addEventListener('change', e => { if (e.target.closest('.al-on, .al-sel, .al-tm')) setTimeout(() => { hypoSync(); postSync(); remResync(); }, 60); });
+  document.addEventListener('click', async e => {
+    const el = e.target.closest('[data-act^="nt-"]'); if (!el) return; const ln = LN(); if (!ln) return toast('Notificações não estão disponíveis neste aparelho.');
+    try {
+      if (el.dataset.act === 'nt-perm') { const p = await ln.requestPermissions(); toast(p.display === 'granted' ? 'Notificações permitidas.' : 'Permissão negada. Ative em Configurações do Android → Apps → TiaBete → Notificações.'); }
+      else if (el.dataset.act === 'nt-exact') { try { await ln.changeExactNotificationSetting(); } catch (x) { toast('Neste Android não é preciso permitir horários exatos.'); } }
+      else if (el.dataset.act === 'nt-test') {
+        if (!(await ensurePerm())) return toast('Permita as notificações do TiaBete nas configurações do Android.');
+        try { await ln.createChannel({ id: 'lembretes', name: 'Lembretes', description: 'Horários de medir a glicemia e da insulina', importance: 4, vibration: true }); } catch (x) { }
+        await ln.schedule({ notifications: [{ id: 999, title: 'TiaBete', body: 'Teste: as notificações estão funcionando.', channelId: 'lembretes', schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true } }] }); toast('Teste agendado. Pode fechar o app e aguardar 10 segundos.');
+      }
+    } catch (x) { console.error(x); toast('Não consegui concluir.'); }
+    setTimeout(diagFill, 500);
+  });
   document.addEventListener('click', async e => {
     const el = e.target.closest('[data-act="rem-on"],[data-act="rem-off"]'); if (!el) return;
     e.stopImmediatePropagation();

@@ -3,7 +3,7 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 
 /* ---------- 1. Lembrete de backup ---------- */
 const BK_DAYS = 7;
-const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
+const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, plan: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
 S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
@@ -151,7 +151,7 @@ async function makeSummaryPDF() {
     need(40); y = Math.max(y, H - 56); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUT);
     doc.text(doc.splitTextToSize('Documento de acompanhamento pessoal gerado pelo TiaBete. Nao e diagnostico nem indicacao de tratamento; a interpretacao e do medico. Notas e textos de exames sao resumos automaticos: confira com os laudos originais.', CW), M, y);
     const pdf = doc.output('arraybuffer');
-    await saveFile(`tiabete-resumo-consulta-${stamp()}.pdf`, new Uint8Array(pdf));
+    await outFile(`tiabete-resumo-consulta-${stamp()}.pdf`, new Uint8Array(pdf));
     say('');
   } catch (e) { console.error(e); toast('Não consegui gerar o resumo: ' + (e && e.message || e)); const st = $('#rep-status'); if (st) st.textContent = ''; }
 }
@@ -194,7 +194,8 @@ const insSave = async () => { if (!insLoaded) return; try { await Store.put('met
 function insRoll() { const d = isoDate(new Date()); if (S.ins.day === d) return false; S.ins.day = d; S.ins.fast = S.ins.lunch = S.ins.dinner = null; S.ins.skip = {}; return true; }
 const skipped = k => !!(S.ins.skip && S.ins.skip[k]);
 const setSkip = (k, v) => { S.ins.skip = S.ins.skip || {}; if (v) S.ins.skip[k] = 1; else delete S.ins.skip[k]; };
-const INS_KIND = { basal: 'Basal', fast: 'Jejum', lunch: 'Almoço', dinner: 'Jantar' };
+const INS_KIND = { basal: 'Basal', fast: 'Jejum', lunch: 'Almoço', dinner: 'Jantar', extra: 'Outra insulina' };
+const insName = r => r.kind === 'extra' ? (r.name || 'Outra insulina') : INS_KIND[r.kind];
 async function logAdd(kind, ts, units) { const r = { id: uid(), kind, ts, date: isoDate(new Date(ts)), at: Date.now() }; if (units != null) r.units = units; await Store.put('inslog', r); S.inslog.push(r); S.inslog.sort((a, b) => a.ts - b.ts); return r; }
 async function logDel(id) { await Store.del('inslog', id); S.inslog = S.inslog.filter(x => x.id !== id); }
 async function logPut(r) { await Store.put('inslog', r); S.inslog = S.inslog.map(x => x.id === r.id ? r : x).sort((a, b) => a.ts - b.ts); }
@@ -283,7 +284,7 @@ function insCard() {
   <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas e só liberam depois que você informa as unidades (Ui). Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
     ${swRow('fast', 'Jejum', '')}${swRow('lunch', 'Pré-prandial do almoço', '')}${swRow('dinner', 'Pré-prandial do jantar', '', dn)}
     <button class="btn full" style="margin-top:12px" data-act="go" data-r="insulinas">Ver histórico de insulinas</button>
-    <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>`;
+    <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>${extraInsCard()}`;
 }
 setInterval(() => {
   if (!insLoaded) return;
@@ -350,7 +351,7 @@ document.addEventListener('submit', async e => {
     if (!t) { $('#il-err').textContent = 'Informe um horário válido (ex.: 21:30).'; return; }
     const ts = mkTs(d, t); if (ts > Date.now() + 60000) { $('#il-err').textContent = 'Esse horário ainda não chegou.'; return; }
     const un = parseUnits($('#il-u').value); if (un === 'bad') { $('#il-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
-    if (old) { const nb = { ...old, ts, date: isoDate(new Date(ts)) }; if (un != null) nb.units = un; else delete nb.units; await logPut(nb); if (kind === 'basal' && old.ts === S.ins.basalTs) S.ins.basalTs = ts; }
+    if (old) { const nb = { ...old, ts, date: isoDate(new Date(ts)) }; if (kind === 'extra' && $('#il-n')) nb.name = $('#il-n').value.trim().slice(0, 80) || old.name; if (un != null) nb.units = un; else delete nb.units; await logPut(nb); if (kind === 'basal' && old.ts === S.ins.basalTs) S.ins.basalTs = ts; }
     else { await logAdd(kind, ts, un); if (kind === 'basal') { const lb = S.inslog.filter(x => x.kind === 'basal').pop(); if (!S.ins.basalTs || lb.ts > S.ins.basalTs) S.ins.basalTs = lb.ts; } }
     insSync(); await insSave(); closeSheet(); render(); toast('Registro salvo.');
   } else if (e.target.id === 'ins-min-form') {
@@ -363,8 +364,8 @@ document.addEventListener('submit', async e => {
 /* ---------- Histórico de insulinas: tela ---------- */
 function insLogForm(r) {
   const now = new Date(), d = r ? r.date : isoDate(now), t = r ? HM(r.ts) : HM(now.getTime());
-  return `<h2>${r ? 'Editar · ' + INS_KIND[r.kind] : 'Registrar dose passada'}</h2><p class="hint" style="margin:0 0 12px">Horário e unidades são registros seus. O app não calcula nem sugere dose.</p><form id="ins-log-form" data-id="${r ? r.id : ''}" novalidate><div class="form-grid">
-    ${r ? '' : `<div class="field full"><label class="fl" for="il-k">Tipo</label><select class="in" id="il-k"><option value="basal">Basal</option><option value="fast">Rápida · Jejum</option><option value="lunch">Rápida · Pré-prandial do almoço</option><option value="dinner">Rápida · Pré-prandial do jantar</option></select></div>`}
+  return `<h2>${r ? 'Editar · ' + esc(insName(r)) : 'Registrar dose passada'}</h2><p class="hint" style="margin:0 0 12px">Horário e unidades são registros seus. O app não calcula nem sugere dose.</p><form id="ins-log-form" data-id="${r ? r.id : ''}" novalidate><div class="form-grid">
+    ${r && r.kind === 'extra' ? `<div class="field full"><label class="fl" for="il-n">Insulina</label><input class="in" id="il-n" maxlength="80" value="${esc(r.name || '')}"></div>` : ''}${r ? '' : `<div class="field full"><label class="fl" for="il-k">Tipo</label><select class="in" id="il-k"><option value="basal">Basal</option><option value="fast">Rápida · Jejum</option><option value="lunch">Rápida · Pré-prandial do almoço</option><option value="dinner">Rápida · Pré-prandial do jantar</option></select></div>`}
     <div class="field"><label class="fl" for="il-d">Data</label><input class="in" type="date" id="il-d" value="${d}" max="${isoDate(now)}"></div>
     <div class="field"><label class="fl" for="il-t">Horário</label><input class="in" id="il-t" value="${t}" inputmode="numeric" placeholder="21:30" autocomplete="off"></div>${unitsField('il-u', r ? r.units : null)}</div>
     <div class="err" id="il-err" role="alert" style="color:var(--red-l);min-height:18px;margin-top:6px"></div>
@@ -391,7 +392,7 @@ function insDotChart(list) {
 function unitsStat(list) { const u = list.map(r => r.units).filter(v => v != null); if (!u.length) return null; const m = u.reduce((a, b) => a + b, 0) / u.length; return { n: u.length, mean: Math.round(m * 10) / 10, min: Math.min(...u), max: Math.max(...u) }; }
 const unitsTxt = s => s ? `dose média ${fU(s.mean)}${s.n > 1 ? ' (' + fU(s.min) + ' a ' + fU(s.max) + ')' : ''} · ${s.n} com unidades` : '';
 function viewInsulinas() {
-  const from = mkTs(isoDate(new Date(addDays(Date.now(), -29))), '00:00'), list = S.inslog.filter(x => x.ts >= from);
+  const from = mkTs(isoDate(new Date(addDays(Date.now(), -29))), '00:00'), all = S.inslog.filter(x => x.ts >= from), list = all.filter(x => x.kind !== 'extra');
   const bs = insStats(list.filter(x => x.kind === 'basal'));
   let basal;
   if (!bs.n) basal = `<p class="hint" style="margin:8px 0 0">Ainda sem doses de basal nos últimos 30 dias. Elas entram aqui quando você toca em “Tomei a basal agora” no Painel, ou em “Registrar dose passada”.</p>`;
@@ -410,9 +411,9 @@ function viewInsulinas() {
     }
   }
   const rapid = ['fast', 'lunch', 'dinner'].map(k => { const st = insStats(list.filter(x => x.kind === k)); return `<div class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line,var(--line))"><span><b>${k === 'fast' ? 'Jejum' : k === 'lunch' ? 'Pré-prandial do almoço' : 'Pré-prandial do jantar'}</b><div class="dim" style="font-size:12px">${st.n ? st.n + ' registro' + (st.n > 1 ? 's' : '') + ' em 30 dias' : 'Sem registros em 30 dias'}${(() => { const us = unitsStat(list.filter(x => x.kind === k)); return us ? '<br>' + unitsTxt(us) : ''; })()}</div></span><span class="num" style="text-align:right">${st.n ? '<b>' + hhmm(st.mean) + '</b><div class="dim" style="font-size:12px">' + (st.n > 1 ? hhmm(st.earliest) + ' – ' + hhmm(st.latest) : 'média') + '</div>' : '—'}</span></div>`; }).join('');
-  const byDay = {}; list.forEach(r => (byDay[r.date] = byDay[r.date] || []).push(r));
+  const byDay = {}; all.forEach(r => (byDay[r.date] = byDay[r.date] || []).push(r));
   const days = Object.keys(byDay).sort().reverse();
-  const dl = days.length ? `<div class="stack" style="gap:8px">${days.map(d => `<div class="card" style="padding:12px"><div class="num" style="font-weight:700;margin-bottom:8px">${fmtDate(d)}</div><div class="row" style="flex-wrap:wrap;gap:6px">${byDay[d].sort((a, b) => a.ts - b.ts).map(r => `<button class="btn sm" data-act="ins-log-edit" data-id="${r.id}">${INS_KIND[r.kind]} · ${HM(r.ts)}${r.units != null ? ' · ' + fU(r.units) : ''}</button>`).join('')}</div></div>`).join('')}</div>` : `<div class="card"><p class="hint" style="margin:0">Nenhum registro nos últimos 30 dias.</p></div>`;
+  const dl = days.length ? `<div class="stack" style="gap:8px">${days.map(d => `<div class="card" style="padding:12px"><div class="num" style="font-weight:700;margin-bottom:8px">${fmtDate(d)}</div><div class="row" style="flex-wrap:wrap;gap:6px">${byDay[d].sort((a, b) => a.ts - b.ts).map(r => `<button class="btn sm" data-act="ins-log-edit" data-id="${r.id}">${esc(insName(r))} · ${HM(r.ts)}${r.units != null ? ' · ' + fU(r.units) : ''}</button>`).join('')}</div></div>`).join('')}</div>` : `<div class="card"><p class="hint" style="margin:0">Nenhum registro nos últimos 30 dias.</p></div>`;
   return banners() + `<p class="hint" style="margin:0 0 12px">Mostra a que horas você costuma tomar cada insulina e quanto isso varia de um dia para o outro. Horários e unidades são só registros seus: o app não calcula nem sugere dose.</p>
   <button class="btn pri full" data-act="ins-log-new">Registrar dose passada</button>
   <h2 class="sec">Basal · últimos 30 dias</h2><div class="card">${basal}</div>
@@ -455,7 +456,7 @@ document.addEventListener('click', async e => {
 /* ---------- Tópicos expansíveis / retráteis ---------- */
 S.acc = {};
 const ACC_ALL = /[?&]all\b/.test(location.search); // gancho de teste: abre todos os tópicos
-const ACC_OPEN = { painel: ['hoje', 'insulinas'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
+const ACC_OPEN = { painel: ['hoje', 'meu tratamento'], esquemas: ['meu', 'insulinas', 'remedios', 'bomba', 'medicoes'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
 try { const a = JSON.parse(localStorage.getItem('tb-acc') || '{}'); if (a && typeof a === 'object') S.acc = a; } catch (e) { }
 const accSave = () => { try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } try { Store.put('meta', { id: 'acc', value: S.acc }); } catch (e) { } };
 const accKey = (route, h2, i) => route + '|' + (route === 'painel' && i === 0 ? 'hoje' : norm(h2.textContent).trim().split('·')[0].trim().slice(0, 40)); // 1º tópico do Painel muda de rótulo (Hoje/Ontem/data)
@@ -735,6 +736,7 @@ async function insLink() {
 async function applyBackupState(st, replace) {
   if (!st) return;
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
+  try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
   try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
   try { if (st.bolus && Array.isArray(st.bolus.meals)) { const have = new Set(blMeals().map(m => m.id)), add = blCleanMeals(st.bolus.meals).filter(m => !have.has(m.id)); if (add.length) { S.bl.meals = blMeals().concat(add); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
@@ -821,6 +823,7 @@ function alertsPanel() {
   return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card"><p class="hint" style="margin:0 0 8px">Faixas e telas que aparecem com o app aberto. Ligue ou desligue cada uma.</p>
   ${row('backup', c.backup, 'Lembrar de fazer backup', 'Faixa no topo quando o último backup está velho.', `<select class="in al-sel" data-k="backupDays" aria-label="Intervalo do backup">${opt([3, 7, 14, 30], c.backupDays, x => 'a cada ' + x + ' dias')}</select>`)}
   ${row('rewards', c.rewards, 'Avisar conquistas', 'Mostrar a tela de comemoração ao atingir um marco.')}
+  ${row('plan', c.plan, 'Alarmes do meu tratamento', 'Faixa no Painel nos horários de insulina, remédios, medições e troca de cateter que você cadastrou em Esquemas de tratamento.')}
   ${row('bBasal', c.bBasal, 'Insulina basal', 'Faixa quando se aproxima ou passa de 24 h da última dose de basal.')}
   ${row('bPre', c.bPre, 'Pré-jantar', 'Faixa com a medição pré-jantar quando ela está no limite.')}
   ${row('bMiss', c.bMiss, 'Medição esquecida', 'Faixa quando ainda não há glicemia na janela do horário habitual.')}
@@ -1227,3 +1230,43 @@ function viewConfig() {
   <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
 }
 document.addEventListener('click', e => { if (e.target.closest('#cfg')) go('config'); });
+
+
+/* ================= Enviar ao meu médico (compartilhar) ================= */
+/* O app não envia nada sozinho: abre o menu de compartilhar do aparelho (ou links de WhatsApp/Telegram) e o usuário escolhe o destino. */
+async function shareFile(name, data, mime) {
+  try {
+    const f = new File([data], name, { type: mime || (name.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream') });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'Resumo de glicemia (TiaBete)', text: 'Resumo de glicemia gerado pelo TiaBete.' }); return true; }
+  } catch (e) { if (e && e.name === 'AbortError') return false; }
+  if (!IS_NATIVE) toast('Este aparelho não abriu o menu de compartilhar. O PDF será salvo para você anexar à mensagem.');
+  return await saveFile(name, data);
+}
+async function outFile(name, data) { if (S._share) { S._share = false; return shareFile(name, data); } return saveFile(name, data); }
+function shareText() {
+  const r = S.rep; if (!r.from) { r.to = isoDate(new Date()); r.from = isoDate(new Date(addDays(Date.now(), -29))); }
+  const recs = inRange(S.records.filter(x => !isEx(x)), mkTs(r.from, '00:00'), endOfDay(mkTs(r.to, '00:00'))), st = stats(recs);
+  if (!st.n) return '';
+  const lab = [...S.hba].reverse().find(x => !isEx(x) && x.source !== 'estimativa' && x.value != null);
+  return ['Resumo de glicemia (TiaBete)', `Período: ${fmtDate(r.from)} a ${fmtDate(r.to)}`, `${st.n} medições · média ${fn(st.mean, 0)} mg/dL · mínima ${fn(st.min, 0)} · máxima ${fn(st.max, 0)}`, `Abaixo de ${LIM.low}: ${st.hypo} · acima da faixa: ${st.hyper}`, lab ? `Última HbA1c de laboratório: ${fn(lab.value, 1)}% (${fmtDate(lab.date)})` : '', 'Dados de acompanhamento pessoal; não é diagnóstico nem indicação de tratamento.'].filter(Boolean).join('\n');
+}
+function shareSheet() {
+  const t = shareText(), q = encodeURIComponent(t), canNative = !!navigator.share || IS_NATIVE, r = S.rep;
+  openSheet(`<h2>Enviar ao meu médico</h2><p class="hint" style="margin:0 0 12px">O TiaBete não envia nada sozinho: você escolhe o destino e confere a mensagem antes. Ao compartilhar, dados de saúde saem deste aparelho.</p>
+  ${t ? `<label class="fl" for="sh-text">Texto do resumo (${fmtDate(r.from)} a ${fmtDate(r.to)})</label><textarea class="in" id="sh-text" style="min-height:140px;font-size:13px" readonly>${esc(t)}</textarea>` : '<p class="hint">Não há medições no período escolhido em Relatórios. O PDF de resumo ainda pode ser enviado.</p>'}
+  <div class="stack" style="margin-top:12px">
+  <button class="btn pri full" data-act="sh-pdf-sum">Compartilhar PDF · resumo para a consulta</button>
+  <button class="btn full" data-act="sh-pdf-rep" ${t ? '' : 'disabled'}>Compartilhar PDF · relatório do período</button>
+  ${t ? `${canNative ? '<button class="btn full" data-act="sh-native">Compartilhar texto…</button>' : ''}<a class="btn full" style="text-align:center;text-decoration:none" href="https://wa.me/?text=${q}" target="_blank" rel="noopener">Enviar texto pelo WhatsApp</a>
+    <button class="btn full" data-act="sh-copy">Copiar texto (para e-mail ou outro app)</button>` : ''}
+  <button class="btn full" data-act="close">Fechar</button></div>
+  <p class="hint" style="margin:12px 0 0">Se o menu de compartilhar do aparelho não abrir, o PDF é salvo e você o anexa à mensagem. O WhatsApp recebe só o texto; para enviar o PDF, use “Compartilhar PDF”.</p>`);
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act^="sh-"]'); if (!el) return; const a = el.dataset.act;
+  if (a === 'sh-open') shareSheet();
+  else if (a === 'sh-pdf-sum') { closeSheet(); S._share = true; try { await makeSummaryPDF(); } finally { S._share = false; } }
+  else if (a === 'sh-pdf-rep') { closeSheet(); S._share = true; try { await makePDF(); } finally { S._share = false; } }
+  else if (a === 'sh-native') { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share; if (IS_NATIVE && P) await P.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText(), dialogTitle: 'Enviar resumo' }); else await navigator.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText() }); } catch (err) { } }
+  else if (a === 'sh-copy') { const t = shareText(); try { await navigator.clipboard.writeText(t); toast('Texto copiado.'); } catch (err) { const ta = $('#sh-text'); if (ta) { ta.focus(); ta.select(); } toast('Selecione o texto e copie.'); } }
+});

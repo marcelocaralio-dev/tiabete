@@ -661,3 +661,30 @@ input.swt:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .rec.meal .gl { min-width: 44px; }
 :root[data-theme="light"] { --meal-y: #B98900; }
 .bl-done .btn[disabled], #bl-done .btn[disabled] { opacity: .5; }
+
+/* Meu tratamento */
+.pl-it { border: 1px solid var(--line); border-radius: 14px; background: var(--s1); }
+.pl-it > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pl-it > summary::-webkit-details-marker { display: none; }
+.pl-it > summary::after { content: '▾'; color: var(--mut); transition: transform .2s; flex: none; }
+.pl-it[open] > summary::after { transform: rotate(180deg); }
+.pl-s { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pl-s b { overflow-wrap: anywhere; }
+.pl-s small { color: var(--mut); font-size: 12px; }
+.pl-b { padding: 0 14px 14px; }
+.pl-sw { margin-top: 12px; }
+.pl-card textarea.in { min-height: 70px; }
+
+/* cards de medição por faixa */
+.rec.g-ok { border-color: var(--good-st); }
+.rec.g-low, .rec.g-vlow { background: color-mix(in srgb, var(--red) 9%, var(--s1)); border-color: var(--low-bd); }
+.rec.g-high, .rec.g-vhigh { background: color-mix(in srgb, var(--red) 24%, var(--s1)); border-color: color-mix(in srgb, var(--red) 55%, var(--line)); }
+.rec.g-low:active, .rec.g-vlow:active, .rec.g-high:active, .rec.g-vhigh:active { filter: brightness(1.08); }
+/* busca em Mais */
+.mais-s { position: relative; margin-bottom: 12px; }
+.mais-s svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: none; stroke: var(--mut); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.mais-s .in { padding-left: 44px; padding-right: 40px; width: 100%; }
+.mais-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; background: transparent; color: var(--mut); font-size: 22px; cursor: pointer; }
+
+.pl-chip { min-width: 64px; }
+.pl-chip.late:not(.pri) { border-color: var(--low-bd); color: var(--red-l); }
