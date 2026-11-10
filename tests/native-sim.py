@@ -14,9 +14,8 @@ async def main(web):
         pg = await (await b.new_context(viewport={'width':400,'height':860},accept_downloads=True)).new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
         if not web: await pg.add_init_script(MOCK)
-        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_selector('#tb-splash', state='detached', timeout=8000); await pg.wait_for_timeout(1000)
+        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_timeout(1000)
         await pg.evaluate("""(async()=>{const d=isoDate(new Date());await Store.put('records',{id:'t1',date:d,time:'07:00',ts:mkTs(d,'07:00'),glucose:110,context:'jejum',source:'manual'});await loadAll();render();})()"""); await pg.wait_for_timeout(300)
-        if await pg.query_selector('#gate-skip'): await pg.click('#gate-skip'); await pg.wait_for_timeout(300)
         for i in range(6):
             if await pg.query_selector('#rw-ok'): await pg.click('#rw-ok'); await pg.wait_for_timeout(200)
         await pg.evaluate("go('mais')"); await pg.wait_for_timeout(300)

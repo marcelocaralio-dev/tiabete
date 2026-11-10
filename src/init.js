@@ -10,14 +10,13 @@
   insLoaded = true;
   try { const m = (await Store.all('meta')).find(x => x.id === 'a1c-target'); if (m && m.value >= 4 && m.value <= 12) S.a1cT = m.value; } catch (e) { }
   try { if (S.ins.dinnerMin === 150) S.ins.dinnerMin = 140; await insBackfill(); insSync(); await insSave(); } catch (e) { }
-  try { const us = (await Store.all('meta')).find(x => x.id === 'ui-scale'); if (us && SCALES.some(x => x[0] === us.value)) { S.scale = us.value; applyScale(); } } catch (e) { }
   try { const th = (await Store.all('meta')).find(x => x.id === 'theme'); if (th && ['light', 'dark', 'auto'].includes(th.value)) { S.theme = th.value; try { localStorage.setItem('tb-theme', th.value); } catch (e) { } } applyTheme(); } catch (e) { }
   try { const ac = (await Store.all('meta')).find(x => x.id === 'acc'); if (ac && ac.value && typeof ac.value === 'object') { S.acc = ac.value; try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } } } catch (e) { }
   try { const rw = (await Store.all('meta')).find(x => x.id === 'rewards'); if (rw && rw.value) S.rw = { got: {}, act: {}, init: false, ...rw.value }; } catch (e) { }
   try { const am = (await Store.all('meta')).find(x => x.id === 'alerts'); if (am && am.value) S.alerts = { ...AL_DEF, ...am.value }; } catch (e) { }
-  try { const pm = (await Store.all('meta')).find(x => x.id === 'profile'); if (pm && pm.value) S.profile = pfClean(pm.value); } catch (e) { }
   try { const bm = (await Store.all('meta')).find(x => x.id === 'bolus'); if (bm) blLoad(bm.value); } catch (e) { }
-  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0 }); } catch (e) { }
+  try { const pf = (await Store.all('meta')).find(x => x.id === 'profile'); if (pf && pf.value && typeof pf.value === 'object') S.profile = { ...S.profile, ...pf.value }; } catch (e) { }
+  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, intervalDays: [1,7,15,30].includes(+dp.intervalDays) ? +dp.intervalDays : 1, folderId: dp.folderId || null, lastTs: dp.lastTs || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }
   try { const sv = (await Store.all('meta')).find(x => x.id === 'saved-meals'); if (sv && Array.isArray(sv.value)) S.saved = sv.value; } catch (e) { }
   askPersist();

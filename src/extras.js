@@ -3,12 +3,11 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 
 /* ---------- 1. Lembrete de backup ---------- */
 const BK_DAYS = 7;
-const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
+const AL_DEF = { backup: true, backupDays: 7, rewards: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
-S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
 async function alSave() { try { await Store.put('meta', { id: 'alerts', value: S.alerts }); } catch (e) { } }
-const hasRealData = () => S.records.some(r => !isEx(r)) || S.exams.length > 0 || S.hba.some(x => !isEx(x) && x.source !== 'exame');
+const hasRealData = () => S.records.some(r => !isEx(r)) || S.exams.length > 0 || S.hba.some(x => !isEx(x) && x.source !== 'exame') || !!(S.bl && ((S.bl.foods || []).length || S.bl.ratio >= 1 || Object.keys(S.bl.days || {}).length || (S.bl.ratioLog || []).length)) || !!(S.profile && (S.profile.name || S.profile.diabetes || S.profile.photo));
 function backupBanner() {
   if (!alCfg().backup || !hasRealData() || Date.now() < S.bkSnooze) return '';
   const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / DAY) : null;
@@ -219,7 +218,6 @@ function basalInfo() {
   return { el, rem, st: rem <= 0 ? 'over' : rem <= 3600e3 ? 'soon' : 'ok' };
 }
 function basalBanner() {
-  if (!alCfg().bBasal) return '';
   const b = basalInfo(); if (!b || b.st === 'ok' || skipped('basal')) return '';
   return `<div class="banner warn"><span><b>Basal.</b> ${b.st === 'over' ? 'Já passaram 24 h desde a última dose de basal.' : `Faltam ${Math.max(1, Math.ceil(b.rem / 60000))} min para completar 24 h da última basal.`}</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
 }
@@ -231,7 +229,6 @@ function preDinner() {
 const dinnerOpen = () => { const pd = preDinner(); return !!(pd && pd.glucose >= S.ins.dinnerMin); };
 const isLocked = k => k === 'dinner' && !S.ins.dinner && !dinnerOpen();
 function dinnerBanner() {
-  if (!alCfg().bPre) return '';
   insRoll(); if (S.ins.dinner || skipped('dinner') || !dinnerOpen()) return '';
   const pd = preDinner();
   return `<div class="banner warn"><span><b>Pré-jantar.</b> Sua medição das ${pd.time} foi <b class="num">${f0(pd.glucose)}</b> mg/dL, no limite de ${S.ins.dinnerMin} ou acima. A chave da insulina rápida do jantar está liberada.</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
@@ -246,24 +243,14 @@ function remPending() {
   return has ? null : { ...w, key: day + w.k };
 }
 function remBanner() {
-  if (!alCfg().bMiss) return '';
   if (S.route !== 'painel') return ''; const r = remPending(); S._rk = r ? r.key : '';
   return r ? `<div class="banner"><span><b>Medição.</b> Ainda sem glicemia ${r.t} hoje (janela ${hhmm(r.a)}–${hhmm(r.b)}).</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="new" data-ctx="${r.ctx}" data-meal="${r.meal}">Registrar</button><button class="btn sm" data-act="rem-off" data-k="${r.key}">Dispensar</button></span></div>` : '';
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const r = remPending(), k = r ? r.key : ''; if (k !== (S._rk || '')) render(); } }, 5000);
 document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el) return; S.remOff[el.dataset.k] = 1; render(); });
-S.ud = {};
-const udOk = k => { const u = parseUnits(S.ud[k] || ''); return typeof u === 'number' && u > 0; };
-const draftUnits = k => `<div class="un-row"><label for="ud-${k}">Unidades a tomar</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(S.ud[k] || '')}" aria-label="Unidades a tomar"><b>Ui</b></span></div><div class="dim" id="udh-${k}" style="font-size:12px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>`;
-document.addEventListener('input', e => {
-  const el = e.target.closest && e.target.closest('input.un-draft'); if (!el) return;
-  const k = el.dataset.k; S.ud[k] = el.value; const ok = udOk(k), b = document.querySelector('.tgl[data-k="' + k + '"]'), h = document.getElementById('udh-' + k);
-  if (h) h.style.display = ok ? 'none' : '';
-  if (b && !b.dataset.lk) { b.disabled = !ok; b.setAttribute('aria-disabled', String(!ok)); b.style.opacity = ok ? '' : '.35'; }
-});
 function swRow(k, title, sub, extra = '') {
   const on = S.ins[k], lk = isLocked(k), sk = skipped(k) && !on;
-  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:12.5px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : (lk || sk ? '' : draftUnits(k))}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
+  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:12.5px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : ''}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
 }
 function insCard() {
   insRoll();
@@ -280,7 +267,7 @@ function insCard() {
   const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:12.5px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
   return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="eyebrow">Basal · lembrete de 24 h</div><div style="margin-top:10px">${basalShow}</div>${b && !skB ? unitsInline('basal') : ''}
     <div class="stack" style="margin-top:14px;gap:10px"><button class="btn ${b && b.st === 'ok' ? '' : 'pri'} full" data-act="ins-basal">Tomei a basal agora</button><div class="row"><button class="btn grow" data-act="ins-basal-at">Outro horário</button><button class="btn grow" data-act="ins-skip" data-k="basal">${skB ? 'Desfazer pulo' : 'Pular hoje'}</button></div>${b ? '<button class="btn full" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div></div>
-  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas e só liberam depois que você informa as unidades (Ui). Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
+  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas. Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
     ${swRow('fast', 'Jejum', '')}${swRow('lunch', 'Pré-prandial do almoço', '')}${swRow('dinner', 'Pré-prandial do jantar', '', dn)}
     <button class="btn full" style="margin-top:12px" data-act="go" data-r="insulinas">Ver histórico de insulinas</button>
     <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>`;
@@ -300,7 +287,7 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="ins-"]'); if (!el) return;
   const act = el.dataset.act;
   try {
-    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const inp = document.getElementById('ud-' + k), u = parseUnits(inp ? inp.value : (S.ud[k] || '')); if (typeof u !== 'number' || !(u > 0)) { toast('Informe as unidades (Ui) antes de marcar.'); return; } const r = await logAdd(k, Date.now(), u); S.ins[k] = r.ts; S.ud[k] = ''; } await insSave(); render(); }
+    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const r = await logAdd(k, Date.now()); S.ins[k] = r.ts; } await insSave(); render(); }
     else if (act === 'ins-basal') {
       const b = basalInfo();
       if (b && b.st === 'ok' && Date.now() - basalConfirm > 5000) { basalConfirm = Date.now(); el.textContent = 'Toque de novo para confirmar nova dose'; el.classList.add('pri'); setTimeout(() => { basalConfirm = 0; if (el.isConnected) render(); }, 5000); return; }
@@ -342,7 +329,7 @@ document.addEventListener('submit', async e => {
     e.preventDefault(); const t = parseTime($('#it-t').value); if (!t) { $('#it-err').textContent = 'Informe um horário válido.'; return; }
     const un = parseUnits($('#it-u').value); if (un === 'bad') { $('#it-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
     const ts = mkTs(isoDate(new Date()), t); if (ts > Date.now() + 60000) { $('#it-err').textContent = 'Esse horário ainda não chegou hoje.'; return; }
-    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } await logDayClear(kk); await logAdd(kk, ts, u2); S.ins[kk] = ts; setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
+    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } await logDayClear(kk); await logAdd(kk, ts, un); S.ins[kk] = ts; setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
   } else if (e.target.id === 'ins-log-form') {
     e.preventDefault(); const id = e.target.dataset.id, old = id ? S.inslog.find(x => x.id === id) : null;
     const kind = old ? old.kind : $('#il-k').value, d = $('#il-d').value, t = parseTime($('#il-t').value);
@@ -529,7 +516,6 @@ function hypoNextTxt(st) {
   return rem > 0 ? 'Próxima medição em <b class="num">' + (m => pad(Math.floor(m / 60)) + ':' + pad(m % 60))(Math.ceil(rem / 1000)) + '</b>' : '<b>⏱ Já passaram 15 min: meça de novo agora.</b>';
 }
 function hypoBanner() {
-  if (!alCfg().bHypo) return '';
   const st = hypoState(); if (!st || S.hypoOff[st.id]) return '';
   const g = st.last.glucose;
   return `<div class="banner hypo" role="alert"><div><b>⚠ Hipoglicemia:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
@@ -593,7 +579,6 @@ function hyperState() {
   return last && last.glucose > LIM.vhigh && Date.now() - last.ts <= 4 * 3600e3 ? last : null;
 }
 function hyperBanner() {
-  if (!alCfg().bHyper) return '';
   const r = hyperState(); if (!r || S.hyperOff[r.id]) return '';
   return `<div class="banner hyper" role="alert"><div><b>▲ Glicemia muito elevada:</b> <b class="num">${f0(r.glucose)}</b> mg/dL às ${r.time}.<div style="margin-top:4px">Acima de ${LIM.vhigh} mg/dL. Siga o plano combinado com seu médico. Com mal-estar, vômitos, sede intensa ou respiração acelerada, procure atendimento.</div></div><button class="btn sm" data-act="hyper-off">Dispensar</button></div>`;
 }
@@ -734,10 +719,18 @@ async function insLink() {
 /* ---------- estado do app dentro do backup (insulinas, conquistas, refeições salvas) ---------- */
 async function applyBackupState(st, replace) {
   if (!st) return;
-  try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
-  try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
-  try { if (st.bolus && Array.isArray(st.bolus.meals)) { const have = new Set(blMeals().map(m => m.id)), add = blCleanMeals(st.bolus.meals).filter(m => !have.has(m.id)); if (add.length) { S.bl.meals = blMeals().concat(add); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
+  try { if (st.bolus && typeof st.bolus === 'object') {
+    if (replace) blLoad(st.bolus);
+    else {
+      const incoming = st.bolus, current = S.bl || blDefault();
+      const foodById = new Map((current.foods || []).map(f => [f.id, f]));
+      (Array.isArray(incoming.foods) ? incoming.foods : []).forEach(f => { if (f && f.id && !foodById.has(f.id)) foodById.set(f.id, f); });
+      const merged = { ...current, foods: [...foodById.values()], ratio: current.ratio >= 1 ? current.ratio : incoming.ratio, bolusOn: { ...(incoming.bolusOn || {}), ...(current.bolusOn || {}) }, tpl: { sem: { ...(incoming.tpl && incoming.tpl.sem || {}), ...(current.tpl && current.tpl.sem || {}) }, fds: { ...(incoming.tpl && incoming.tpl.fds || {}), ...(current.tpl && current.tpl.fds || {}) } }, days: { ...(incoming.days || {}), ...(current.days || {}) }, ratioLog: [...(incoming.ratioLog || []), ...(current.ratioLog || [])].filter((v,i,a)=>a.findIndex(x=>x.id===v.id)===i) };
+      blLoad(merged);
+    }
+    await Store.put('meta', { id: 'bolus', value: S.bl });
+  } } catch (e) { console.error('Falha ao restaurar bolus', e); }
   try {
     const i = st.insulin;
     if (i && typeof i === 'object') {
@@ -816,24 +809,15 @@ function icsDefault(k) {
   return ICS_ITEMS.find(x => x.k === k).d;
 }
 function alertsPanel() {
-  const c = alCfg(), sw = (k, on) => `<input type="checkbox" class="al-on swt" role="switch" data-k="${k}" ${on ? 'checked' : ''}>`, opt = (arr, v, f) => arr.map(x => `<option value="${x}" ${+x === +v ? 'selected' : ''}>${f(x)}</option>`).join('');
+  const c = alCfg(), sw = (k, on) => `<input type="checkbox" class="al-on" data-k="${k}" ${on ? 'checked' : ''}>`, opt = (arr, v, f) => arr.map(x => `<option value="${x}" ${+x === +v ? 'selected' : ''}>${f(x)}</option>`).join('');
   const row = (k, on, t, d, extra) => `<div class="al-row"><label class="al-l">${sw(k, on)}<span><b>${t}</b><small>${d}</small></span></label>${extra || ''}</div>`;
-  return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card"><p class="hint" style="margin:0 0 8px">Faixas e telas que aparecem com o app aberto. Ligue ou desligue cada uma.</p>
+  return `<h2 class="sec">Avisos dentro do app</h2><div class="card al-card">
   ${row('backup', c.backup, 'Lembrar de fazer backup', 'Faixa no topo quando o último backup está velho.', `<select class="in al-sel" data-k="backupDays" aria-label="Intervalo do backup">${opt([3, 7, 14, 30], c.backupDays, x => 'a cada ' + x + ' dias')}</select>`)}
-  ${row('rewards', c.rewards, 'Avisar conquistas', 'Mostrar a tela de comemoração ao atingir um marco.')}
-  ${row('bBasal', c.bBasal, 'Insulina basal', 'Faixa quando se aproxima ou passa de 24 h da última dose de basal.')}
-  ${row('bPre', c.bPre, 'Pré-jantar', 'Faixa com a medição pré-jantar quando ela está no limite.')}
-  ${row('bMiss', c.bMiss, 'Medição esquecida', 'Faixa quando ainda não há glicemia na janela do horário habitual.')}
-  ${row('bLabel', c.bLabel, 'Medições sem etiqueta', 'Aviso de medições sem jejum, antes ou depois da refeição.')}
-  ${row('bHypo', c.bHypo, 'Faixa de hipoglicemia', 'Alerta vermelho quando a última medição está abaixo de 70 mg/dL. É um aviso de segurança: desligue só se tiver certeza.')}
-  ${row('bHyper', c.bHyper, 'Faixa de glicemia muito alta', 'Alerta quando a última medição está muito elevada.')}</div>
+  ${row('rewards', c.rewards, 'Avisar conquistas', 'Mostrar a tela de comemoração ao atingir um marco.')}</div>
   <h2 class="sec">Notificações com o app fechado</h2><div class="card al-card">
-  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
-  ${row('postFast', c.postFast, 'Medir 2 h após a insulina do jejum', 'Notifica exatamente 2 horas depois de registrar a insulina rápida do jejum. Se você não registrar uma glicemia em até 10 minutos depois da hora, a notificação some e o aviso é ignorado.')}
-  ${row('postLunch', c.postLunch, 'Medir 2 h após a insulina do almoço', 'Notifica 2 horas depois de registrar a insulina rápida do almoço. Some sozinha após 10 minutos sem medição.')}
-  ${row('postDinner', c.postDinner, 'Medir 2 h após a insulina do jantar', 'Notifica 2 horas depois de registrar a insulina rápida do jantar. Some sozinha após 10 minutos sem medição.')}
+  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' minutos')}</select>`)}
   ${row('quiet', c.quiet, 'Silenciar à noite', 'Não notificar neste intervalo (o aviso de hipoglicemia continua).', `<span class="al-time"><input class="in al-tm" data-k="qFrom" type="time" value="${c.qFrom}" aria-label="Início do silêncio"><span>às</span><input class="in al-tm" data-k="qTo" type="time" value="${c.qTo}" aria-label="Fim do silêncio"></span>`)}
-  <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete. Os lembretes diários de horário estão logo abaixo, cada um com sua chave.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica com o app fechado.'}</p></div>
+  <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica sozinho: use o arquivo de calendário abaixo.'}</p></div>
   <h2 class="sec">Lembretes de horário</h2>`;
 }
 document.addEventListener('change', async e => {
@@ -847,7 +831,7 @@ document.addEventListener('change', async e => {
 function viewLembretes() {
   const sv = S.icsPref || {};
   return banners() + alertsPanel() + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário: abra o arquivo no celular e o seu calendário cria alarmes que se repetem todo dia. Escolha os horários.</p>
-  <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row-reverse;justify-content:space-between;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on swt" role="switch" data-k="${x.k}" ${on ? 'checked' : ''}><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
+  <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on" data-k="${x.k}" ${on ? 'checked' : ''} style="width:22px;height:22px;flex:none"><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
   <div class="field" style="margin-top:14px"><label class="fl" for="ics-adv">Avisar com antecedência</label><select class="in" id="ics-adv"><option value="0">Na hora</option><option value="5">5 minutos antes</option><option value="10">10 minutos antes</option><option value="15">15 minutos antes</option></select></div></div>
   <button class="btn pri full" style="margin-top:12px" data-act="ics-make">Gerar arquivo de calendário</button>
   <p class="hint" style="margin:10px 0 0">O horário da basal vem da sua média registrada, quando existe. Para parar os lembretes, apague os eventos “TiaBete” do calendário. Os horários são só avisos seus: o app não indica doses.</p>`;
@@ -1069,7 +1053,7 @@ new MutationObserver(ms => { if (ms.every(m => m.target.nodeType === 1 && m.targ
 
 /* ================= Backup no Google Drive (conector do Claude) ================= */
 const DRV = 'Google Drive', DRV_FOLDER = 'TiaBete Backups', DRV_GAP = 20 * 3600 * 1000;
-S.drv = { auto: false, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0 };
+S.drv = { auto: false, intervalDays: 1, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0 };
 async function drvMcp() { try { return window.claude && window.claude.use ? await window.claude.use('mcp') : null; } catch (e) { return null; } }
 async function drvCall(tool, input) {
   if (window.TB_DRV) return window.TB_DRV.call(tool, input); // APK: API do Drive com a conta Google do usuário
@@ -1089,7 +1073,7 @@ function drvErrTxt(e) {
   return 'Não foi possível falar com o Drive' + (e && e.message ? ': ' + String(e.message).slice(0, 80) : '.');
 }
 const drvFiles = p => (p && Array.isArray(p.files)) ? p.files : Array.isArray(p) ? p : [];
-async function drvSavePref() { try { await Store.put('meta', { id: 'drive-pref', auto: S.drv.auto, folderId: S.drv.folderId, lastTs: S.drv.lastTs }); } catch (e) { } }
+async function drvSavePref() { try { await Store.put('meta', { id: 'drive-pref', auto: S.drv.auto, intervalDays: [1,7,15,30].includes(+S.drv.intervalDays) ? +S.drv.intervalDays : 1, folderId: S.drv.folderId, lastTs: S.drv.lastTs }); } catch (e) { } }
 async function drvFolder() {
   if (S.drv.folderId) return S.drv.folderId;
   const f = drvFiles(await drvCall('search_files', { query: `title = '${DRV_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and owner = 'me'`, excludeContentSnippets: true, pageSize: 5 }))[0];
@@ -1115,7 +1099,7 @@ async function drvBackup(manual) {
 }
 function drvAuto() {
   const d = S.drv; if (!HAS_CLAUDE || !d.auto || d.busy || !hasRealData()) return;
-  if (Date.now() - d.lastTs < DRV_GAP || Date.now() - d.failAt < 30 * 60000) return;
+  if (Date.now() - d.lastTs < (Math.max(1, +d.intervalDays || 1) * DAY) || Date.now() - d.failAt < 30 * 60000) return;
   drvBackup(false);
 }
 async function drvList() {
@@ -1141,10 +1125,10 @@ function driveCardBody(intro) {
   const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^tiabete-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
   return `<p class="hint" style="margin:0 0 12px">${intro}</p>
     <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled' : ''}>${d.busy ? 'Aguarde…' : 'Fazer backup no Drive agora'}</button>
-    <label class="chk"><input type="checkbox" id="drv-auto" ${d.auto ? 'checked' : ''}><span>Backup automático (no máximo 1 por dia, ao abrir o app)</span></label>
+    <label class="chk"><input type="checkbox" id="drv-auto" ${d.auto ? 'checked' : ''}><span>Ativar backup automático</span></label><div class="field"><label class="fl" for="drv-interval">Frequência do backup</label><select class="in" id="drv-interval"><option value="1"${(+d.intervalDays===1)?' selected':''}>A cada 1 dia (padrão)</option><option value="7"${(+d.intervalDays===7)?' selected':''}>A cada 7 dias</option><option value="15"${(+d.intervalDays===15)?' selected':''}>A cada 15 dias</option><option value="30"${(+d.intervalDays===30)?' selected':''}>A cada 30 dias</option></select></div>
     <button class="btn full" data-act="drv-list" ${d.busy ? 'disabled' : ''}>Ver backups no Drive para restaurar</button></div>${list}
     <p class="hint" style="margin:12px 0 0">Último backup no Drive: <b>${when || 'nenhum ainda'}</b>.${d.msg && d.msg !== 'ok' ? `</p><p class="hint" style="margin:6px 0 0;color:var(--red-t)" role="alert">${esc(d.msg)}` : ''}</p>
-    <p class="hint" style="margin:6px 0 0">O app não apaga backups antigos do Drive. Apague-os por lá quando quiser.</p>`;
+    <p class="hint" style="margin:6px 0 0">A frequência é verificada quando o TiaBete é aberto e tem conexão. O navegador/PWA não garante execução diária com o app fechado. O app não apaga backups antigos do Drive.</p>`;
 }
 function driveCard() {
   if (!HAS_CLAUDE) return '';
@@ -1158,72 +1142,9 @@ document.addEventListener('click', async e => {
   catch (err) { console.error(err); }
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'drv-interval') { S.drv.intervalDays = [1,7,15,30].includes(+e.target.value) ? +e.target.value : 1; await drvSavePref(); toast('Frequência do backup atualizada.'); return; }
   if (e.target.id !== 'drv-auto') return;
   S.drv.auto = e.target.checked; S.drv.failAt = 0; await drvSavePref();
   if (S.drv.auto) { const ok = await drvBackup(true); if (!ok) { S.drv.auto = false; await drvSavePref(); render(); } }
   else toast('Backup automático desligado.');
 });
-
-
-/* ================= Perfil (cadastro opcional, só neste aparelho) ================= */
-const PF_TYPES = ['MODY', 'Tipo 1', 'Tipo 2', 'Gestacional', 'Outro', 'Prefiro não informar'];
-const pfClean = p => ({ name: String(p.name || '').slice(0, 80), birth: /^\d{4}-\d\d-\d\d$/.test(p.birth || '') ? p.birth : '', type: PF_TYPES.includes(p.type) ? p.type : '', team: String(p.team || '').slice(0, 80) });
-async function pfSave() { try { await Store.put('meta', { id: 'profile', value: S.profile }); } catch (e) { } }
-function pfLine() {
-  const p = S.profile; if (!p) return '';
-  const parts = [p.name && 'Paciente: ' + p.name, p.birth && 'Nascimento: ' + fmtDate(p.birth), p.type && p.type !== 'Prefiro não informar' && 'Diabetes: ' + p.type, p.team && 'Equipe: ' + p.team].filter(Boolean);
-  return parts.join('  ·  ');
-}
-function viewPerfil() {
-  const p = S.profile || {}, first = S.profPrompt, gp = window.TB_DRV_STATE && TB_DRV_STATE.profile;
-  const name = p.name != null && S.profile ? p.name : (gp && gp.name) || '';
-  return banners() + `<div class="card"><p class="hint" style="margin:0">${first ? '<b>Cadastro opcional.</b> ' : ''}Estas informações ficam <b>só neste aparelho</b> (e no seu backup). Servem para personalizar o app e para o cabeçalho dos relatórios que você leva ao médico. Não mudam nenhum cálculo nem faixa de glicemia.</p></div>
-  <h2 class="sec">Seus dados</h2><div class="card"><form id="pf-form" class="stack" style="gap:12px">
-    <div class="field"><label class="fl" for="pf-name">Nome</label><input class="in" id="pf-name" autocomplete="off" maxlength="80" value="${esc(name)}"></div>
-    <div class="field"><label class="fl" for="pf-birth">Data de nascimento (opcional)</label><input class="in" id="pf-birth" type="date" max="${isoDate(new Date())}" value="${esc(p.birth || '')}"></div>
-    <div class="field"><label class="fl" for="pf-type">Tipo de diabetes</label><select class="in" id="pf-type"><option value="">Não informado</option>${PF_TYPES.map(t => `<option ${p.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-    <div class="field"><label class="fl" for="pf-team">Médico ou equipe de saúde (opcional)</label><input class="in" id="pf-team" autocomplete="off" maxlength="80" value="${esc(p.team || '')}"></div>
-    <button class="btn pri full" type="submit">Salvar</button>
-    ${first ? '<button class="btn full" type="button" data-act="pf-skip">Agora não</button>' : ''}
-    ${S.profile ? '<button class="btn full" type="button" data-act="pf-clear">Apagar meu perfil deste aparelho</button>' : ''}
-  </form></div>`;
-}
-document.addEventListener('submit', async e => {
-  if (e.target.id !== 'pf-form') return; e.preventDefault();
-  const v = id => document.getElementById(id).value.trim();
-  S.profile = pfClean({ name: v('pf-name'), birth: v('pf-birth'), type: v('pf-type'), team: v('pf-team') }); S.profPrompt = false; await pfSave(); toast('Perfil salvo.'); go('mais');
-});
-document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act="pf-skip"],[data-act="pf-clear"]'); if (!el) return;
-  if (el.dataset.act === 'pf-skip') { S.profPrompt = false; try { await Store.put('meta', { id: 'profile-skip', value: true }); } catch (x) { } go('painel'); }
-  else { S.profile = null; try { await Store.put('meta', { id: 'profile', value: null }); } catch (x) { } toast('Perfil apagado.'); render(); }
-});
-
-
-/* ================= Escala da tela (acessibilidade) ================= */
-const SCALES = [[1, 'Padrão'], [1.15, 'Grande'], [1.3, 'Maior'], [1.5, 'Máximo']];
-S.scale = 1;
-const scaleOk = v => v <= 1.3 || window.innerWidth / v >= 300; /* em telas estreitas só os níveis que cabem, para nada ficar desconfigurado */
-const BASE_ZOOM = (() => { try { return parseFloat(getComputedStyle(document.documentElement).zoom) || 1; } catch (e) { return 1; } })();
-function applyScale() { try { const v = scaleOk(S.scale) ? S.scale : 1.3; document.documentElement.style.zoom = v === 1 ? '' : String(+(BASE_ZOOM * v).toFixed(4)); } catch (e) { } }
-function scaleCard() {
-  return `<h2 class="sec">Tamanho da tela</h2><div class="card" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">Aumenta textos e botões para enxergar melhor. “Padrão” é o tamanho original do app.</p><div class="seg" role="group" aria-label="Tamanho da tela" style="display:flex">${SCALES.filter(([v]) => scaleOk(v)).map(([v, t]) => `<button class="grow" data-act="scale" data-v="${v}" aria-pressed="${S.scale === v}">${t}<br><small>${Math.round(v * 100)}%</small></button>`).join('')}</div></div>`;
-}
-document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act="scale"]'); if (!el) return;
-  const v = +el.dataset.v; if (!SCALES.some(x => x[0] === v)) return;
-  S.scale = v; applyScale(); try { await Store.put('meta', { id: 'ui-scale', value: v }); } catch (x) { } render();
-});
-
-/* ================= Configurações (tudo que o usuário pode ajustar) ================= */
-function viewConfig() {
-  const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + themeCard() + scaleCard() + `
-  <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
-    <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
-    <div class="row sp"><span><b>Limite da insulina do jantar</b><br><span class="dim" style="font-size:12.5px">Hoje: ${S.ins.dinnerMin} mg/dL (definido por você e seu médico)</span></span><button class="btn sm" data-act="ins-min">Alterar</button></div>
-    <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
-  </div></div>
-  <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
-}
-document.addEventListener('click', e => { if (e.target.closest('#cfg')) go('config'); });
