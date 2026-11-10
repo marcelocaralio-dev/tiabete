@@ -1,7 +1,7 @@
 // Monta www/index.html (um único arquivo) a partir de src/ + native/native.js, com fontes locais (@fontsource).
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..'), rd = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
-const order = ['native/ai-core.js', 'src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'native/native.js', 'native/ai-ui.js', 'native/drive.js', 'src/init.js'];
+const order = ['native/ai-core.js', 'src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'native/native.js', 'native/ai-ui.js', 'native/drive.js', 'native/login.js', 'src/init.js'];
 /* ID do cliente Google (OAuth) para o backup no Drive: arquivo config/google-client-id.txt (não é segredo). Se não existir, o app pede para colar na tela. */
 let gid = ''; try { gid = rd('config', 'google-client-id.txt').trim().split(/\s+/)[0] || ''; } catch (e) { }
 /* Textos do app web que citam o Claude viram textos neutros: no APK a IA é a que o usuário configurar. */
@@ -14,6 +14,9 @@ const APK_TEXT = [
 ];
 let js = order.map(f => rd(f)).join('\n');
 for (const [a, b] of APK_TEXT) js = js.replace(a, b);
+/* Data/hora da compilação (horário de Brasília) para a tela Sobre */
+const BR = new Date(Date.now() - 3 * 3600e3), p2 = n => String(n).padStart(2, '0');
+js = js.replace('__BUILD_DATE__', `${p2(BR.getUTCDate())}/${p2(BR.getUTCMonth() + 1)}/${BR.getUTCFullYear()} ${p2(BR.getUTCHours())}:${p2(BR.getUTCMinutes())}`);
 js = 'window.TB_PUBLIC = true;\nwindow.TB_GOOGLE_CLIENT_ID = ' + JSON.stringify(gid) + ';\n' + js;
 const fonts = [['unbounded', 'Unbounded', [500, 700]], ['manrope', 'Manrope', [400, 500, 600, 700, 800]], ['jetbrains-mono', 'JetBrains Mono', [400, 500]]];
 const out = path.join(root, 'www'); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });

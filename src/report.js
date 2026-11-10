@@ -48,6 +48,7 @@ async function makePDFInner() {
   doc.text('RELATÓRIO GLICÊMICO · versão ' + APP_VERSION, M, 70);
   doc.text(`Período ${fmtDate(D.from)} a ${fmtDate(D.to)}   ·   gerado em ${new Date().toLocaleDateString('pt-BR')}`, W - M, 70, { align: 'right' });
   y = 116;
+  if (pfLine()) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK); doc.text(pfLine(), M, y); y += 18; }
   if (D.ex) { doc.setTextColor(...RED); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text('ATENÇÃO: este relatório contém DADOS DE EXEMPLO.', M, y); y += 18; }
   const need = h => { if (y + h > H - 56) { doc.addPage(); y = 52; } };
   const h2 = t => { need(60); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...RED); doc.text(t.toUpperCase(), M, y); doc.setDrawColor(...DARK); doc.setLineWidth(.8); doc.line(M, y + 5, W - M, y + 5); y += 20; };
@@ -162,7 +163,7 @@ async function makeXLSXInner() {
   const hw = [12, 8, 16, 14, 18, 14, 14, 16, 12, 10, 10, 10, 14, 18, 20, 30, 10];
   const sheets = [
     { name: 'Resumo', title: 0, hdr: [4, 13], widths: [36, 26, 18], rows: [
-      ['TiaBete ' + APP_VERSION + ' - Relatório glicêmico'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
+      ['TiaBete ' + APP_VERSION + ' - Relatório glicêmico'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], pfLine() ? ['Paciente', pfLine()] : [], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
       ['Indicador', 'Valor'], ['Medições', s.n], ['Média (mg/dL)', r1(s.mean)], ['Desvio-padrão (mg/dL)', r1(s.sd)], ['Menor (mg/dL)', s.min ?? ''], ['Maior (mg/dL)', s.max ?? ''], ['Medições < 70', s.hypo], ['Medições acima da faixa', s.hyper], [],
       ['Faixa (mg/dL)', 'Medições', '% das medições'], ...BAND_LIST.map(b => [b.label + ' ' + b.name, D.bands[b.k], s.n ? r1(D.bands[b.k] / s.n * 100) : 0]), [],
       ['Observação', 'Contagem de medições pontuais; não representa tempo no alvo (TIR). Este relatório não recomenda doses.']] },
