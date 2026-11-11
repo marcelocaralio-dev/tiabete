@@ -778,9 +778,9 @@ function menuGroups() {
 }
 const hubOf = r => { if (r === 'perguntas' || r === 'ia') return 'g-ia'; const G = menuGroups(); for (const [k, g] of Object.entries(G)) if (g.items.some(x => x[0] === r)) return k; return null; };
 const hubView = k => () => { const g = menuGroups()[k]; return banners() + `<div class="stack">${g.items.map(x => menuItem(x[0], x[1], x[2])).join('')}</div>`; };
-const MAIS_KW = { bolus: 'refeicao refeicoes alimentos carboidrato calculo insulina rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'nome idade nascimento tipo diabetes equipe medico', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'nome idade nascimento tipo diabetes equipe medico', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
 function maisIndex() {
-  const G = menuGroups(), out = [{ r: 'bolus', t: 'Cálculo de bolus', d: 'Alimentos, refeições salvas, refeições feitas e bolus por dia', g: '' }, { r: 'hypo', t: 'Protocolo de hipoglicemia', d: 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', g: '', act: 'hypo-open' }];
+  const G = menuGroups(), out = [{ r: 'bolus', t: 'Cálculo de bolus', d: 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia', g: '' }, { r: 'hypo', t: 'Protocolo de hipoglicemia', d: 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', g: '', act: 'hypo-open' }];
   for (const g of Object.values(G)) for (const x of g.items) out.push({ r: x[0], t: x[1], d: x[2], g: g.t });
   out.push({ r: 'sobre', t: 'Sobre e limites', d: 'Privacidade, métodos e avisos', g: '' });
   return out;
@@ -795,7 +795,7 @@ document.addEventListener('click', e => { const c = e.target.closest('[data-act=
 function maisMenu() {
   const G = menuGroups(), grp = k => G[k].items.length > 1 ? menuItem(k, G[k].t, G[k].d) : G[k].items.length ? menuItem(G[k].items[0][0], G[k].items[0][1], G[k].items[0][2]) : '';
   const hypo = `<button class="menu-item" data-act="hypo-open">${mi('hypo')}<div>Protocolo de hipoglicemia<span>Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return menuItem('bolus', 'Cálculo de bolus', 'Alimentos, refeições salvas, refeições feitas e bolus por dia') + hypo + grp('g-trat') + grp('g-exames') + grp('g-analises') + grp('g-ia') + grp('g-dados') + grp('g-ajustes') + menuItem('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos');
+  return menuItem('bolus', 'Cálculo de bolus', 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia') + hypo + grp('g-trat') + grp('g-exames') + grp('g-analises') + grp('g-ia') + grp('g-dados') + grp('g-ajustes') + menuItem('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos');
 }
 function viewMais() {
   const q = S.maisQ || '';
@@ -819,6 +819,20 @@ function viewSobre() {
 /* ================= Roteamento e renderização ================= */
 
 const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, 'g-trat': hubView('g-trat'), 'g-exames': hubView('g-exames'), 'g-analises': hubView('g-analises'), 'g-ia': hubView('g-ia'), 'g-dados': hubView('g-dados'), 'g-ajustes': hubView('g-ajustes') };
+/* ---- Aviso de segurança e responsabilidade médica (páginas com exames, bolus, estimativas, IA e tratamento) ---- */
+const SF_SHORT = { exames: 'A IA pode errar. Os resultados não substituem o seu médico.', exame: 'A IA pode errar. Os resultados não substituem o seu médico.', comparar: 'A IA pode errar. Os resultados não substituem o seu médico.', perguntas: 'As respostas da IA podem ter imprecisões e não substituem o seu médico.', hba1c: 'Estimativas não são exame e não decidem tratamento.', bolus: 'Cálculos não substituem o seu médico. Não mude doses por conta própria.', esquemas: 'Doses e remédios só mudam com orientação médica.', painel: 'Ferramenta de apoio ao acompanhamento. Não substitui o seu médico.' };
+function safetyNote(view, route) {
+  const sh = SF_SHORT[route]; if (!sh) return;
+  const el = document.createElement('details'); el.className = 'sf-note' + (route === 'painel' ? ' bottom' : '');
+  el.innerHTML = `<summary><span class="sf-i" aria-hidden="true">!</span><span class="sf-t">${sh}</span><span class="sf-m">Aviso completo</span></summary><ul>
+    <li>O TiaBete é uma ferramenta de <b>acompanhamento e apoio</b> ao gerenciamento do diabetes.</li>
+    <li>Ele <b>não substitui</b> consultas, exames nem o acompanhamento com endocrinologista e outros profissionais de saúde.</li>
+    <li>Resultados da <b>IA</b> podem conter imprecisões. Confira sempre com o laudo e com a sua equipe.</li>
+    <li>Cálculos e estimativas (bolus, HbA1c estimada, médias) <b>não devem ser usados isoladamente</b> para decidir o tratamento.</li>
+    <li>Mudanças nas doses de insulina e de medicamentos <b>só com orientação médica</b>.</li>
+    <li>Em hipoglicemia ou hiperglicemia, siga o <b>seu plano de cuidados individualizado</b>. Emergência: SAMU 192.</li></ul>`;
+  if (route === 'painel') view.appendChild(el); else { const h = view.querySelector('h1.pg'); if (h) h.after(el); else view.prepend(el); }
+}
 function render() {
   const route = VIEWS[S.route] ? S.route : 'painel';
   const back = !['painel', 'historico', 'analise', 'mais'].includes(route);
@@ -826,6 +840,7 @@ function render() {
   view.innerHTML = `<h1 class="pg">${back ? `<button class="btn sm" data-act="go" data-r="${backOf(route)}" style="margin-right:10px;vertical-align:middle" aria-label="Voltar">←</button>` : ''}${TITLES[route]}</h1>` + VIEWS[route]();
   $('#nav').innerHTML = navHTML();
   makeAccordions(view);
+  safetyNote(view, route);
   attachCharts(view);
   rewardSoon();
   setTimeout(drvAuto, 2500);

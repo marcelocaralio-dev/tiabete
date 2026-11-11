@@ -472,7 +472,7 @@ function makeAccordions(view) {
     const body = []; for (let n = h.nextElementSibling; n && !isHead(n); n = n.nextElementSibling) body.push(n);
     if (!body.length) return;
     const k0 = key.split('|')[1];
-    const open = ACC_ALL ? true : key in S.acc ? !!S.acc[key] : dflt ? dflt.some(d => k0.startsWith(d)) : many ? i === 0 : true;
+    const open = ACC_ALL ? true : key in S.acc ? !!S.acc[key] : route === 'bolus' && k0.startsWith('tutorial') ? false : dflt ? dflt.some(d => k0.startsWith(d)) : many ? i === 0 : true;
     const wrap = document.createElement('div'); wrap.className = 'acc-b'; wrap.id = 'acc-' + i; wrap.hidden = !open;
     h.after(wrap); body.forEach(n => wrap.appendChild(n));
     h2.classList.add('acc-h'); h2.setAttribute('role', 'button'); h2.tabIndex = 0; h2.dataset.key = key; h2.setAttribute('aria-expanded', open); h2.setAttribute('aria-controls', wrap.id);
@@ -739,6 +739,7 @@ async function applyBackupState(st, replace) {
   try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
   try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
+  try { if (st.bolus && Array.isArray(st.bolus.rlog)) { const have = new Set(blRlog().map(r => r.id)), add = blCleanRlog(st.bolus.rlog).filter(r => !have.has(r.id)); if (add.length) { S.bl.rlog = blRlog().concat(add).sort((x, y) => x.ts - y.ts); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
   try { if (st.bolus && Array.isArray(st.bolus.meals)) { const have = new Set(blMeals().map(m => m.id)), add = blCleanMeals(st.bolus.meals).filter(m => !have.has(m.id)); if (add.length) { S.bl.meals = blMeals().concat(add); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
   try {
     const i = st.insulin;

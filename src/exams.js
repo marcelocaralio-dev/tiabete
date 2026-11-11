@@ -15,6 +15,34 @@ const exSorted = () => [...S.exams].sort((a, b) => (b.date || '').localeCompare(
 
 /* ---------- acesso ao Claude (capacidade "sample") ---------- */
 async function getSample() { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } }
+/* ---- Dependência da IA: estado e cartão de orientação (exames e bolus) ---- */
+/* 'ok' = IA pronta · 'notcfg' = falta configurar (app Android) · 'none' = indisponível neste ambiente */
+let AI_CFG, AI_T = 0;
+function aiRefresh() {
+  if (!(window.TB_AI && window.TB_AI.config) || Date.now() - AI_T < 1500) return; AI_T = Date.now();
+  Promise.resolve().then(() => window.TB_AI.config()).then(c => { const v = !!c; if (v !== AI_CFG) { AI_CFG = v; try { render(); } catch (e) {} } }).catch(() => { if (AI_CFG !== false) { AI_CFG = false; try { render(); } catch (e) {} } });
+}
+function aiState() {
+  if (!HAS_CLAUDE) return 'none';
+  if (window.TB_AI && window.TB_AI.config) { aiRefresh(); return AI_CFG === false ? 'notcfg' : 'ok'; }
+  return 'ok';
+}
+function aiCard(ctx) {
+  const st = aiState();
+  if (st === 'ok') {
+    const nat = !!(window.TB_AI && window.TB_AI.config), can = !!(typeof VIEWS !== 'undefined' && VIEWS.ia);
+    const what = ctx === 'exames' ? 'A análise dos exames depende da IA.' : 'O cálculo inteligente depende da IA. Sem ela, cadastre os alimentos à mão.';
+    return `<div class="ai-ok"><span class="ai-dot" aria-hidden="true"></span><span class="ai-tx"><b>IA ${nat ? 'configurada' : 'ativa'}</b> · ${what}</span>${nat && can ? '<button class="ai-lk" data-act="go" data-r="ia">Ajustar</button>' : ''}</div>`;
+  }
+  const canCfg = !!(typeof VIEWS !== 'undefined' && VIEWS.ia);
+  const need = ctx === 'exames'
+    ? 'A <b>análise e a interpretação dos exames</b> dependem da integração com a IA. Sem ela, o app não lê os laudos.'
+    : 'O <b>cálculo inteligente de bolus</b> depende da integração com a IA: ela identifica os alimentos que você descreve e estima os carboidratos. Sem a IA, você precisa <b>cadastrar à mão</b> cada alimento, com seus carboidratos, e informar a quantidade de cada um (aba Alimentos).';
+  if (st === 'none' || !canCfg) return `<div class="card soft ai-need"><b>IA indisponível aqui</b><p class="hint" style="margin:6px 0 0">${need}</p><p class="hint" style="margin:8px 0 0">Este recurso só funciona quando o app é aberto dentro do Claude ou no aplicativo para Android, com a IA configurada.</p></div>`;
+  return `<div class="card soft ai-need" role="alert"><b>Configure a IA para usar este recurso</b><p class="hint" style="margin:6px 0 0">${need}</p>
+    <ol class="hint" style="margin:8px 0 10px;padding-left:20px"><li>Toque em <b>Configurar a IA agora</b>.</li><li>Escolha um provedor e cole a sua chave da API. A tela explica, passo a passo, como obter uma (há opções gratuitas).</li><li>Marque a caixa de ciência, toque em <b>Salvar</b> e depois em <b>Testar conexão</b>. Volte aqui quando aparecer “conectado”.</li></ol>
+    <button class="btn pri full" data-act="go" data-r="ia">Configurar a IA agora</button></div>`;
+}
 function sampleErrMsg(e) {
   if (e && e.aiMsg) return e.aiMsg;
   const c = e && e.code;
@@ -164,11 +192,13 @@ function exListHTML() {
 function viewExames() {
   const dated = S.exams.filter(e => e.date).length;
   let h = banners();
-  h += `<p class="hint" style="margin:0 0 12px">Envie seus exames de laboratório em <b>PDF</b> (ou foto). O Claude lê cada um, compara com a referência impressa no próprio laudo, dá uma <b>nota de 0 a 10</b> e explica o contexto. Depois você pode comparar os exames entre si.</p>
+  const aiOk = aiState() === 'ok';
+  h += aiCard('exames') + (aiOk ? '' : '<div style="height:12px"></div>');
+  h += `<p class="hint" style="margin:0 0 12px">Envie seus exames em <b>PDF</b> (ou foto). A IA lê cada um, dá uma <b>nota de 0 a 10</b> e explica o contexto.</p>
   ${lastExamBox()}<div style="height:12px"></div>
   <input type="file" id="ex-file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/gif" multiple hidden>
-  <div class="stack"><button class="btn pri full" data-act="ex-pick" ${S.ex.busy ? 'disabled' : ''}>Enviar exames (PDF ou foto)</button>
-  <button class="btn full" data-act="ex-paste" ${S.ex.busy ? 'disabled' : ''}>Colar o texto de um laudo</button></div>`;
+  <div class="stack"><button class="btn pri full" data-act="ex-pick" ${S.ex.busy || !aiOk ? 'disabled' : ''}>Enviar exames (PDF ou foto)</button>
+  <button class="btn full" data-act="ex-paste" ${S.ex.busy || !aiOk ? 'disabled' : ''}>Colar o texto de um laudo</button></div>`;
   if (S.ex.paste) h += `<div class="card" style="margin-top:12px"><label class="fl" for="ex-text">Cole aqui o texto do laudo</label><textarea class="in" id="ex-text" style="min-height:160px" placeholder="Copie o texto do site do laboratório ou do PDF e cole aqui"></textarea><div class="row" style="margin-top:10px"><button class="btn pri grow" data-act="ex-paste-go">Analisar</button><button class="btn" data-act="ex-paste">Cancelar</button></div></div>`;
   h += queueHTML();
   h += `<div class="card soft" style="margin-top:12px;border-style:dashed"><p class="hint" style="margin:0"><b>Privacidade.</b> Ao analisar, o texto do exame (sem CPF nem e-mail) é enviado ao Claude da sua conta, depois de você autorizar. Os resultados ficam salvos só neste navegador; o PDF em si não é guardado. A análise é educativa, <b>não é diagnóstico</b> e não indica tratamento. Confira sempre com o laudo original e converse com seu médico.</p></div>`;
