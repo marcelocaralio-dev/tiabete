@@ -1,0 +1,113 @@
+/* ---------- Menu lateral (Navigation Drawer) ----------
+   Abre ao tocar no avatar da barra superior ou ao deslizar a partir da borda esquerda.
+   Módulos: DR_ICONS (ícones) · drMetrics · drBody (conteúdo) · drOpen/drClose (estado) · gestos · teclado. */
+const DR_IC = {
+  home: '<path d="M3 11l9-8 9 8M5 10v10h14V10"/>', list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  chart: '<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>',
+  pill: '<path d="M10.5 20.5a5 5 0 0 1-7-7l9-9a5 5 0 0 1 7 7z"/><path d="M8.5 8.5l7 7"/>',
+  drop: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z"/>', cloud: '<path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1 0 9z"/>',
+  more: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>', dot: '<path d="M9 6l6 6-6 6"/>'
+};
+const drIc = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${DR_IC[k] || DR_IC.dot}</svg>`;
+const DR = { open: false, more: false, last: null };
+const DR_MAIN = [['painel', 'Painel', 'home'], ['historico', 'Histórico', 'list'], ['analise', 'Análise', 'chart'], ['perfil', 'Meu Perfil', 'user'], ['bolus', 'Cálculo de bolus', 'calc'], ['esquemas', 'Esquemas de tratamento', 'pill'], ['hba1c', 'Hemoglobina glicada', 'drop'], ['backup', 'Backup e dados', 'cloud']];
+
+function drMetrics() {
+  const rs = S.records.filter(r => !isEx(r)), n = rs.length;
+  if (!n) return [['—', 'medições'], ['—', 'última'], ['—', 'média 30 d']];
+  const last = rs.reduce((a, b) => (b.ts > a.ts ? b : a)), lim = Date.now() - 30 * 864e5;
+  const m = rs.filter(r => r.ts >= lim && Number.isFinite(r.glucose)), mean = m.length ? Math.round(m.reduce((s, r) => s + r.glucose, 0) / m.length) : null;
+  return [[String(n), n === 1 ? 'medição' : 'medições'], [Number.isFinite(last.glucose) ? String(Math.round(last.glucose)) : '—', 'última mg/dL'], [mean == null ? '—' : String(mean), 'média 30 d mg/dL']];
+}
+function drItem(r, t, i, sub) {
+  const cur = S.route === r || hubOf(S.route) === r ? ' aria-current="page"' : '';
+  return `<button class="dr-it${sub ? ' sub' : ''}" type="button" data-dr-go="${r}"${cur}>${sub ? '' : drIc(i)}<span>${esc(t)}</span></button>`;
+}
+function drMore() {
+  const used = new Set(DR_MAIN.map(x => x[0]).concat(['config', 'sobre', 'mais'])), seen = new Set(), out = [];
+  for (const g of Object.values(menuGroups())) for (const x of g.items) { if (used.has(x[0]) || seen.has(x[0]) || !VIEWS[x[0]]) continue; seen.add(x[0]); out.push([x[0], x[1]]); }
+  for (const [r, t] of [['relatorios', 'Relatórios'], ['importar', 'Importar do mySugr'], ['padroes', 'Padrões'], ['conquistas', 'Conquistas'], ['eventos', 'Eventos'], ['sobre', 'Sobre e limites']]) if (VIEWS[r] && !seen.has(r)) { seen.add(r); out.push([r, t]); }
+  return out;
+}
+function drBody() {
+  const p = S.profile || {}, name = p.name || '', type = p.type && p.type !== 'Prefiro não informar' ? p.type : '';
+  const light = themeEff() === 'light', mt = drMetrics();
+  return `<div class="dr-head"><button class="dr-x" type="button" data-dr-close aria-label="Fechar menu">${drIc('x')}</button>
+    <button class="dr-me" type="button" data-dr-go="perfil" aria-label="Abrir Meu Perfil"><span class="dr-av pf-av">${pfAvatarHTML()}</span></button>
+    <div class="dr-name">${esc(name || 'Seu perfil')}</div><div class="dr-sub">${esc(type ? 'Diabetes ' + type : (name ? 'Ver e editar perfil' : 'Toque para criar o seu perfil'))}</div>
+    <div class="dr-met">${mt.map(m => `<div><b>${esc(m[0])}</b><span>${esc(m[1])}</span></div>`).join('')}</div></div>
+  <nav class="dr-nav" aria-label="Menu principal">${DR_MAIN.filter(x => VIEWS[x[0]]).map(x => drItem(x[0], x[1], x[2])).join('')}
+    <button class="dr-it dr-mb" type="button" data-dr-more aria-expanded="${DR.more}" aria-controls="dr-more">${drIc('more')}<span>Mais</span><i class="dr-ch${DR.more ? ' on' : ''}">${drIc('chev')}</i></button>
+    <div class="dr-more${DR.more ? ' on' : ''}" id="dr-more"><div>${drMore().map(x => drItem(x[0], x[1], '', true)).join('')}</div></div></nav>
+  <div class="dr-foot">
+    <button class="dr-it" type="button" data-dr-theme role="switch" aria-checked="${light}">${drIc(light ? 'sun' : 'moon')}<span>Tema ${light ? 'claro' : 'escuro'}</span><i class="dr-sw${light ? ' on' : ''}"></i></button>
+    <button class="dr-it" type="button" data-dr-go="config">${drIc('gear')}<span>Configurações e Privacidade</span></button>
+    <button class="dr-it" type="button" data-dr-go="sobre">${drIc('help')}<span>Central de Ajuda</span></button></div>`;
+}
+function drEnsure() {
+  if (document.getElementById('dr')) return;
+  const bg = document.createElement('div'); bg.className = 'dr-bg'; bg.id = 'dr-bg'; bg.setAttribute('data-dr-close', '');
+  const a = document.createElement('aside'); a.className = 'dr'; a.id = 'dr'; a.setAttribute('role', 'dialog'); a.setAttribute('aria-modal', 'true'); a.setAttribute('aria-label', 'Menu de navegação'); a.setAttribute('inert', '');
+  document.body.append(bg, a);
+}
+function drOpen() {
+  drEnsure(); const a = document.getElementById('dr'), bg = document.getElementById('dr-bg'); if (DR.open) return;
+  DR.open = true; DR.last = document.activeElement; a.innerHTML = drBody(); a.removeAttribute('inert'); a.style.transform = ''; bg.style.opacity = '';
+  a.classList.add('on'); bg.classList.add('on'); document.documentElement.classList.add('dr-lock');
+  const b = document.getElementById('pfb'); if (b) b.setAttribute('aria-expanded', 'true');
+  setTimeout(() => { const f = a.querySelector('.dr-me'); if (f) f.focus({ preventScroll: true }); }, 30);
+}
+function drClose(restore) {
+  const a = document.getElementById('dr'), bg = document.getElementById('dr-bg'); if (!a || !DR.open) return;
+  DR.open = false; a.classList.remove('on'); bg.classList.remove('on'); a.style.transform = ''; bg.style.opacity = ''; a.setAttribute('inert', '');
+  document.documentElement.classList.remove('dr-lock');
+  const b = document.getElementById('pfb'); if (b) b.setAttribute('aria-expanded', 'false');
+  if (restore !== false && b) b.focus({ preventScroll: true });
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('#pfb')) { DR.open ? drClose() : drOpen(); return; }
+  if (!DR.open) return;
+  const g = t.closest('[data-dr-go]');
+  if (g) { const r = g.dataset.drGo; drClose(false); go(r); return; }
+  if (t.closest('[data-dr-more]')) { DR.more = !DR.more; const m = document.getElementById('dr-more'), b = t.closest('[data-dr-more]'); m.classList.toggle('on', DR.more); b.setAttribute('aria-expanded', DR.more); b.querySelector('.dr-ch').classList.toggle('on', DR.more); if (DR.more) setTimeout(() => m.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 200); return; }
+  if (t.closest('[data-dr-theme]')) { setTheme(themeEff() === 'light' ? 'dark' : 'light').then(() => { const a = document.getElementById('dr'); if (a && DR.open) { const y = a.scrollTop; a.innerHTML = drBody(); a.scrollTop = y; const f = a.querySelector('[data-dr-theme]'); if (f) f.focus({ preventScroll: true }); } }); return; }
+  if (t.closest('[data-dr-close]')) drClose();
+});
+document.addEventListener('keydown', e => {
+  if (!DR.open) return;
+  if (e.key === 'Escape') { e.preventDefault(); drClose(); return; }
+  if (e.key !== 'Tab') return;
+  const f = [...document.querySelectorAll('#dr button')].filter(x => x.offsetParent !== null); if (!f.length) return;
+  const i = f.indexOf(document.activeElement);
+  if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+});
+/* Gesto: arrastar a partir da borda esquerda abre; arrastar para a esquerda sobre o menu fecha */
+(function drSwipe() {
+  const W = () => Math.min(320, window.innerWidth * .86); let g = null;
+  const EDGE = 22;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return; const t = e.touches[0];
+    if (!DR.open && t.clientX <= EDGE && !document.querySelector('.sheet-bg, .rw-bg')) g = { m: 'open', x: t.clientX, y: t.clientY, dx: 0, on: false };
+    else if (DR.open && e.target.closest('#dr, #dr-bg')) g = { m: 'close', x: t.clientX, y: t.clientY, dx: 0, on: false };
+    else g = null;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!g) return; const t = e.touches[0], dx = t.clientX - g.x, dy = t.clientY - g.y;
+    if (!g.on) { if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { g = null; return; } if (Math.abs(dx) < 8) return; if ((g.m === 'open' && dx < 0) || (g.m === 'close' && dx > 0)) { g = null; return; } g.on = true; if (g.m === 'open') { drOpen(); } const a = document.getElementById('dr'); a.classList.add('drag'); document.getElementById('dr-bg').classList.add('drag'); }
+    g.dx = dx; const w = W(), p = g.m === 'open' ? Math.max(0, Math.min(1, dx / w)) : Math.max(0, Math.min(1, 1 + dx / w));
+    const a = document.getElementById('dr'); a.style.transform = `translateX(${(p - 1) * 100}%)`; document.getElementById('dr-bg').style.opacity = String(p);
+  }, { passive: true });
+  const end = () => {
+    if (!g) return; const on = g.on, m = g.m, dx = g.dx; g = null; if (!on) return;
+    const a = document.getElementById('dr'), bg = document.getElementById('dr-bg'); a.classList.remove('drag'); bg.classList.remove('drag');
+    a.style.transform = ''; bg.style.opacity = ''; const w = W(), shown = m === 'open' ? dx > w * .33 : -dx < w * .33;
+    if (shown) { DR.open = true; a.classList.add('on'); bg.classList.add('on'); } else drClose(false);
+  };
+  document.addEventListener('touchend', end, { passive: true }); document.addEventListener('touchcancel', end, { passive: true });
+})();

@@ -27,7 +27,9 @@ const PL_PRESETS = {
 S.plan = { types: [], insulin: [], meds: [], checks: [], pump: { model: '', notes: '', siteDays: 3, lastChange: '', siteTime: '08:00', alarm: false } };
 S.planOpen = {}; S.planDone = { day: '', map: {} };
 const plTime = t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t || '');
-const plItem0 = (o, role) => ({ id: uid(), name: String(o.name || '').slice(0, 80), role: o.role || role || '', times: (o.times || []).filter(plTime).slice(0, 8), dose: String(o.dose || '').slice(0, 120), notes: String(o.notes || '').slice(0, 200), alarm: o.alarm !== false });
+const plDays0 = d => [...new Set((Array.isArray(d) ? d : []).map(Number).filter(x => x >= 0 && x <= 6))].sort(), plOff0 = (o, tm) => (Array.isArray(o.off) ? o.off : []).filter(t => tm.includes(t));
+const plItem0 = (o, role) => { const tm = (o.times || []).filter(plTime).slice(0, 8); return plItem1(o, role, tm); };
+const plItem1 = (o, role, tm) => ({ id: uid(), name: String(o.name || '').slice(0, 80), role: o.role || role || '', times: tm, days: plDays0(o.days), off: plOff0(o, tm), dose: String(o.dose || '').slice(0, 120), notes: String(o.notes || '').slice(0, 200), alarm: o.alarm !== false });
 function plClean(v) {
   v = v && typeof v === 'object' ? v : {}; const arr = a => Array.isArray(a) ? a.filter(x => x && typeof x === 'object').slice(0, 30).map(x => ({ ...plItem0(x), id: typeof x.id === 'string' && x.id ? x.id : uid() })) : [];
   const p = v.pump && typeof v.pump === 'object' ? v.pump : {};
@@ -38,13 +40,23 @@ const plSave = async () => { try { await Store.put('meta', { id: 'plan', value: 
 const plHas = () => S.plan.types.length || S.plan.insulin.length || S.plan.meds.length || S.plan.checks.length || S.plan.pump.model || S.plan.pump.notes || S.plan.pump.lastChange;
 const plSec = { insulina: 'insulin', remedios: 'meds', checks: 'checks' };
 const plNext = (times) => { const l = times[times.length - 1]; if (!l) return '08:00'; const [h, m] = l.split(':').map(Number); return pad((h + 4) % 24) + ':' + pad(m); };
-const plTimesTxt = it => it.times.length ? it.times.map(t => t).join(' · ') : 'sem horário fixo';
+const plTimesTxt = it => it.times.length ? it.times.join(' · ') + (it.days && it.days.length && it.days.length < 7 ? ' · ' + plDaysTxt(it) : '') : 'sem horário fixo';
 
 /* ----- Alarmes do tratamento (lista do dia; usada pela faixa do app e, no Android, pelas notificações) ----- */
-function planAlarms(day) {
-  day = day || isoDate(new Date()); const p = S.plan, out = [];
-  const add = (sec, items, on) => { if (on) items.forEach(it => { if (it.alarm) it.times.forEach(t => plTime(t) && out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id })); }); };
+const PL_WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], PL_WDL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const plDaysTxt = it => { const d = it.days || []; return !d.length || d.length === 7 ? 'todos os dias' : d.join() === '1,2,3,4,5' ? 'dias úteis' : d.join() === '0,6' ? 'fins de semana' : d.map(x => PL_WD[x]).join(', '); };
+function plQuietAt(t) { const c = alCfg(); if (!c.plQuiet || !c.quiet) return false; const m = x => { const [h, mi] = String(x).split(':').map(Number); return h * 60 + mi; }, v = m(t), f = m(c.qFrom), e = m(c.qTo); return f === e ? false : f < e ? (v >= f && v < e) : (v >= f || v < e); }
+/* Lista única de lembretes do tratamento: só o que a pessoa cadastrou (item, horário, dias). all=true inclui os desligados. */
+function plCollect(all) {
+  const p = S.plan, out = [];
+  const add = (sec, items, on) => { if (on) items.forEach(it => { if (all || it.alarm) it.times.forEach(t => { if (!plTime(t)) return; const off = !it.alarm || (it.off || []).includes(t); if (off && !all) return; out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id, dose: it.dose || '', days: it.days || [], off, secKey: sec === 'Insulina' ? 'insulin' : sec === 'Remédio' ? 'meds' : 'checks' }); }); }); };
   add('Insulina', p.insulin, p.types.includes('insulina')); add('Remédio', p.meds, p.types.includes('remedios')); add('Medição', p.checks, true);
+  return out.sort((a, b) => a.time.localeCompare(b.time));
+}
+const plDow = day => new Date(mkTs(day, '12:00')).getDay();
+function planAlarms(day) {
+  day = day || isoDate(new Date()); const p = S.plan, dow = plDow(day);
+  const out = plCollect(false).filter(a => !a.days.length || a.days.includes(dow));
   if (p.types.includes('bomba') && p.pump.alarm && p.pump.lastChange) { const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))); if (day >= due) out.push({ key: 'pump@' + due, time: p.pump.siteTime, label: 'Trocar o cateter/set de infusão da bomba', sec: 'Bomba', pump: true }); }
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
@@ -67,6 +79,7 @@ function plItemHTML(sec, it) {
   return `<details class="pl-it" data-id="${it.id}" data-sec="${sec}" ${open ? 'open' : ''}><summary><span class="pl-s"><b data-pl-name>${esc(it.name || 'Sem nome')}</b><small data-pl-sum>${esc(plTimesTxt(it))}${it.alarm && n ? ' · alarme ligado' : ''}</small></span></summary>
     <div class="pl-b"><div class="form-grid"><div class="field full"><label class="fl" for="pl-n-${it.id}">${nameLb}</label><input class="in" id="pl-n-${it.id}" data-pl="name" value="${esc(it.name)}" maxlength="80"></div>
     <div class="field full"><label class="fl" for="pl-c-${it.id}">Quantas vezes por dia</label><select class="in" id="pl-c-${it.id}" data-pl="count"><option value="0" ${n === 0 ? 'selected' : ''}>Só quando necessário</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(c => `<option value="${c}" ${n === c ? 'selected' : ''}>${c} ${c === 1 ? 'vez' : 'vezes'} ao dia</option>`).join('')}</select></div>${times}
+    ${n ? `<div class="field full"><span class="fl">Dias da semana</span><div class="row" style="gap:6px">${PL_WD.map((w, d) => `<label class="bl-chk"><input type="checkbox" data-pl="day" data-d="${d}" ${!it.days.length || it.days.includes(d) ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div><small class="hint" style="display:block;margin-top:4px">Vale para todos os horários deste item. Desmarque os dias em que não usa.</small></div>` : ''}
     ${sec === 'checks' ? '' : `<div class="field full"><label class="fl" for="pl-d-${it.id}">Dose indicada pela equipe</label><input class="in" id="pl-d-${it.id}" data-pl="dose" value="${esc(it.dose)}" maxlength="120" placeholder="Ex.: 1 comprimido · 10 Ui (como a equipe indicou)"></div>`}
     <div class="field full"><label class="fl" for="pl-o-${it.id}">Observações</label><input class="in" id="pl-o-${it.id}" data-pl="notes" value="${esc(it.notes)}" maxlength="200" placeholder="Ex.: junto com o almoço"></div></div>
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-pl="alarm" ${it.alarm ? 'checked' : ''} ${n ? '' : 'disabled'}><span><b>Alarme nestes horários</b><small>${n ? 'Faixa no Painel (e notificação no aplicativo Android) na hora marcada.' : 'Defina horários para poder ligar o alarme.'}</small></span></label>
@@ -89,19 +102,72 @@ function plPumpCard() {
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-pp="alarm" ${p.alarm ? 'checked' : ''}><span><b>Alarme da troca do cateter</b><small>Aviso no dia da troca, até você tocar em “Feito”.</small></span></label>
     ${p.lastChange ? `<button class="btn full" style="margin-top:10px" data-act="pl-pump-now">Troquei o cateter hoje</button>` : ''}</div>`;
 }
+
+/* ----- Lembretes do tratamento: lista central, uma linha por horário ----- */
+function plPlatform() {
+  const nat = typeof IS_NATIVE !== 'undefined' && IS_NATIVE;
+  if (nat) {
+    const n = window.TB_PLAN_N, perm = window.TB_PLAN_PERM;
+    if (perm === false) return '<div class="banner warn" style="margin:0 0 12px"><span><b>Notificações bloqueadas.</b> Ative em Configurações do Android → Apps → TiaBete → Notificações. Sem isso, os lembretes não tocam com o app fechado.</span></div>';
+    if (typeof n === 'number') return `<p class="hint" style="margin:0 0 12px">✓ ${n ? n + ' notificaç' + (n === 1 ? 'ão agendada' : 'ões agendadas') + ' no celular. Tocam com o app fechado e são refeitas sozinhas quando você altera o tratamento.' : 'Nenhuma notificação agendada agora.'}</p>`;
+    return '<p class="hint" style="margin:0 0 12px">Verificando as notificações do celular…</p>';
+  }
+  return '<div class="banner" style="margin:0 0 12px"><span><b>Aqui o lembrete aparece como faixa no Painel, com o app aberto.</b> Para tocar com o app fechado, use o aplicativo Android (APK) do TiaBete.</span></div>';
+}
+function plRemindersCard() {
+  const c = alCfg(), all = plCollect(true), p = S.plan;
+  const rows = all.map(a => { const quiet = !a.off && plQuietAt(a.time);
+    return `<div class="pl-r ${a.off ? 'off' : ''}"><label class="pl-rs"><input type="checkbox" class="swt" role="switch" data-plr="${esc(a.key)}" data-sec="${a.secKey}" ${a.off ? '' : 'checked'} aria-label="Lembrete ${esc(a.label)} às ${a.time}"></label>
+      <button class="pl-rb" data-act="pl-rem-edit" data-k="${esc(a.key)}" data-sec="${a.secKey}"><span class="pl-rt num">${a.time}</span><span class="pl-ri"><b>${esc(a.label)}</b><small>${esc(a.sec)} · ${esc(plDaysTxt(a))}${a.dose && a.sec !== 'Medição' ? ' · ' + esc(a.dose) : ''}${quiet ? ' · não toca no silêncio noturno' : ''}</small></span><span class="pl-re" aria-hidden="true">Editar</span></button></div>`; }).join('');
+  const pump = p.types.includes('bomba') && p.pump.alarm && p.pump.lastChange ? `<p class="hint" style="margin:10px 0 0">Bomba: aviso de troca do cateter a cada ${p.pump.siteDays} dias, às ${esc(p.pump.siteTime)} (conforme você definiu).</p>` : '';
+  return `<h2 class="sec">Lembretes do tratamento</h2><div class="card pl-card">${plPlatform()}
+    <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-plm="plan" ${c.plan ? 'checked' : ''}><span><b>Lembretes ligados</b><small>Chave geral de todos os lembretes do tratamento.</small></span></label>
+    ${c.quiet ? `<label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-plm="plQuiet" ${c.plQuiet ? 'checked' : ''}><span><b>Respeitar o silêncio noturno</b><small>${esc(c.qFrom)} às ${esc(c.qTo)}. Desligado, os horários de tratamento tocam mesmo nesse período.</small></span></label>` : ''}
+    <div class="pl-rl">${rows || '<p class="hint" style="margin:10px 0 0">Nenhum lembrete ainda. Cadastre horários nos itens de insulina, remédios e medições abaixo.</p>'}</div>${pump}
+    <p class="hint" style="margin:12px 0 0">Os lembretes usam só os medicamentos, doses e horários que <b>você</b> cadastrou. O app não cria nem muda horários de dose. Mudou o tratamento? Fale com a sua equipe e atualize aqui: os alarmes se ajustam sozinhos.</p>
+    <details class="pl-it" style="margin-top:12px"><summary><span class="pl-s"><b>Limitações por plataforma</b><small>Android, aplicativo instalado e navegador</small></span></summary><div class="pl-b hint" style="line-height:1.5">
+    <p style="margin:0 0 8px"><b>Aplicativo Android (APK).</b> Agenda alarmes no sistema: tocam com o app fechado e são refeitos quando você altera o tratamento. Podem falhar se: a permissão de notificações estiver negada; a economia de bateria do fabricante (Xiaomi, Samsung, Huawei e outros) travar o app, então deixe o TiaBete “sem restrição”; o modo Não perturbe estiver ligado; ou o app for forçado a parar (abra-o uma vez para voltar). Depois de reiniciar o celular, abra o app uma vez para garantir.</p>
+    <p style="margin:0 0 8px"><b>Aplicativo instalado pelo navegador (PWA).</b> Sem servidor, o navegador não permite agendar notificação com o app fechado, e no iPhone isso exige envio por servidor. Só aparece a faixa no Painel com o app aberto.</p>
+    <p style="margin:0"><b>Versão web dentro do Claude.</b> Igual ao PWA: faixa no Painel enquanto a página está aberta.</p></div></details></div>`;
+}
+function plRemEdit(key, sec) {
+  const it = S.plan[sec] && S.plan[sec].find(x => key.startsWith(x.id + '@')), t = key.slice(key.indexOf('@') + 1); if (!it) return '';
+  const on = it.alarm && !(it.off || []).includes(t);
+  return `<h2>Editar lembrete</h2><p class="hint" style="margin:0 0 12px"><b>${esc(it.name || 'Sem nome')}</b>${it.dose ? ' · ' + esc(it.dose) : ''}. Nome e dose se editam no item, em Esquemas de tratamento.</p>
+    <div class="stack"><div class="field"><label class="fl" for="plr-t">Horário</label><input class="in" type="time" id="plr-t" value="${t}"></div>
+    <div class="field"><span class="fl">Dias da semana (vale para todos os horários deste item)</span><div class="row" style="gap:6px">${PL_WD.map((w, d) => `<label class="bl-chk"><input type="checkbox" class="plr-d" data-d="${d}" ${!it.days.length || it.days.includes(d) ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div></div>
+    <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" id="plr-on" ${on ? 'checked' : ''}><span><b>Lembrete ligado</b></span></label>
+    <p class="err" id="plr-err" role="alert"></p><button class="btn pri full" data-act="pl-rem-save" data-id="${it.id}" data-sec="${sec}" data-t="${t}">Salvar</button><button class="btn full" data-act="close">Cancelar</button></div>`;
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="pl-rem-edit"],[data-act="pl-rem-save"]'); if (!el) return;
+  if (el.dataset.act === 'pl-rem-edit') { const h = plRemEdit(el.dataset.k, el.dataset.sec); if (h) openSheet(h); return; }
+  const it = S.plan[el.dataset.sec].find(x => x.id === el.dataset.id); if (!it) return; const t0 = el.dataset.t, t1 = $('#plr-t').value, err = m => { $('#plr-err').textContent = m; };
+  if (!plTime(t1)) return err('Informe um horário válido.');
+  if (t1 !== t0 && it.times.includes(t1)) return err('Este item já tem um lembrete nesse horário.');
+  const days = [...document.querySelectorAll('.plr-d')].filter(x => x.checked).map(x => +x.dataset.d); if (!days.length) return err('Marque pelo menos um dia.');
+  const on = $('#plr-on').checked; it.times = it.times.map(x => x === t0 ? t1 : x).sort(); it.off = (it.off || []).filter(x => x !== t0 && x !== t1); if (!on) it.off.push(t1); else it.alarm = true;
+  it.days = days.length === 7 ? [] : days; await plSave(); closeSheet(); render(); toast('Lembrete atualizado.');
+});
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t.dataset) return;
+  if (t.dataset.plm) { S.alerts = { ...(S.alerts || {}), [t.dataset.plm]: t.checked }; await alSave(); render(); return; }
+  if (t.dataset.plr) { const key = t.dataset.plr, it = S.plan[t.dataset.sec].find(x => key.startsWith(x.id + '@')), tm = key.slice(key.indexOf('@') + 1); if (!it) return;
+    it.off = (it.off || []).filter(x => x !== tm); if (t.checked) it.alarm = true; else it.off.push(tm); await plSave(); render(); }
+});
 function planCards() {
   const type = (S.profile || {}).type || '', pre = PL_PRESETS[type], p = S.plan, on = k => p.types.includes(k);
   const sw = ([k, t, d]) => `<label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-ptype="${k}" ${on(k) ? 'checked' : ''}><span><b>${t}</b><small>${d}</small></span></label>`;
   let h = `<h2 class="sec">Meu tratamento</h2><div class="card pl-card"><div class="banner warn" style="margin:0 0 12px"><span><b>O TiaBete não substitui a consulta com a sua equipe de saúde.</b> Medicamentos, doses e horários devem ser os que ela indicou. O app só organiza as informações e lembra.</span></div>
-    <div class="row" style="justify-content:space-between;gap:8px;align-items:center"><span class="dim" style="font-size:13px">Tipo de diabetes (do Perfil)</span><b>${esc(type && type !== 'Prefiro não informar' ? type : 'Não informado')}</b></div>
+    <div class="field"><label class="fl" for="pl-dtype">Tipo de diabetes</label><select class="in" id="pl-dtype"><option value="">Não informado</option>${PF_TYPES.map(t => `<option value="${esc(t)}" ${type === t ? 'selected' : ''}>${t === 'Outro' ? 'Outros' : esc(t)}</option>`).join('')}</select><small class="hint" style="display:block;margin-top:4px">Muda também no Perfil e no relatório. O modelo de tratamento abaixo acompanha o tipo; os itens que você já cadastrou não são alterados.</small></div>
     ${pre ? `<p class="hint" style="margin:10px 0 0">${esc(pre.intro)}</p>${pre.tips.map(t => `<p class="hint" style="margin:6px 0 0">• ${esc(t)}</p>`).join('')}<button class="btn full" style="margin-top:12px" data-act="pl-preset">Usar modelo para ${esc(type)}</button><p class="hint" style="margin:8px 0 0">O modelo só cria uma estrutura editável, sem doses. Tudo pode ser alterado ou removido.</p>`
-      : `<p class="hint" style="margin:10px 0 0">Informe o tipo de diabetes no Perfil para ver um modelo de tratamento do seu tipo. Você também pode montar o seu do zero abaixo.</p><button class="btn full" style="margin-top:10px" data-act="go" data-r="perfil">Abrir Perfil</button>`}
-    <p class="eyebrow" style="margin:16px 0 4px">Que tipo de tratamento você usa?</p><p class="hint" style="margin:0 0 6px">Pode marcar mais de um.</p>${PL_TYPES.map(sw).join('')}</div>`;
+      : `<p class="hint" style="margin:10px 0 0">${type && type !== 'Prefiro não informar' ? 'Para este tipo não há modelo pronto.' : 'Escolha o tipo de diabetes para ver um modelo de tratamento do seu tipo.'} Você também pode montar o seu do zero abaixo.</p>`}
+    <p class="eyebrow" style="margin:16px 0 4px">Que tipo de tratamento você usa?</p><p class="hint" style="margin:0 0 6px">Pode marcar mais de um.</p>${PL_TYPES.map(sw).join('')}</div>` + plRemindersCard();
   if (on('insulina')) h += plListCard('insulin', 'Insulinas', 'Cadastre cada insulina que você usa, quantas vezes por dia e em quais horários. Toque em um item para editar.', 'Adicionar insulina');
   if (on('remedios')) h += plListCard('meds', 'Remédios', 'Cadastre cada remédio (comprimido ou injetável), quantas vezes por dia e os horários. Toque em um item para editar.', 'Adicionar remédio');
   if (on('bomba')) h += plPumpCard();
   h += plListCard('checks', 'Medições programadas', 'Horários em que você quer ser lembrado de medir a glicemia. Os alarmes aparecem como faixa no Painel.', 'Adicionar medição');
-  return h + `<p class="hint" style="margin:-4px 0 12px">Os alarmes do tratamento podem ser desligados em Mais → Ajustes e conta → Alertas e notificações.</p>`;
+  return h;
 }
 function plPicker(sec) {
   const groups = sec === 'insulin' ? PL_INS.map(g => [g[0], g[2], g[1]]) : PL_MEDS.map(g => [g[0], g[1], 'oral']);
@@ -137,15 +203,17 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('pl-it') && d.dataset.id) S.planOpen[d.dataset.id] = d.open; }, true);
 document.addEventListener('change', async e => {
-  const t = e.target; if (!t.dataset) return;
+  const t = e.target; if (t.id === 'pl-dtype') { S.profile = pfClean({ ...(S.profile || {}), type: t.value }); S.profPrompt = false; await pfSave(); render(); toast(t.value ? 'Tipo de diabetes atualizado.' : 'Tipo de diabetes removido.'); return; }
+  if (!t.dataset) return;
   if (t.dataset.ptype) { const k = t.dataset.ptype; S.plan.types = t.checked ? [...new Set([...S.plan.types, k])] : S.plan.types.filter(x => x !== k); await plSave(); render(); return; }
   if (t.dataset.pp) { const k = t.dataset.pp, p = S.plan.pump; if (k === 'alarm') p.alarm = t.checked; else if (k === 'siteDays') p.siteDays = +t.value; else if (k === 'siteTime') p.siteTime = plTime(t.value) ? t.value : p.siteTime; else p[k] = t.value; await plSave(); if (k === 'lastChange' || k === 'siteDays') render(); return; }
   const k = t.dataset.pl; if (!k) return; const box = t.closest('.pl-it'); if (!box) return; const sec = box.dataset.sec, it = S.plan[sec].find(x => x.id === box.dataset.id); if (!it) return;
   if (k === 'name') { it.name = t.value.trim().slice(0, 80); const b = box.querySelector('[data-pl-name]'); if (b) b.textContent = it.name || 'Sem nome'; }
   else if (k === 'dose') it.dose = t.value.slice(0, 120); else if (k === 'notes') it.notes = t.value.slice(0, 200);
-  else if (k === 'time') { if (plTime(t.value)) { it.times[+t.dataset.i] = t.value; it.times.sort(); } else return; }
+  else if (k === 'time') { if (plTime(t.value)) { const old = it.times[+t.dataset.i]; it.times[+t.dataset.i] = t.value; it.times.sort(); it.off = (it.off || []).filter(x => x !== old); } else return; }
+  else if (k === 'day') { const set = new Set(it.days.length ? it.days : [0, 1, 2, 3, 4, 5, 6]); t.checked ? set.add(+t.dataset.d) : set.delete(+t.dataset.d); if (!set.size) { t.checked = true; toast('Deixe pelo menos um dia marcado, ou desligue o alarme.'); return; } it.days = set.size === 7 ? [] : [...set].sort(); }
   else if (k === 'alarm') it.alarm = t.checked;
-  else if (k === 'count') { const c = +t.value; while (it.times.length > c) it.times.pop(); while (it.times.length < c) it.times.push(plNext(it.times)); S.planOpen[it.id] = true; await plSave(); render(); return; }
+  else if (k === 'count') { const c = +t.value; while (it.times.length > c) it.times.pop(); it.off = (it.off || []).filter(x => it.times.includes(x)); while (it.times.length < c) it.times.push(plNext(it.times)); S.planOpen[it.id] = true; await plSave(); render(); return; }
   await plSave(); const s = box.querySelector('[data-pl-sum]'); if (s) s.textContent = plTimesTxt(it) + (it.alarm && it.times.length ? ' · alarme ligado' : '');
 });
 

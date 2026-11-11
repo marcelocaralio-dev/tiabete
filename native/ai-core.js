@@ -62,7 +62,7 @@
       return { status: r.status, data: d };
     })();
     try { return await (abort ? Promise.race([run, abort]) : run); }
-    catch (e) { if (e && (e.code === 'aborted' || e.aiMsg)) throw e; throw { code: 'ai_network', aiMsg: 'Sem conexão com o provedor de IA. Verifique a internet e tente de novo.' }; }
+    catch (e) { if (e && (e.code === 'aborted' || e.aiMsg)) throw e; throw { code: 'ai_network', aiMsg: 'Não consegui falar com o provedor de IA. Verifique a internet e tente de novo.' + (e && (e.message || e.errorMessage) ? ' (' + String(e.message || e.errorMessage).slice(0, 80) + ')' : '') }; }
   }
   window.TB_HTTP = http;
 
@@ -71,6 +71,8 @@
     anthropic: { name: 'Claude (Anthropic)', kind: 'anthropic', base: 'https://api.anthropic.com/v1', model: 'claude-haiku-5-5', hint: 'Chave em console.anthropic.com → API keys. Exige crédito pré-pago.' },
     openai: { name: 'ChatGPT (OpenAI)', kind: 'openai', base: 'https://api.openai.com/v1', model: '', hint: 'Chave em platform.openai.com → API keys. Exige crédito pré-pago.' },
     gemini: { name: 'Google Gemini', kind: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', model: '', hint: 'Chave em aistudio.google.com. Cuidado: o plano gratuito pode usar o conteúdo para melhorar produtos do Google; para dados de saúde, prefira o plano pago.' },
+    groq: { name: 'Groq', kind: 'openai', base: 'https://api.groq.com/openai/v1', model: 'openai/gpt-oss-120b', hint: 'Chave em console.groq.com/keys. Tem plano gratuito com limites (veja os seus em console.groq.com/settings/limits).' },
+    mistral: { name: 'Mistral AI', kind: 'openai', base: 'https://api.mistral.ai/v1', model: '', hint: 'Chave em console.mistral.ai/api-keys. O plano gratuito “Experiment” pode usar seus pedidos para treinar modelos da Mistral.' },
     openrouter: { name: 'OpenRouter', kind: 'openai', base: 'https://openrouter.ai/api/v1', model: '', hint: 'Chave em openrouter.ai/keys. Dá acesso a modelos de vários fabricantes.' },
     custom: { name: 'Outro (compatível com OpenAI)', kind: 'openai', base: '', model: '', hint: 'Informe o endereço https:// do serviço e o modelo. Serve para servidores próprios com HTTPS.' },
   };
@@ -87,10 +89,11 @@
   function httpErr(r) {
     const st = r.status, d = r.data, m = d && (d.error && (d.error.message || d.error) || d.message) || '';
     const txt = (typeof m === 'string' ? m : JSON.stringify(m)).slice(0, 200);
-    if (st === 401 || st === 403) return Object.assign({}, ERR.auth, { detail: txt });
+    if (st === 401 || st === 403) return Object.assign({}, ERR.auth, { aiMsg: ERR.auth.aiMsg + (txt ? ' Resposta do provedor: ' + txt : ''), detail: txt });
     if (st === 402 || /credit|billing|quota|insufficient/i.test(txt)) return st === 429 && !/credit|billing|insufficient/i.test(txt) ? ERR.rate : Object.assign({}, ERR.bill, { detail: txt });
     if (st === 429) return ERR.rate;
-    if (st === 404) return Object.assign({}, ERR.model, { detail: txt });
+    if (st >= 500 || /high demand|overloaded|unavailable|try again later/i.test(txt)) return { code: 'ai_busy', aiMsg: 'O modelo escolhido está sobrecarregado no provedor neste momento (isso costuma passar em minutos). Tente de novo ou escolha outro modelo em Mais → Inteligência artificial.', detail: txt };
+    if (st === 404) return Object.assign({}, ERR.model, { aiMsg: ERR.model.aiMsg + (txt ? ' Resposta do provedor: ' + txt : ''), detail: txt });
     if (st === 413) return ERR.big;
     return { code: 'ai_http', aiMsg: 'O provedor de IA recusou o pedido' + (txt ? ': ' + txt : ' (erro ' + st + ').'), detail: txt };
   }
@@ -161,7 +164,12 @@
     let acc = '';
     for (let round = 0; round < 8; round++) {
       if (opts.signal && opts.signal.aborted) throw { code: 'aborted' };
-      const r = await adapters[cfg.kind](cfg, st, tools, opts.signal);
+      let r, tryN = 0;
+      for (;;) {
+        const keep = st.msgs.length;
+        try { r = await adapters[cfg.kind](cfg, st, tools, opts.signal); break; }
+        catch (e) { st.msgs.length = keep; if (e && (e.code === 'ai_busy' || e.code === 'ai_network') && tryN < 2) { await new Promise(ok => setTimeout(ok, 2500 * (tryN + 1))); tryN++; continue; } throw e; }
+      }
       if (r.text) { acc = r.text; if (opts.onText) { try { opts.onText({ text: acc, delta: r.text }); } catch (e) { } } }
       if (r.done) return { text: acc, truncated: false };
       const outs = [];
@@ -198,6 +206,8 @@
       if (r.status >= 300) throw httpErr(r);
       const d = r.data || {};
       if (P.kind === 'gemini') return (d.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => m.name.replace(/^models\//, '')).sort();
+      const meta = (window.TB_AI.meta = {});
+      for (const m of d.data || []) if (m && m.id) meta[m.id] = { free: !!(m.pricing && Number(m.pricing.prompt) === 0 && Number(m.pricing.completion) === 0) || /:free$/.test(m.id), ctx: m.context_length || 0 };
       return (d.data || []).map(m => m.id).filter(Boolean).sort();
     },
     async test(provider, base, key, model) {

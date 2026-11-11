@@ -404,6 +404,31 @@ function blRazaoView() {
     <h2 class="sec">Tutorial: entenda a sua razão</h2>${tut}`;
 }
 
+
+/* ---- Backup: o que conta como dado do bolus e como unir um backup sem perder nem duplicar ---- */
+const blDirty = () => { try { return JSON.stringify(S.bl) !== JSON.stringify(blDefault()); } catch (e) { return true; } };
+/* Une o bolus de um backup ao que já existe. Nada local é sobrescrito: alimentos iguais (mesmo nome) são reaproveitados e as
+   referências (modelos e dias) são religadas ao alimento local; dias, refeições e registros só entram se ainda não existirem. */
+function blMerge(b) {
+  if (!b || typeof b !== 'object' || !Array.isArray(b.foods)) return { foods: 0, days: 0 };
+  const nm = x => String(x || '').trim().toLowerCase(), map = {}, st = { foods: 0, days: 0 };
+  b.foods.filter(f => f && f.id && typeof f.name === 'string').forEach(f => {
+    const same = S.bl.foods.find(x => x.id === f.id && nm(x.name) === nm(f.name)), byName = S.bl.foods.find(x => nm(x.name) === nm(f.name));
+    if (same) map[f.id] = same.id; else if (byName) map[f.id] = byName.id;
+    else { const id = S.bl.foods.some(x => x.id === f.id) ? 'f' + uid() : f.id; S.bl.foods.push({ ...f, id }); map[f.id] = id; st.foods++; }
+  });
+  const rl = m => { const o = {}; BL_MEALS.forEach(x => { if (Array.isArray(m && m[x.id])) o[x.id] = m[x.id].filter(it => it && map[it.f]).map(it => ({ ...it, f: map[it.f] })); }); return o; };
+  const empty = m => !m || BL_MEALS.every(x => !(m[x.id] || []).length);
+  if (b.tpl && typeof b.tpl === 'object') ['sem', 'fds'].forEach(k => { if (b.tpl[k] && empty(S.bl.tpl[k])) { const r = rl(b.tpl[k]); S.bl.tpl[k] = { cafe: [], almoco: [], jantar: [], lanche: [], ...r }; } });
+  if (b.days && typeof b.days === 'object') Object.keys(b.days).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d) && !S.bl.days[d] && b.days[d] && typeof b.days[d] === 'object') { S.bl.days[d] = { cafe: [], almoco: [], jantar: [], lanche: [], ...rl(b.days[d]) }; st.days++; } });
+  if (!(S.bl.ratio >= 1) && b.ratio >= 1 && b.ratio <= 200) { S.bl.ratio = b.ratio; if (b.bolusOn && typeof b.bolusOn === 'object') S.bl.bolusOn = { ...S.bl.bolusOn, ...b.bolusOn }; }
+  const rr = blCleanRatios(b.ratios); S.bl.ratios = S.bl.ratios || {}; Object.keys(rr).forEach(k => { if (!(S.bl.ratios[k] >= 1)) S.bl.ratios[k] = rr[k]; });
+  const hk = new Set((S.bl.rhist || []).map(x => x.ts + '|' + x.p)); S.bl.rhist = (S.bl.rhist || []).concat(blCleanRhist(b.rhist).filter(x => !hk.has(x.ts + '|' + x.p))).sort((x, y) => x.ts - y.ts).slice(-60);
+  const hm = new Set(blMeals().map(m => m.id)); S.bl.meals = blMeals().concat(blCleanMeals(b.meals).filter(m => !hm.has(m.id)));
+  const hr = new Set(blRlog().map(r => r.id)); S.bl.rlog = blRlog().concat(blCleanRlog(b.rlog).filter(r => !hr.has(r.id))).sort((x, y) => x.ts - y.ts);
+  return st;
+}
+
 VIEWS.bolus = viewBolus; TITLES.bolus = 'Cálculo de bolus';
 
 /* ---- eventos ---- */

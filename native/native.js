@@ -91,8 +91,8 @@ if (NATIVE) {
   async function hypoSync() {
     const ln = LN(); if (!ln) return;
     try {
-      const c = alCfg(), last = S.records.filter(r => !r.noTime && r.ts).sort((a, b) => b.ts - a.ts)[0];
-      const low = last && last.glucose < LIM.low && Date.now() - last.ts < 60 * 60000;
+      const c = alCfg(), ep = hypoEpisode(S.records, Date.now()), last = ep && ep.last; // só reavalia com glicemia <= 60 (61 a 69 apenas registra)
+      const low = !!(ep && ep.protocol && Date.now() - last.ts < 60 * 60000);
       if (!c.hypo || !low) { await ln.cancel({ notifications: [{ id: HYPO_ID }] }); return; }
       const at = last.ts + c.hypoMin * 60000; if (at <= Date.now() + 5000) return;
       if (!(await ensurePerm())) return;
@@ -157,17 +157,27 @@ if (NATIVE) {
       const ids = [], list = [];
       if (alCfg().plan) {
         const p = S.plan, on = k => p.types.includes(k), day = isoDate(new Date()), seen = new Set();
-        const add = (sec, items, enabled) => { if (enabled) for (const it of items) { if (!it.alarm) continue; for (const t of it.times) { if (!parseTime(t)) continue; const key = it.id + '@' + t; if (seen.has(key)) continue; seen.add(key); const [h, m] = t.split(':').map(Number); if (inQuiet(h, m)) continue; const id = planId(key); ids.push(id); list.push({ id, title: sec === 'Medição' ? 'TiaBete · hora de medir' : 'TiaBete · hora do tratamento', body: (it.name || sec) + ' · ' + t + (it.dose && sec !== 'Medição' ? ' · ' + it.dose : ''), channelId: 'tratamento', schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } }); } } };
-        add('Insulina', p.insulin, on('insulina')); add('Remédio', p.meds, on('remedios')); add('Medição', p.checks, true);
+        /* lista única vinda do cadastro (plCollect): só horários e doses que a pessoa definiu; desligados ficam de fora */
+        const quietOn = !!alCfg().plQuiet;
+        for (const a of plCollect(false)) {
+          if (!parseTime(a.time) || seen.has(a.key)) continue; seen.add(a.key); const [h, m] = a.time.split(':').map(Number); if (quietOn && inQuiet(h, m)) continue;
+          const base = { title: a.sec === 'Medição' ? 'TiaBete · hora de medir' : 'TiaBete · hora do tratamento', body: (a.label || a.sec) + ' · ' + a.time + (a.dose && a.sec !== 'Medição' ? ' · ' + a.dose : ''), channelId: 'tratamento' };
+          const days = a.days && a.days.length && a.days.length < 7 ? a.days : null;
+          if (!days) { const id = planId(a.key); ids.push(id); list.push({ id, ...base, schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } }); }
+          else for (const d of days) { const id = planId(a.key + '#' + d); ids.push(id); list.push({ id, ...base, schedule: { on: { weekday: d + 1, hour: h, minute: m }, allowWhileIdle: true } }); } /* weekday do Capacitor: 1 = domingo */
+        }
         if (on('bomba') && p.pump.alarm && p.pump.lastChange) {
           const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))), at = mkTs(due, p.pump.siteTime || '08:00');
-          if (at > Date.now() && !inQuiet(new Date(at).getHours(), new Date(at).getMinutes())) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter/set de infusão.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
+          if (at > Date.now() && !(alCfg().plQuiet && inQuiet(new Date(at).getHours(), new Date(at).getMinutes()))) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter/set de infusão.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
         }
       }
-      if (list.length && (await ensurePerm())) {
+      let granted = true;
+      if (list.length) { granted = !!(await ensurePerm()); if (granted) {
         try { await ln.createChannel({ id: 'tratamento', name: 'Meu tratamento', description: 'Horários de insulina, remédios, medições e troca do cateter', importance: 4, vibration: true }); } catch (e) { }
         await ln.schedule({ notifications: list });
-      }
+      } }
+      const n = granted ? list.length : 0, ch = window.TB_PLAN_N !== n || (list.length && window.TB_PLAN_PERM !== granted);
+      window.TB_PLAN_N = n; if (list.length) window.TB_PLAN_PERM = granted; if (ch && S.route === 'esquemas' && !document.getElementById('sheet-bg') && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) { try { render(); } catch (e) { } }
       await Store.put('meta', { id: 'plan-sched', value: ids });
     } catch (e) { console.error(e); } finally { planBusy = false; }
   }
@@ -183,7 +193,15 @@ if (NATIVE) {
   }
   setTimeout(notifInit, 5000);
   setInterval(() => { postClean(); postSync(); }, 60000);
-  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); });
+  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); setTimeout(() => { try { if (typeof drvAuto === 'function') drvAuto(); } catch (e) { } }, 1500); });
+  /* backup programado no Drive falhou: avisa também com notificação do Android */
+  window.addEventListener('tb-drv-fail', async ev => {
+    try {
+      const ln = LN(); if (!ln || !(await ensurePerm())) return;
+      try { await ln.createChannel({ id: 'backup', name: 'Backup no Drive', description: 'Avisos de falha do backup programado', importance: 3 }); } catch (e) { }
+      await ln.schedule({ notifications: [{ id: 998, title: 'TiaBete · backup não concluído', body: ((ev && ev.detail) || 'O backup no Google Drive falhou.') + ' Abra o app para tentar de novo.', channelId: 'backup', schedule: { at: new Date(Date.now() + 1500) } }] });
+    } catch (e) { console.error(e); }
+  });
   const _loadAll = loadAll;
   loadAll = async function () { const r = await _loadAll.apply(this, arguments); hypoSync(); postSync(); return r; };
   setTimeout(hypoSync, 2000);

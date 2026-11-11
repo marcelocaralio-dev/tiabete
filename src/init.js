@@ -16,9 +16,10 @@
   try { const rw = (await Store.all('meta')).find(x => x.id === 'rewards'); if (rw && rw.value) S.rw = { got: {}, act: {}, init: false, ...rw.value }; } catch (e) { }
   try { const am = (await Store.all('meta')).find(x => x.id === 'alerts'); if (am && am.value) S.alerts = { ...AL_DEF, ...am.value }; } catch (e) { }
   try { const pm = (await Store.all('meta')).find(x => x.id === 'profile'); if (pm && pm.value) S.profile = pfClean(pm.value); } catch (e) { }
+  try { const pi = (await Store.all('meta')).find(x => x.id === 'profile-invite'); if (pi && pi.value > 0) S.pfSnooze = pi.value; } catch (e) { }
   try { const bm = (await Store.all('meta')).find(x => x.id === 'bolus'); if (bm) blLoad(bm.value); } catch (e) { }
   try { const pm = (await Store.all('meta')).find(x => x.id === 'plan'); if (pm) plLoad(pm.value); else if (S.inslog.length || S.ins.basalTs) { S.plan.types = ['insulina']; await plSave(); } } catch (e) { }
-  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0 }); } catch (e) { }
+  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }
   try { const sv = (await Store.all('meta')).find(x => x.id === 'saved-meals'); if (sv && Array.isArray(sv.value)) S.saved = sv.value; } catch (e) { }
   askPersist();

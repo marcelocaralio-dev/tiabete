@@ -3,12 +3,12 @@ S.events = []; S.lastBackup = 0; S.bkSnooze = 0;
 
 /* ---------- 1. Lembrete de backup ---------- */
 const BK_DAYS = 7;
-const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, plan: true, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
+const AL_DEF = { bHypo: true, bHyper: true, bBasal: true, bPre: true, bMiss: true, bLabel: true, postFast: true, postLunch: true, postDinner: true, backup: true, backupDays: 7, rewards: true, plan: true, plQuiet: false, hypo: true, hypoMin: 15, quiet: false, qFrom: '22:00', qTo: '06:00' };
 S.alerts = { ...AL_DEF };
 S.profile = null;
 const alCfg = () => ({ ...AL_DEF, ...(S.alerts || {}) });
 async function alSave() { try { await Store.put('meta', { id: 'alerts', value: S.alerts }); } catch (e) { } }
-const hasRealData = () => S.records.some(r => !isEx(r)) || S.exams.length > 0 || S.hba.some(x => !isEx(x) && x.source !== 'exame');
+const hasRealData = () => S.records.some(r => !isEx(r)) || S.exams.length > 0 || S.hba.some(x => !isEx(x) && x.source !== 'exame') || blDirty() || plHas();
 function backupBanner() {
   if (!alCfg().backup || !hasRealData() || Date.now() < S.bkSnooze) return '';
   const days = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / DAY) : null;
@@ -447,16 +447,15 @@ function themeCard() {
   return `<h2 class="sec">Tema do aplicativo</h2><div class="card" style="margin-bottom:12px"><div class="seg" role="group" aria-label="Tema" style="display:flex">${o.map(([k, t]) => `<button class="grow" data-act="theme" data-v="${k}" aria-pressed="${S.theme === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">“Automático” segue o modo claro ou escuro do seu aparelho. O botão no topo alterna na hora.</p></div>`;
 }
 document.addEventListener('click', async e => {
-  const el = e.target.closest('#thm, [data-act="theme"]'); if (!el) return;
-  if (el.id === 'thm') await setTheme(themeEff() === 'light' ? 'dark' : 'light');
-  else { await setTheme(el.dataset.v); render(); }
+  const el = e.target.closest('[data-act="theme"]'); if (!el) return;
+  await setTheme(el.dataset.v); render();
 });
 
 
 /* ---------- Tópicos expansíveis / retráteis ---------- */
 S.acc = {};
 const ACC_ALL = /[?&]all\b/.test(location.search); // gancho de teste: abre todos os tópicos
-const ACC_OPEN = { painel: ['hoje', 'meu tratamento'], esquemas: ['meu', 'insulinas', 'remedios', 'bomba', 'medicoes'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
+const ACC_OPEN = { ia: ['como a ia', 'assistente'], painel: ['hoje', 'meu tratamento', 'evolucao'], esquemas: ['meu', 'lembretes', 'insulinas', 'remedios', 'bomba', 'medicoes'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''], backup: ['exportar', 'google drive', 'restaurar'], perfil: ['informa', 'diabetes'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
 try { const a = JSON.parse(localStorage.getItem('tb-acc') || '{}'); if (a && typeof a === 'object') S.acc = a; } catch (e) { }
 const accSave = () => { try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } try { Store.put('meta', { id: 'acc', value: S.acc }); } catch (e) { } };
 const accKey = (route, h2, i) => route + '|' + (route === 'painel' && i === 0 ? 'hoje' : norm(h2.textContent).trim().split('·')[0].trim().slice(0, 40)); // 1º tópico do Painel muda de rótulo (Hoje/Ontem/data)
@@ -517,20 +516,16 @@ document.addEventListener('change', e => { if (e.target.id !== 'ia-m') return; c
 const HYPO_STEP = 15 * 60e3; // intervalo entre reavaliações
 S.hypoOff = {};
 try { S.hypoOff = JSON.parse(localStorage.getItem('tb-hypo-off') || '{}') || {}; } catch (e) { }
-function hypoState() {
-  const real = S.records.filter(r => !r.noTime && r.source !== 'exemplo' && r.ts).sort((a, b) => a.ts - b.ts);
-  const last = real[real.length - 1];
-  if (!last || last.glucose >= LIM.low || Date.now() - last.ts > 4 * 3600e3) return null;
-  let i = real.length - 1;
-  while (i > 0) { const p = real[i - 1]; if ((p.glucose < LIM.low || (p.marks || []).includes('hipo')) && real[i].ts - p.ts <= 90 * 60e3) i--; else break; }
-  const ep = real.slice(i); return { last, start: ep[0], ep, id: ep[0].id };
-}
+function hypoState() { const st = hypoEpisode(S.records, Date.now()); return st && st.protocol ? st : null; } // episódio com reavaliação ativa (glicemia <= 60)
+function hypoLow() { const st = hypoEpisode(S.records, Date.now()); return st && !st.protocol ? st : null; } // 61 a 69: só registro, sem reavaliação
 function hypoNextTxt(st) {
   const rem = st.last.ts + HYPO_STEP - Date.now();
   return rem > 0 ? 'Próxima medição em <b class="num">' + (m => pad(Math.floor(m / 60)) + ':' + pad(m % 60))(Math.ceil(rem / 1000)) + '</b>' : '<b>⏱ Já passaram 15 min: meça de novo agora.</b>';
 }
 function hypoBanner() {
   if (!alCfg().bHypo) return '';
+  const lo = hypoLow();
+  if (lo && !S.hypoOff[lo.id]) return `<div class="banner hypo" role="alert"><div><b>Glicemia baixa:</b> <b class="num">${f0(lo.last.glucose)}</b> mg/dL às ${lo.last.time}, registrada como hipoglicemia.<div style="margin-top:2px;opacity:.95">Siga o plano combinado com seu médico.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm" data-act="hypo-off">Dispensar</button></div></div>`;
   const st = hypoState(); if (!st || S.hypoOff[st.id]) return '';
   const g = st.last.glucose;
   return `<div class="banner hypo" role="alert"><div><b>⚠ Hipoglicemia:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
@@ -544,7 +539,7 @@ function hypoSheet() {
   if (st) {
     const g = st.last.glucose, ago = Math.max(0, Math.round((Date.now() - st.last.ts) / 60000));
     top = `<div class="hy-big"><span class="num">${f0(g)}</span><small>mg/dL</small></div><div class="dim" style="font-size:13px">às ${st.last.time} · há ${ago} min ${g < LIM.vlow ? '<span class="badge vlow">▼ Muito baixa</span>' : ''}</div><div class="hy-next" data-hy-next>${hypoNextTxt(st)}</div>`;
-  } else top = `<p class="hint" style="margin:0 0 8px">Nenhuma glicemia abaixo de 70 mg/dL nas últimas 4 horas. Se medir agora e estiver baixa, registre abaixo.</p>`;
+  } else top = `<p class="hint" style="margin:0 0 8px">Nenhuma reavaliação ativa. O protocolo começa com glicemia de 60 mg/dL ou menos. Se medir agora e estiver baixa, registre abaixo.</p>`;
   const list = st ? `<h3 class="hy-h">Medições deste episódio</h3><div class="stack" style="gap:6px">${st.ep.map(r => `<div class="row" style="justify-content:space-between;gap:8px;font-size:14px"><span class="num dim">${r.time}</span><span class="num"><b>${f0(r.glucose)}</b> mg/dL</span>${badge(r.glucose, r.context)}</div>`).join('')}</div>` : '';
   return `<h2>${st ? '⚠ Hipoglicemia' : 'Protocolo de hipoglicemia'}</h2>${top}
   <p class="hint" style="margin:10px 0 8px">Meça de novo a cada 15 minutos até a glicemia voltar a 70 mg/dL ou mais. Siga o plano de hipoglicemia combinado com seu médico.</p>
@@ -556,11 +551,11 @@ function hypoSheet() {
   <div class="row" style="margin-top:8px"><button class="btn pri grow" type="submit">Salvar medições</button><button class="btn" type="button" data-act="close">Fechar</button></div></form>`;
 }
 function hypoOpen() { openSheet(hypoSheet()); }
-function hypoAfterSave(rec) { if (rec && rec.glucose < LIM.low && !rec.noTime && Date.now() - rec.ts < 4 * 3600e3) setTimeout(hypoOpen, 150); }
+function hypoAfterSave(rec) { const st = hypoState(); if (rec && st && !rec.noTime && Date.now() - rec.ts < 4 * 3600e3 && st.ep.some(r => r.id === rec.id)) setTimeout(hypoOpen, 150); }
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act^="hypo-"]'); if (!el) return; const act = el.dataset.act;
   if (act === 'hypo-open') hypoOpen();
-  else if (act === 'hypo-off') { const st = hypoState(); if (st) { S.hypoOff[st.id] = 1; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } render(); }
+  else if (act === 'hypo-off') { const st = hypoState() || hypoLow(); if (st) { S.hypoOff[st.id] = 1; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } render(); }
   else if (act === 'hypo-add') { const rows = document.getElementById('hy-rows'); rows.insertAdjacentHTML('beforeend', hypoRow(rows.children.length + 1, nowHM())); const l = rows.lastElementChild.querySelector('[data-hy=g]'); if (l) l.focus(); }
   else if (act === 'hypo-rm') { const rows = document.getElementById('hy-rows'); if (rows.children.length > 2) { el.closest('.hy-row').remove(); [...rows.children].forEach((r, i) => { r.querySelector('.hy-n').textContent = i + 1; }); } else toast('Mantenha ao menos 2 campos.'); }
 });
@@ -573,13 +568,13 @@ document.addEventListener('submit', async e => {
     if (g === null || g < GLU_MIN || g > GLU_MAX) return err(`Glicemia entre ${GLU_MIN} e ${GLU_MAX} mg/dL.`);
     if (!t) return err('Informe o horário de cada medição.');
     const ts = mkTs(today, t); if (ts > Date.now() + 60000) return err('Esse horário ainda não chegou.');
-    out.push({ id: uid(), date: today, time: t, glucose: g, source: 'manual', marks: ['hipo'], ts });
+    out.push(hypoStamp({ id: uid(), date: today, time: t, glucose: g, source: 'manual', marks: ['hipo'], ts }));
   }
   if (!out.length) return err('Preencha ao menos uma glicemia.');
   try {
     if (hasExamples()) await removeExamples();
     await Store.putMany('records', out); await loadAll(); closeSheet(); render();
-    if (!hypoState()) toast('Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.');
+    if (!hypoState()) toast(hypoLow() ? 'Medições salvas. A glicemia ainda está abaixo de 70.' : 'Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.');
     else { toast('Medições salvas. Meça de novo em 15 min.'); setTimeout(hypoOpen, 200); }
   } catch (x) { console.error(x); toast('Não foi possível salvar: ' + (x && x.message || x)); }
 });
@@ -737,10 +732,8 @@ async function applyBackupState(st, replace) {
   if (!st) return;
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
-  try { if (st.alerts) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
-  try { if (st.bolus && (replace || !blHasData())) { blLoad(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { }
-  try { if (st.bolus && Array.isArray(st.bolus.rlog)) { const have = new Set(blRlog().map(r => r.id)), add = blCleanRlog(st.bolus.rlog).filter(r => !have.has(r.id)); if (add.length) { S.bl.rlog = blRlog().concat(add).sort((x, y) => x.ts - y.ts); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
-  try { if (st.bolus && Array.isArray(st.bolus.meals)) { const have = new Set(blMeals().map(m => m.id)), add = blCleanMeals(st.bolus.meals).filter(m => !have.has(m.id)); if (add.length) { S.bl.meals = blMeals().concat(add); await Store.put('meta', { id: 'bolus', value: S.bl }); } } } catch (e) { }
+  try { if (st.alerts && (replace || JSON.stringify(alCfg()) === JSON.stringify(AL_DEF))) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
+  try { if (st.bolus && typeof st.bolus === 'object') { if (replace) blLoad(st.bolus); else blMerge(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { console.error(e); }
   try {
     const i = st.insulin;
     if (i && typeof i === 'object') {
@@ -832,7 +825,7 @@ function alertsPanel() {
   ${row('bHypo', c.bHypo, 'Faixa de hipoglicemia', 'Alerta vermelho quando a última medição está abaixo de 70 mg/dL. É um aviso de segurança: desligue só se tiver certeza.')}
   ${row('bHyper', c.bHyper, 'Faixa de glicemia muito alta', 'Alerta quando a última medição está muito elevada.')}</div>
   <h2 class="sec">Notificações com o app fechado</h2><div class="card al-card">
-  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
+  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição de 60 mg/dL ou menos, avisar para medir de novo (de 61 a 69 só registra). Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
   ${row('postFast', c.postFast, 'Medir 2 h após a insulina do jejum', 'Notifica exatamente 2 horas depois de registrar a insulina rápida do jejum. Se você não registrar uma glicemia em até 10 minutos depois da hora, a notificação some e o aviso é ignorado.')}
   ${row('postLunch', c.postLunch, 'Medir 2 h após a insulina do almoço', 'Notifica 2 horas depois de registrar a insulina rápida do almoço. Some sozinha após 10 minutos sem medição.')}
   ${row('postDinner', c.postDinner, 'Medir 2 h após a insulina do jantar', 'Notifica 2 horas depois de registrar a insulina rápida do jantar. Some sozinha após 10 minutos sem medição.')}
@@ -1072,8 +1065,10 @@ new MutationObserver(ms => { if (ms.every(m => m.target.nodeType === 1 && m.targ
 
 
 /* ================= Backup no Google Drive (conector do Claude) ================= */
-const DRV = 'Google Drive', DRV_FOLDER = 'TiaBete Backups', DRV_GAP = 20 * 3600 * 1000;
-S.drv = { auto: false, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0 };
+const DRV = 'Google Drive', DRV_FOLDER = 'TiaBete Backups';
+S.drv = { auto: false, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0, freq: '1', custom: 3, notify: true, lastStatus: '', lastMsg: '', lastAt: 0, failSeen: 0 };
+/* intervalo escolhido, em ms (menos 2 h de folga, para o diário valer mesmo abrindo o app um pouco mais cedo) */
+const drvGap = () => { const d = S.drv, n = d.freq === 'custom' ? Math.min(90, Math.max(1, Math.round(+d.custom) || 1)) : (+d.freq || 1); return n * 86400000 - 2 * 3600000; };
 async function drvMcp() { try { return window.claude && window.claude.use ? await window.claude.use('mcp') : null; } catch (e) { return null; } }
 async function drvCall(tool, input) {
   if (window.TB_DRV) return window.TB_DRV.call(tool, input); // APK: API do Drive com a conta Google do usuário
@@ -1093,7 +1088,7 @@ function drvErrTxt(e) {
   return 'Não foi possível falar com o Drive' + (e && e.message ? ': ' + String(e.message).slice(0, 80) : '.');
 }
 const drvFiles = p => (p && Array.isArray(p.files)) ? p.files : Array.isArray(p) ? p : [];
-async function drvSavePref() { try { await Store.put('meta', { id: 'drive-pref', auto: S.drv.auto, folderId: S.drv.folderId, lastTs: S.drv.lastTs }); } catch (e) { } }
+async function drvSavePref() { const d = S.drv; try { await Store.put('meta', { id: 'drive-pref', auto: d.auto, folderId: d.folderId, lastTs: d.lastTs, freq: d.freq, custom: d.custom, notify: d.notify, lastStatus: d.lastStatus, lastMsg: d.lastMsg, lastAt: d.lastAt, failSeen: d.failSeen }); } catch (e) { } }
 async function drvFolder() {
   if (S.drv.folderId) return S.drv.folderId;
   const f = drvFiles(await drvCall('search_files', { query: `title = '${DRV_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and owner = 'me'`, excludeContentSnippets: true, pageSize: 5 }))[0];
@@ -1107,19 +1102,20 @@ async function drvBackup(manual) {
   const txt = backupText(); if (!txt) { if (manual) toast('Ainda não há dados reais para salvar.'); return false; }
   d.busy = true; d.msg = ''; if (manual) render();
   try {
+    const ek = await secDriveKey(), body = ek ? await secSeal(txt, ek.key, b64d(ek.salt), ek.iter) : txt;
     let pid = await drvFolder(), now = new Date(), name = `tiabete-backup-${isoDate(now)}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
-    const mk = id => drvCall('create_file', { title: name, textContent: txt, contentMimeType: 'application/json', disableConversionToGoogleType: true, parentId: id });
+    const mk = id => drvCall('create_file', { title: name, textContent: body, contentMimeType: 'application/json', disableConversionToGoogleType: true, parentId: id });
     try { await mk(pid); }
     catch (e) { if (e && e.code === 'tool_error') { S.drv.folderId = null; pid = await drvFolder(); await mk(pid); } else throw e; }
-    d.lastTs = Date.now(); d.failAt = 0; await drvSavePref(); await markBackup();
+    d.lastTs = Date.now(); d.lastAt = d.lastTs; d.lastStatus = 'ok'; d.lastMsg = ''; d.failAt = 0; await drvSavePref(); await markBackup();
     d.msg = 'ok'; if (manual) toast('Backup salvo no Google Drive.');
     return true;
-  } catch (e) { d.failAt = Date.now(); d.msg = drvErrTxt(e); if (manual) toast(d.msg); return false; }
+  } catch (e) { d.failAt = Date.now(); d.msg = drvErrTxt(e); d.lastAt = d.failAt; d.lastStatus = 'fail'; d.lastMsg = d.msg; await drvSavePref(); if (manual) toast(d.msg); else if (d.notify) { try { window.dispatchEvent(new CustomEvent('tb-drv-fail', { detail: d.msg })); } catch (x) { } } return false; }
   finally { d.busy = false; if (S.route === 'backup') render(); }
 }
 function drvAuto() {
   const d = S.drv; if (!HAS_CLAUDE || !d.auto || d.busy || !hasRealData()) return;
-  if (Date.now() - d.lastTs < DRV_GAP || Date.now() - d.failAt < 30 * 60000) return;
+  if (Date.now() - d.lastTs < drvGap() || Date.now() - d.failAt < 30 * 60000) return;
   drvBackup(false);
 }
 async function drvList() {
@@ -1141,14 +1137,27 @@ async function drvLoad(id) {
   } catch (e) { d.msg = drvErrTxt(e); d.busy = false; render(); }
 }
 function driveCardBody(intro) {
-  const d = S.drv, when = d.lastTs ? new Date(d.lastTs).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : null;
+  const d = S.drv, fmt = t => new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const acct = window.TB_DRV ? '' : '<p class="hint" style="margin:0 0 10px">Conta: a do conector Google Drive do seu Claude (o app não enxerga o e-mail).</p>';
   const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^tiabete-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
-  return `<p class="hint" style="margin:0 0 12px">${intro}</p>
-    <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled' : ''}>${d.busy ? 'Aguarde…' : 'Fazer backup no Drive agora'}</button>
-    <label class="chk"><input type="checkbox" id="drv-auto" ${d.auto ? 'checked' : ''}><span>Backup automático (no máximo 1 por dia, ao abrir o app)</span></label>
+  const ok = d.lastStatus === 'ok' && d.lastTs, bad = d.lastStatus === 'fail';
+  const status = `<div class="bl-facts" style="margin:0 0 12px"><div class="row sp"><span>Último backup</span><b class="num">${d.lastTs ? fmt(d.lastTs) : 'nenhum ainda'}</b></div>
+    <div class="row sp"><span>Status</span><b>${ok ? '✓ Concluído' : bad ? '✗ Falhou' : '—'}</b></div>${bad ? `<div class="row sp"><span>Última tentativa</span><b class="num">${fmt(d.lastAt)}</b></div>` : ''}
+    ${d.auto && d.lastTs ? `<div class="row sp"><span>Próxima verificação</span><b class="num">depois de ${fmt(d.lastTs + drvGap())}</b></div>` : ''}</div>${bad ? `<p class="hint" style="margin:0 0 12px;color:var(--red-t)" role="alert">${esc(d.lastMsg || d.msg || 'O backup não foi concluído.')}</p>` : ''}`;
+  return `<p class="hint" style="margin:0 0 12px">${intro}</p>${acct}${status}
+    <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled' : ''}>${d.busy ? 'Aguarde…' : 'Fazer backup agora'}</button>
     <button class="btn full" data-act="drv-list" ${d.busy ? 'disabled' : ''}>Ver backups no Drive para restaurar</button></div>${list}
-    <p class="hint" style="margin:12px 0 0">Último backup no Drive: <b>${when || 'nenhum ainda'}</b>.${d.msg && d.msg !== 'ok' ? `</p><p class="hint" style="margin:6px 0 0;color:var(--red-t)" role="alert">${esc(d.msg)}` : ''}</p>
-    <p class="hint" style="margin:6px 0 0">O app não apaga backups antigos do Drive. Apague-os por lá quando quiser.</p>`;
+    <div class="fl" style="margin:18px 0 8px">Backup programado</div>
+    <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" id="drv-auto" ${d.auto ? 'checked' : ''}><span><b>Fazer backup ao abrir o app</b><small>Quando passar o intervalo escolhido, o backup é feito na próxima vez que você abrir ou voltar ao app.</small></span></label>
+    <div class="form-grid" style="margin-top:10px"><div class="field"><label class="fl" for="drv-freq">Frequência</label><select class="in" id="drv-freq">${[['1', 'A cada 1 dia'], ['7', 'A cada 7 dias'], ['15', 'A cada 15 dias'], ['30', 'A cada 30 dias'], ['custom', 'Personalizado']].map(([v, l]) => `<option value="${v}" ${String(d.freq) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    ${d.freq === 'custom' ? `<div class="field"><label class="fl" for="drv-custom">Dias entre backups</label><input class="in num" type="number" inputmode="numeric" min="1" max="90" id="drv-custom" value="${d.custom}"></div>` : ''}</div>
+    <label class="al-l pl-sw" style="margin-top:6px"><input type="checkbox" class="swt" role="switch" id="drv-notify" ${d.notify ? 'checked' : ''}><span><b>Avisar se o backup falhar</b><small>Faixa no app${window.TB_DRV ? ' e notificação do Android' : ''}.</small></span></label>
+    <p class="hint" style="margin:12px 0 0"><b>Importante:</b> este backup <b>não roda com o app fechado</b>. ${window.TB_DRV ? 'O Android não permite que o TiaBete envie arquivos em segundo plano por conta própria.' : 'O navegador e o Claude só executam o app enquanto ele está aberto.'} Ele só acontece quando você abre o app, ou toca em “Fazer backup agora”. Se ficar muitos dias sem abrir, o backup atrasa.</p>
+    <p class="hint" style="margin:6px 0 0">O backup inclui medições, exames, insulinas, tratamento, alimentos, refeições, razão insulina/carboidratos e configurações. O app não apaga backups antigos do Drive.</p>`;
+}
+function drvBanner() {
+  const d = S.drv; if (!d.auto || !d.notify || d.lastStatus !== 'fail' || d.failSeen >= d.lastAt) return '';
+  return `<div class="banner warn"><span><b>O backup no Drive falhou.</b> ${esc(d.lastMsg || '')}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="drv-retry">Tentar agora</button><button class="btn sm" data-act="drv-dismiss">Fechar</button></span></div>`;
 }
 function driveCard() {
   if (!HAS_CLAUDE) return '';
@@ -1158,51 +1167,107 @@ function driveCard() {
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="drv-"]'); if (!el) return;
   const a = el.dataset.act;
-  try { if (a === 'drv-now') await drvBackup(true); else if (a === 'drv-list') await drvList(); else if (a === 'drv-load') await drvLoad(el.dataset.id); }
+  try { if (a === 'drv-retry') { await drvBackup(true); render(); } else if (a === 'drv-dismiss') { S.drv.failSeen = S.drv.lastAt; await drvSavePref(); render(); } else if (a === 'drv-now') await drvBackup(true); else if (a === 'drv-list') await drvList(); else if (a === 'drv-load') await drvLoad(el.dataset.id); }
   catch (err) { console.error(err); }
 });
 document.addEventListener('change', async e => {
-  if (e.target.id !== 'drv-auto') return;
+  const id = e.target.id; if (!['drv-auto', 'drv-freq', 'drv-custom', 'drv-notify'].includes(id)) return;
+  if (id === 'drv-freq') { S.drv.freq = e.target.value; await drvSavePref(); render(); return; }
+  if (id === 'drv-custom') { const n = Math.round(+e.target.value); if (n >= 1 && n <= 90) { S.drv.custom = n; await drvSavePref(); render(); } else { toast('Informe de 1 a 90 dias.'); e.target.value = S.drv.custom; } return; }
+  if (id === 'drv-notify') { S.drv.notify = e.target.checked; await drvSavePref(); return; }
   S.drv.auto = e.target.checked; S.drv.failAt = 0; await drvSavePref();
-  if (S.drv.auto) { const ok = await drvBackup(true); if (!ok) { S.drv.auto = false; await drvSavePref(); render(); } }
-  else toast('Backup automático desligado.');
+  if (S.drv.auto) { const ok = await drvBackup(true); if (!ok) { S.drv.auto = false; await drvSavePref(); render(); } else toast('Backup programado ligado.'); }
+  else toast('Backup programado desligado.');
 });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(drvAuto, 1500); });
+setInterval(drvAuto, 15 * 60000);
 
 
 /* ================= Perfil (cadastro opcional, só neste aparelho) ================= */
 const PF_TYPES = ['MODY', 'Tipo 1', 'Tipo 2', 'Gestacional', 'Outro', 'Prefiro não informar'];
-const pfClean = p => ({ name: String(p.name || '').slice(0, 80), birth: /^\d{4}-\d\d-\d\d$/.test(p.birth || '') ? p.birth : '', type: PF_TYPES.includes(p.type) ? p.type : '', team: String(p.team || '').slice(0, 80) });
+const PF_PHOTO_OK = x => typeof x === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(x) && x.length <= 250000;
+const pfClean = p => ({ id: typeof p.id === 'string' && p.id ? p.id.slice(0, 40) : uid(), createdAt: typeof p.createdAt === 'number' ? p.createdAt : Date.now(), name: String(p.name || '').slice(0, 80), birth: /^\d{4}-\d\d-\d\d$/.test(p.birth || '') ? p.birth : '', type: PF_TYPES.includes(p.type) ? p.type : '', team: String(p.team || '').slice(0, 80), photo: PF_PHOTO_OK(p.photo) ? p.photo : '' });
 async function pfSave() { try { await Store.put('meta', { id: 'profile', value: S.profile }); } catch (e) { } }
 function pfLine() {
   const p = S.profile; if (!p) return '';
   const parts = [p.name && 'Paciente: ' + p.name, p.birth && 'Nascimento: ' + fmtDate(p.birth), p.type && p.type !== 'Prefiro não informar' && 'Diabetes: ' + p.type, p.team && 'Equipe: ' + p.team].filter(Boolean);
   return parts.join('  ·  ');
 }
+/* ---- avatar (cabeçalho e página do perfil) ---- */
+const PF_DEF = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="var(--red-d, #3a1a1c)"/><circle cx="20" cy="15" r="6.5" fill="var(--red)"/><path d="M7 35c1.500-7 6.500-10.500 13-10.500S31.500 28 33 35a20 20 0 0 1-26 0z" fill="var(--red)"/></svg>';
+const pfAvatarHTML = () => S.profile && S.profile.photo ? `<img class="pf-img" src="${S.profile.photo}" alt="">` : PF_DEF;
+function pfSync() { const b = document.getElementById('pfb'); if (!b) return; b.innerHTML = pfAvatarHTML(); const n = S.profile && S.profile.name; b.setAttribute('aria-label', 'Abrir menu de navegação' + (n ? ' · ' + n : '')); b.title = 'Menu'; }
+
+/* convite discreto na página inicial */
+S.pfSnooze = 0;
+function pfInvite() {
+  const p = S.profile; if ((p && (p.name || p.photo)) || Date.now() < S.pfSnooze) return '';
+  return `<div class="pf-inv"><span class="pf-inv-i" aria-hidden="true">${PF_DEF}</span><span class="pf-inv-t"><b>Crie o seu perfil.</b> Uma experiência mais completa, personalizada e organizada, com seus dados e preferências mais fáceis de preservar.</span><span class="pf-inv-b"><button class="btn sm pri" data-act="go" data-r="perfil">Criar</button><button class="pf-x" data-act="pf-snooze" aria-label="Dispensar por 14 dias">×</button></span></div>`;
+}
+const pfKv = (k, v) => `<div class="row sp" style="gap:12px;padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start"><span class="dim" style="flex:none">${k}</span><b style="text-align:right;overflow-wrap:anywhere">${v}</b></div>`;
 function viewPerfil() {
-  const p = S.profile || {}, first = S.profPrompt, gp = window.TB_DRV_STATE && TB_DRV_STATE.profile;
-  const name = p.name != null && S.profile ? p.name : (gp && gp.name) || '';
-  return banners() + `<div class="card"><p class="hint" style="margin:0">${first ? '<b>Cadastro opcional.</b> ' : ''}Estas informações ficam <b>só neste aparelho</b> (e no seu backup). Servem para personalizar o app e para o cabeçalho dos relatórios que você leva ao médico. Não mudam nenhum cálculo nem faixa de glicemia.</p></div>
-  <h2 class="sec">Seus dados</h2><div class="card"><form id="pf-form" class="stack" style="gap:12px">
+  const p = S.profile || {}, gp = window.TB_DRV_STATE && TB_DRV_STATE.profile;
+  const name = p.name != null && S.profile ? p.name : (gp && gp.name) || '', has = !!S.profile;
+  const dtype = p.type && p.type !== 'Prefiro não informar' ? p.type : '';
+  const mi2 = (r, t, d) => menuItem(r, t, d);
+  const n = { med: S.records.filter(r => !isEx(r)).length, hba: S.hba.filter(x => !isEx(x) && x.source !== 'exame').length, ex: S.exams.length, ins: S.inslog.length, fd: (S.bl.foods || []).length, sv: (S.saved || []).length, rl: (S.bl.rlog || []).length, rm: (S.bl.meals || []).length, pl: plCollect(true).length };
+  const ai = aiState(), aiTx = ai === 'ok' ? (window.TB_AI ? 'Configurada' : 'Ativa (Claude)') : ai === 'notcfg' ? 'Não configurada' : 'Indisponível aqui';
+  const drvTx = S.drv.lastTs ? new Date(S.drv.lastTs).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + (S.drv.lastStatus === 'fail' ? ' (última tentativa falhou)' : '') : 'nenhum ainda';
+  return banners() + `<div class="card pf-hd"><button class="pf-big" id="pf-pick" type="button" aria-label="Escolher foto de perfil">${pfAvatarHTML()}<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h3l1.500-2h7L17 8h3v11H4zM12 17a3.500 3.500 0 100-7 3.500 3.500 0 000 7z"/></svg></span></button>
+    <input type="file" id="pf-photo" accept="image/*" hidden>
+    <div class="pf-hn"><b>${esc(name || 'Seu perfil')}</b><span class="hint" style="margin:0">${dtype ? 'Diabetes ' + esc(dtype === 'Outro' ? 'outros' : dtype) : 'Tipo de diabetes não informado'}</span>
+    <span class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-act="pf-pick">${p.photo ? 'Trocar foto' : 'Adicionar foto'}</button>${p.photo ? '<button class="btn sm" type="button" data-act="pf-nophoto">Remover foto</button>' : ''}</span></div></div>
+  <p class="hint" id="pf-msg" role="status" style="margin:8px 2px 0"></p>
+  <h2 class="sec">Informações pessoais</h2><div class="card"><form id="pf-form" class="stack" style="gap:12px">
     <div class="field"><label class="fl" for="pf-name">Nome</label><input class="in" id="pf-name" autocomplete="off" maxlength="80" value="${esc(name)}"></div>
     <div class="field"><label class="fl" for="pf-birth">Data de nascimento (opcional)</label><input class="in" id="pf-birth" type="date" max="${isoDate(new Date())}" value="${esc(p.birth || '')}"></div>
-    <div class="field"><label class="fl" for="pf-type">Tipo de diabetes</label><select class="in" id="pf-type"><option value="">Não informado</option>${PF_TYPES.map(t => `<option ${p.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label class="fl" for="pf-team">Médico ou equipe de saúde (opcional)</label><input class="in" id="pf-team" autocomplete="off" maxlength="80" value="${esc(p.team || '')}"></div>
-    <button class="btn pri full" type="submit">Salvar</button>
-    ${first ? '<button class="btn full" type="button" data-act="pf-skip">Agora não</button>' : ''}
-    ${S.profile ? '<button class="btn full" type="button" data-act="pf-clear">Apagar meu perfil deste aparelho</button>' : ''}
-  </form></div>`;
+    <button class="btn pri full" type="submit">Salvar</button></form>
+    <p class="hint" style="margin:10px 0 0">Ficam só neste aparelho e no seu backup. Aparecem no cabeçalho dos relatórios para o médico e não mudam nenhum cálculo.</p></div>
+  <h2 class="sec">Diabetes</h2><div class="card"><div class="field"><label class="fl" for="pf-type">Tipo de diabetes</label><select class="in" id="pf-type"><option value="">Não informado</option>${PF_TYPES.map(t => `<option value="${esc(t)}" ${p.type === t ? 'selected' : ''}>${t === 'Outro' ? 'Outros' : esc(t)}</option>`).join('')}</select></div>
+    <p class="hint" style="margin:10px 0 0">Mudar aqui atualiza também o Meu tratamento e os relatórios.</p>
+    <div class="stack" style="margin-top:12px"><button class="btn full" data-act="go" data-r="esquemas">Abrir Meu tratamento</button><button class="btn full" data-act="go" data-r="bolus">Minha razão insulina/carboidratos</button></div></div>
+  <h2 class="sec">Preferências</h2><div class="stack">${mi2('aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela')}${mi2('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${mi2('config', 'Configurações', 'Meta de HbA1c, faixas e demais ajustes')}${VIEWS.ia ? mi2('ia', 'Inteligência artificial', 'Provedor e chave de IA') : ''}</div>
+  <h2 class="sec">Dados da conta</h2><div class="card">${pfKv('Perfil criado em', has ? fmtDate(isoDate(new Date(p.createdAt))) : 'ainda não criado')}${has ? pfKv('Identificador', esc(String(p.id).slice(0, 8))) : ''}${pfKv('Plataforma', IS_NATIVE ? 'Aplicativo Android' : 'Versão web')}${gp && gp.email ? pfKv('Conta Google', esc(gp.email)) : ''}${pfKv('IA', aiTx)}${pfKv('Medições de glicemia', n.med)}${pfKv('Resultados de HbA1c', n.hba)}${pfKv('Exames', n.ex)}${pfKv('Registros de insulina', n.ins)}${pfKv('Lembretes do tratamento', n.pl)}${pfKv('Alimentos cadastrados', n.fd)}${pfKv('Refeições salvas e feitas', n.sv + n.rm)}${pfKv('Registros da razão', n.rl)}
+    <p class="hint" style="margin:10px 0 0">Tudo o que você registra neste aparelho (medições, exames, tratamento, alimentos, bolus, IA, notificações e preferências) pertence a este perfil, é guardado no banco local e vai junto no backup. As atualizações do app não apagam esses dados.</p></div>
+  <h2 class="sec">Privacidade e segurança</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no TiaBete nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (o seu backup, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} O app não tem senha própria: use o bloqueio de tela do aparelho.</p>
+    <p class="hint" style="margin:0 0 10px">Armazenamento persistente: <b>${S.persisted ? 'ativo' : 'não confirmado'}</b>. Ele reduz o risco de o navegador apagar os dados por falta de espaço.</p>
+    <div class="stack"><button class="btn full" data-act="pf-persist">Pedir armazenamento persistente</button>${has ? '<button class="btn full" data-act="pf-clear">Apagar meu perfil (nome e foto) deste aparelho</button>' : ''}</div>
+    <p class="hint" style="margin:10px 0 0">Apagar o perfil não apaga medições nem outros registros. Para apagar tudo, use Backup e dados → Apagar dados.</p></div>
+  <h2 class="sec">Dados e backups</h2><div class="card">${pfKv('Último backup (arquivo)', S.lastBackup ? new Date(S.lastBackup).toLocaleDateString('pt-BR') : 'nenhum ainda')}${pfKv('Último backup no Drive', drvTx)}${pfKv('Backup programado', S.drv.auto ? 'ligado' : 'desligado')}
+    <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="go" data-r="backup">Backup, restauração e Google Drive</button></div></div>`;
 }
+/* foto: recorta o centro em quadrado, reduz para 256 px e guarda como JPEG */
+function pfPhotoFrom(file) {
+  return new Promise((ok, no) => {
+    if (!file || !/^image\//.test(file.type)) return no(new Error('Escolha um arquivo de imagem.'));
+    const fr = new FileReader(); fr.onerror = () => no(new Error('Não consegui ler a imagem.'));
+    fr.onload = () => { const im = new Image(); im.onerror = () => no(new Error('Não consegui abrir essa imagem.')); im.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), m = Math.min(im.width, im.height);
+      g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256); g.drawImage(im, (im.width - m) / 2, (im.height - m) / 2, m, m, 0, 0, 256, 256);
+      const u = c.toDataURL('image/jpeg', 0.82); PF_PHOTO_OK(u) ? ok(u) : no(new Error('A imagem ficou grande demais.')); }; im.src = fr.result; };
+    fr.readAsDataURL(file);
+  });
+}
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'pf-photo') { const f = t.files && t.files[0]; t.value = ''; if (!f) return; try { const u = await pfPhotoFrom(f); S.profile = pfClean({ ...(S.profile || {}), photo: u }); await pfSave(); render(); toast('Foto atualizada.'); } catch (err) { const m = document.getElementById('pf-msg'); if (m) m.textContent = err.message; toast(err.message); } return; }
+  if (t.id === 'pf-type') { S.profile = pfClean({ ...(S.profile || {}), type: t.value }); await pfSave(); render(); toast(t.value ? 'Tipo de diabetes atualizado.' : 'Tipo de diabetes removido.'); }
+});
 document.addEventListener('submit', async e => {
   if (e.target.id !== 'pf-form') return; e.preventDefault();
   const v = id => document.getElementById(id).value.trim();
-  S.profile = pfClean({ name: v('pf-name'), birth: v('pf-birth'), type: v('pf-type'), team: v('pf-team') }); S.profPrompt = false; await pfSave(); toast('Perfil salvo.'); go('mais');
+  S.profile = pfClean({ ...(S.profile || {}), name: v('pf-name'), birth: v('pf-birth'), team: v('pf-team') }); await pfSave(); render(); toast('Perfil salvo.');
 });
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act="pf-skip"],[data-act="pf-clear"]'); if (!el) return;
-  if (el.dataset.act === 'pf-skip') { S.profPrompt = false; try { await Store.put('meta', { id: 'profile-skip', value: true }); } catch (x) { } go('painel'); }
+  const el = e.target.closest('#pf-pick,[data-act="pf-pick"],[data-act="pf-nophoto"],[data-act="pf-clear"],[data-act="pf-snooze"],[data-act="pf-persist"]'); if (!el) return;
+  const a = el.dataset.act || 'pf-pick';
+  if (a === 'pf-pick') { const i = document.getElementById('pf-photo'); if (i) i.click(); }
+  else if (a === 'pf-nophoto') { S.profile = pfClean({ ...S.profile, photo: '' }); await pfSave(); render(); toast('Foto removida.'); }
+  else if (a === 'pf-snooze') { S.pfSnooze = Date.now() + 14 * 86400000; try { await Store.put('meta', { id: 'profile-invite', value: S.pfSnooze }); } catch (x) { } render(); }
+  else if (a === 'pf-persist') { await askPersist(); render(); toast(S.persisted ? 'Armazenamento persistente ativo.' : 'O navegador não confirmou. Seus dados continuam salvos.'); }
   else { S.profile = null; try { await Store.put('meta', { id: 'profile', value: null }); } catch (x) { } toast('Perfil apagado.'); render(); }
 });
-
 
 /* ================= Escala da tela (acessibilidade) ================= */
 const SCALES = [[1, 'Padrão'], [1.15, 'Grande'], [1.3, 'Maior'], [1.5, 'Máximo']];
@@ -1230,7 +1295,6 @@ function viewConfig() {
   </div></div>
   <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
 }
-document.addEventListener('click', e => { if (e.target.closest('#cfg')) go('config'); });
 
 
 /* ================= Enviar ao meu médico (compartilhar) ================= */

@@ -139,7 +139,7 @@ function mealIcon(r) {
 }
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { config: 'Configurações', perfil: 'Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', 'g-trat': 'Insulina e tratamento', 'g-exames': 'Exames e HbA1c', 'g-analises': 'Padrões e conquistas', 'g-ia': 'Inteligência artificial', 'g-dados': 'Dados e relatórios', 'g-ajustes': 'Ajustes e conta' };
+const TITLES = { config: 'Configurações', perfil: 'Meu Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', 'g-trat': 'Insulina e tratamento', 'g-exames': 'Exames e HbA1c', 'g-analises': 'Padrões e conquistas', 'g-ia': 'Inteligência artificial', 'g-dados': 'Dados e relatórios', 'g-ajustes': 'Ajustes e conta' };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
@@ -181,7 +181,7 @@ const curRange = () => periodRanges(S.period, Date.now());
 function banners() {
   let h = '';
   if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte um backup antes de sair.</span></div>`;
-  h += hypoBanner() + hyperBanner() + rwBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner();
+  h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner();
   if (hasExamples()) h += `<div class="banner"><span><b>Dados de exemplo.</b> Eles somem sozinhos quando você importar ou registrar a primeira medição real.</span><button class="btn sm" data-act="rm-examples">Remover agora</button></div>`;
   return h;
 }
@@ -244,7 +244,7 @@ function lastExtremes(all) {
   return `<div class="lxs">${item('▼ Última baixa (<' + LIM.low + ')', find(r => r.glucose < LIM.low), 'var(--red-t)')}${item('▲ Última alta (>' + LIM.high + ')', find(r => r.glucose > LIM.high), 'var(--warn, var(--red-t))')}${avg}</div>`;
 }
 function viewPainel() {
-  let h = banners() + labelBanner();
+  let h = banners() + labelBanner() + pfInvite();
   const all = S.records;
   if (!all.length) {
     return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Seu painel começa aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o CSV do mySugr ou registre uma medição. Os dados ficam só neste navegador.</p>
@@ -261,8 +261,11 @@ function viewPainel() {
   const { cur, prev } = curRange();
   const rc = inRange(all, cur[0], cur[1]), rp = inRange(all, prev[0], prev[1]);
   const sc = stats(rc), sp = stats(rp), cmp = compareStats(sc, sp);
-  h += `<div class="row sp" style="margin:18px 0 12px"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(cur[0])} – ${fmtDM(cur[1])}</span></div>`;
-  h += `<div class="stack">
+  const selBar = `<div class="row sp" style="margin:0 0 12px;flex-wrap:wrap;gap:8px"><div class="seg" role="group" aria-label="Período da evolução e dos indicadores">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(cur[0])} – ${fmtDM(cur[1])}</span></div>`;
+  h += `<h2 class="sec">Evolução glicêmica</h2><div class="card">${selBar}`;
+  h += rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL para medições em jejum. Cada ponto é uma medição real. Toque ou passe o dedo para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.');
+  h += `</div>${eventLegend(cur[0], cur[1])}`;
+  h += `<div class="stack" style="margin-top:14px">
     <div class="card tile big"><div class="lb">Média no período</div><div class="v num">${fm(sc.mean)}<small>mg/dL</small></div>
       <div class="sub">${sc.n ? `${cmp.diff != null ? `${fsign(cmp.diff)} mg/dL vs. ${S.period} dias anteriores` : 'Sem média no período anterior para comparar'}` : 'Sem medições neste período'}</div></div>
     <div class="grid3">
@@ -274,9 +277,6 @@ function viewPainel() {
       <div class="card tile ${sc.hypo ? 'alert' : ''}"><div class="lb">Episódios &lt; 70</div><div class="v num">${sc.hypo}<small>medições</small></div><div class="sub">${sc.n ? (sc.hypo / sc.n * 100).toFixed(0) + '% das medições' : '—'}</div></div>
       <div class="card tile ${sc.hyper ? 'alert' : ''}"><div class="lb">Acima da faixa</div><div class="v num">${sc.hyper}<small>medições</small></div><div class="sub">${sc.n ? (sc.hyper / sc.n * 100).toFixed(0) + '% das medições' : '—'}</div></div>
     </div></div>`;
-  h += `<h2 class="sec">Evolução glicêmica</h2><div class="card">`;
-  h += rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL para medições em jejum. Cada ponto é uma medição real. Toque ou passe o dedo para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.');
-  h += `</div>${eventLegend(cur[0], cur[1])}`;
   const row = (lb, a, b, d, cls = '') => `<tr><td>${lb}</td><td>${a}</td><td class="dim">${b}</td><td class="${cls}">${d}</td></tr>`;
   const few = (sc.n && sc.n < 5) || (sp.n && sp.n < 5);
   h += `<h2 class="sec">Comparação com o período anterior</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Dif.<small>&nbsp;</small></th></tr></thead><tbody>
@@ -421,7 +421,7 @@ async function saveRecord(form) {
   setOr('context', v('f-ctx')); setOr('meal', v('f-meal')); setOr('mealDesc', v('f-mdesc')); setOr('carbs', carbs); setOr('insMeal', insMeal); setOr('insBasal', insBasal); setOr('insCorr', insCorr);
   setOr('actMin', actMin); setOr('actDesc', v('f-act-desc')); setOr('notes', v('f-notes')); { const mk = [...form.querySelectorAll('input[name=mk]:checked')].map(x => x.value); if (mk.length) rec.marks = mk; else delete rec.marks; } if ($('#f-scheme')) setOr('scheme', v('f-scheme'));
   if (old && old.cls && (rec.context !== old.context || rec.meal !== old.meal)) { delete rec.cls; delete rec.prev; }
-  rec.ts = mkTs(rec.date, rec.time); delete rec.key;
+  rec.ts = mkTs(rec.date, rec.time); delete rec.key; hypoStamp(rec);
   let note = '';
   if (hasExamples() && !old) { await removeExamples(); note = ' Dados de exemplo removidos.'; }
   await Store.put('records', rec); await loadAll(); closeSheet(); render(); toast('Medição salva.' + note);
@@ -713,7 +713,8 @@ function viewBackup() {
     <p class="hint"><b>Atenção:</b> limpar os dados do site ou do navegador apaga tudo daqui. Faça backups regulares.</p></div>
     <h2 class="sec">Exportar</h2><div class="stack"><button class="btn pri full" data-act="bk-json">Backup completo (.json)</button><button class="btn full" data-act="bk-csv">Medições em CSV (.csv)</button></div>
     ${driveCard()}
-    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher backup</button>`;
+    ${secCard()}
+    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher backup</button>${secPrompt()}`;
   if (S.rest) {
     const x = S.rest;
     h += `<div style="margin-top:14px"><div class="eyebrow">Arquivo lido</div><p style="margin:6px 0 4px" class="num">${x.records.length} medições · ${x.hba.length} HbA1c · ${x.schemes.length} esquemas</p><p class="hint" style="margin:0 0 12px">Exportado em ${esc(x.exportedAt ? new Date(x.exportedAt).toLocaleString('pt-BR') : 'data desconhecida')}.</p>
@@ -771,16 +772,17 @@ function menuGroups() {
     'g-analises': { t: 'Padrões e conquistas', d: 'Padrões, conquistas, classificação de medições e eventos', items: [['padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180'], ['classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições'], ['eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos']] },
     'g-ia': { t: 'Inteligência artificial', d: 'Perguntas sobre o seu histórico e provedor de IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor de IA e informe a sua chave'] : null] },
     'g-dados': { t: 'Dados e relatórios', d: 'Relatórios, importação do mySugr, backup e restauração', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia'], ['backup', 'Backup e dados', 'Exportar, restaurar, CSV']] },
-    'g-ajustes': { t: 'Ajustes e conta', d: 'Configurações, alertas, perfil e aparência', items: [['config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes'], ['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno'], ['perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde'], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático']] }
+    'g-ajustes': { t: 'Ajustes e conta', d: 'Configurações, alertas, perfil e aparência', items: [['config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes'], ['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno'], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático']] }
   };
   for (const g of Object.values(G)) g.items = g.items.filter(Boolean);
   return G;
 }
 const hubOf = r => { if (r === 'perguntas' || r === 'ia') return 'g-ia'; const G = menuGroups(); for (const [k, g] of Object.entries(G)) if (g.items.some(x => x[0] === r)) return k; return null; };
 const hubView = k => () => { const g = menuGroups()[k]; return banners() + `<div class="stack">${g.items.map(x => menuItem(x[0], x[1], x[2])).join('')}</div>`; };
-const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'nome idade nascimento tipo diabetes equipe medico', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'perfil foto nome idade nascimento tipo diabetes equipe medico privacidade seguranca conta dados avatar', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+const pfMenuDesc = () => S.profile && (S.profile.name || S.profile.photo) ? 'Foto, dados pessoais, diabetes, privacidade e backups' : 'Crie seu perfil para uma experiência personalizada';
 function maisIndex() {
-  const G = menuGroups(), out = [{ r: 'bolus', t: 'Cálculo de bolus', d: 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia', g: '' }, { r: 'hypo', t: 'Protocolo de hipoglicemia', d: 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', g: '', act: 'hypo-open' }];
+  const G = menuGroups(), out = [{ r: 'perfil', t: 'Meu Perfil', d: pfMenuDesc(), g: '' }, { r: 'bolus', t: 'Cálculo de bolus', d: 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia', g: '' }, { r: 'hypo', t: 'Protocolo de hipoglicemia', d: 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', g: '', act: 'hypo-open' }];
   for (const g of Object.values(G)) for (const x of g.items) out.push({ r: x[0], t: x[1], d: x[2], g: g.t });
   out.push({ r: 'sobre', t: 'Sobre e limites', d: 'Privacidade, métodos e avisos', g: '' });
   return out;
@@ -795,7 +797,7 @@ document.addEventListener('click', e => { const c = e.target.closest('[data-act=
 function maisMenu() {
   const G = menuGroups(), grp = k => G[k].items.length > 1 ? menuItem(k, G[k].t, G[k].d) : G[k].items.length ? menuItem(G[k].items[0][0], G[k].items[0][1], G[k].items[0][2]) : '';
   const hypo = `<button class="menu-item" data-act="hypo-open">${mi('hypo')}<div>Protocolo de hipoglicemia<span>Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return menuItem('bolus', 'Cálculo de bolus', 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia') + hypo + grp('g-trat') + grp('g-exames') + grp('g-analises') + grp('g-ia') + grp('g-dados') + grp('g-ajustes') + menuItem('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos');
+  return menuItem('perfil', 'Meu Perfil', pfMenuDesc()) + menuItem('bolus', 'Cálculo de bolus', 'Minha razão insulina/carboidratos, alimentos, refeições e bolus por dia') + hypo + grp('g-trat') + grp('g-exames') + grp('g-analises') + grp('g-ia') + grp('g-dados') + grp('g-ajustes') + menuItem('sobre', 'Sobre e limites', 'Privacidade, métodos e avisos');
 }
 function viewMais() {
   const q = S.maisQ || '';
@@ -841,6 +843,7 @@ function render() {
   $('#nav').innerHTML = navHTML();
   makeAccordions(view);
   safetyNote(view, route);
+  pfSync();
   attachCharts(view);
   rewardSoon();
   setTimeout(drvAuto, 2500);
@@ -962,8 +965,8 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blHasData() || JSON.stringify(S.bl.foods) !== JSON.stringify(BL_FOODS) ? S.bl : null, plan: plHas() ? S.plan : undefined } };
-  if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blHasData()) return null;
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blDirty() ? S.bl : null, plan: plHas() ? S.plan : undefined } };
+  if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }
 async function exportBackup() {
@@ -981,8 +984,12 @@ async function exportCSV() {
 }
 async function readBackupFile(file) {
   if (!file) return;
+  try { const j = JSON.parse((await file.text()).replace(/^\ufeff/, '')); await ingestBackup(j); }
+  catch (e) { S.rest = null; render(); toast(e.message && e.message.length < 90 ? e.message : 'Não consegui ler este backup.'); }
+}
+async function ingestBackup(j) {
   try {
-    const j = JSON.parse((await file.text()).replace(/^﻿/, ''));
+    if (j && j.enc === 1) { SEC.pend = j; SEC.msg = ''; S.rest = null; render(); return; }
     if (!j || !['GlicoTrack', 'TiaBete'].includes(j.app) || !Array.isArray(j.records)) throw new Error('Este arquivo não é um backup do TiaBete.');
     if (j.schema && j.schema > SCHEMA_VERSION) throw new Error('Este backup foi criado por uma versão mais nova do TiaBete.');
     const okRec = r => r && typeof r.date === 'string' && parseDate(r.date) && typeof r.glucose === 'number' && r.glucose >= GLU_MIN && r.glucose <= GLU_MAX;
