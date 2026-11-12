@@ -10,6 +10,8 @@
   insLoaded = true;
   try { const m = (await Store.all('meta')).find(x => x.id === 'a1c-target'); if (m && m.value >= 4 && m.value <= 12) S.a1cT = m.value; } catch (e) { }
   try { if (S.ins.dinnerMin === 150) S.ins.dinnerMin = 140; await insBackfill(); insSync(); await insSave(); } catch (e) { }
+  try { const cm = (await Store.all('meta')).find(x => x.id === 'custom-alerts'); if (cm) caLoad(cm.value); if (caSeed()) await caSave(); caSync(); } catch (e) { }
+  try { const sw = (await Store.all('meta')).find(x => x.id === 'swipe-menu'); if (sw && typeof sw.value === 'boolean') S.swipeMenu = sw.value; } catch (e) { }
   try { const us = (await Store.all('meta')).find(x => x.id === 'ui-scale'); if (us && SCALES.some(x => x[0] === us.value)) { S.scale = us.value; applyScale(); } } catch (e) { }
   try { const th = (await Store.all('meta')).find(x => x.id === 'theme'); if (th && ['light', 'dark', 'auto'].includes(th.value)) { S.theme = th.value; try { localStorage.setItem('tb-theme', th.value); } catch (e) { } } applyTheme(); } catch (e) { }
   try { const ac = (await Store.all('meta')).find(x => x.id === 'acc'); if (ac && ac.value && typeof ac.value === 'object') { S.acc = ac.value; try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } } } catch (e) { }

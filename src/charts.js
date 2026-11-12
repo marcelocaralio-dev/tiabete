@@ -5,7 +5,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const fm = x => x == null ? '—' : x.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const f0 = x => x == null ? '—' : Math.round(x).toLocaleString('pt-BR');
 const fn = (x, d = 1) => x == null ? '—' : x.toLocaleString('pt-BR', { maximumFractionDigits: d });
-const fsign = (x, d = 1) => x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fsign = (x, d = 1) => { if (x == null) return '—'; const t = Math.abs(x).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }); return (/[1-9]/.test(t) ? (x > 0 ? '+' : '−') : '') + t; };
 
 function niceTicks(min, max, target) {
   const span = max - min, raw = span / target;
@@ -73,6 +73,8 @@ function barChart(items, opt = {}) {
   if (ymin < LIM.high && ymax > LIM.high) s += `<line x1="${L}" x2="${W - R}" y1="${Y(LIM.high)}" y2="${Y(LIM.high)}" stroke="var(--red)" stroke-width="1" stroke-dasharray="4 3" opacity=".8"/>`;
   if (ymin < LIM.low && ymax > LIM.low) s += `<line x1="${L}" x2="${W - R}" y1="${Y(LIM.low)}" y2="${Y(LIM.low)}" stroke="var(--red-l)" stroke-width="1" stroke-dasharray="4 3" opacity=".8"/>`;
   const pts = [];
+  s += `<text class="ax" x="${L - 6}" y="${T - 10}" text-anchor="end">mg/dL</text>`;
+  const step = items.length > 8 ? Math.ceil(items.length / 6) : 1;
   items.forEach((it, i) => {
     const cx = L + slot * i + slot / 2;
     if (it.value == null || it.n < MIN_BUCKET) {
@@ -85,7 +87,7 @@ function barChart(items, opt = {}) {
       s += `<text class="ax" x="${cx}" y="${y - 5}" text-anchor="middle" fill="var(--fg)" style="fill:var(--fg);font-size:10.5px">${f0(it.value)}</text>`;
       pts.push({ x: cx, y, tip: `<span>${esc(it.label)}</span><br><b>${fm(it.value)}</b> <span>mg/dL · n = ${it.n}</span>${it.sub ? '<br><span>' + esc(it.sub) + '</span>' : ''}` });
     }
-    const skip = items.length > 8 && i % 2 === 1;
+    const skip = i % step !== 0;
     if (!skip) s += `<text class="ax" x="${cx}" y="${H - 18}" text-anchor="middle">${esc(it.label)}</text>`;
     s += `<text class="ax" x="${cx}" y="${H - 7}" text-anchor="middle">${items.length > 8 ? it.n : 'n=' + it.n}</text>`;
   });

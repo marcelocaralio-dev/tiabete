@@ -38,8 +38,9 @@ async def main():
         pg = await (await b.new_context(viewport={'width':400,'height':860})).new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type=='error' and 'favicon' not in m.text else None)
         await pg.add_init_script(MOCK)
-        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_timeout(1000)
+        await pg.goto('http://localhost:8766/index.html'); await pg.wait_for_selector('#tb-splash', state='detached', timeout=8000); await pg.wait_for_timeout(1000)
         await pg.evaluate("""(async()=>{const d=isoDate(new Date());await Store.put('records',{id:'t1',date:d,time:'07:00',ts:mkTs(d,'07:00'),glucose:110,context:'jejum',source:'manual'});await loadAll();render();})()"""); await pg.wait_for_timeout(300)
+        if await pg.query_selector('#gate-skip'): await pg.click('#gate-skip'); await pg.wait_for_timeout(300)
         for i in range(6):
             if await pg.query_selector('#rw-ok'): await pg.click('#rw-ok'); await pg.wait_for_timeout(200)
         T = lambda: pg.evaluate("document.body.innerText")
@@ -48,12 +49,13 @@ async def main():
         # sem configuração
         e = await pg.evaluate("(async()=>{try{const s=await window.claude.use('sample');await s('oi')}catch(e){return e.code+'|'+e.aiMsg}})()"); print('sem config:', e)
         await pg.evaluate("go('ia')"); await pg.wait_for_timeout(500)
+        print('guia:', 'Assistente de configuração' in await T() and 'Create Key' in await pg.evaluate('document.body.textContent')); await pg.select_option('#ai-prov','openrouter'); await pg.wait_for_timeout(200); print('guia openrouter:', ':free' in await T()); await pg.select_option('#ai-prov','anthropic'); await pg.wait_for_timeout(200)
         await pg.fill('#ai-key','sk-ant-SEGREDO123'); await pg.click('[data-act=ai-save]'); await pg.wait_for_timeout(300); print('sem consentimento:', 'Marque a caixa' in await T())
         await pg.click('#ai-consent'); await pg.fill('#ai-key','sk-ant-SEGREDO123'); await pg.click('[data-act=ai-save]'); await pg.wait_for_timeout(500); print('salvo:', 'Configuração salva' in await T())
         await pg.fill('#ai-key','sk-ant-SEGREDO123') ; await pg.click('[data-act=ai-test]'); await pg.wait_for_timeout(500); print('teste:', 'Conexão funcionando' in await T())
         raw = await pg.evaluate("""(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('tb-secure');q.onsuccess=()=>r(q.result)});const v=await new Promise(r=>{const q=db.transaction('k').objectStore('k').get('s:ai-key');q.onsuccess=()=>r(q.result)});return JSON.stringify([Object.keys(v),v.ct.byteLength])})()"""); print('cofre cifrado:', raw)
         print('chave fora do backup:', await pg.evaluate("(async()=>{const t=backupText();const all=JSON.stringify(await Promise.all(['records','meta'].map(s=>Store.all?Store.all(s):[])));return !(t||'').includes('SEGREDO')&&!all.includes('SEGREDO')})()"))
-        await pg.click('[data-act=ai-models]'); await pg.wait_for_timeout(500); print('modelos:', '2 modelos' in await T(), await pg.evaluate("document.querySelectorAll('#ai-models option').length"))
+        await pg.evaluate("document.querySelectorAll('details.more').forEach(d=>d.open=true)"); await pg.click('[data-act=ai-models]'); await pg.wait_for_timeout(500); print('modelos:', '2 modelos' in await T(), await pg.evaluate("document.querySelectorAll('#ai-models option').length"))
         # chamadas com ferramentas, três famílias
         for prov,model in [('anthropic','claude-haiku-5-5'),('openai','gpt-x'),('gemini','gemini-2.0-flash')]:
             await pg.evaluate("(async([p,m])=>{await TB_SECURE.setCfg('ai',{provider:p,base:'',model:m,consent:true})})", [prov,model])

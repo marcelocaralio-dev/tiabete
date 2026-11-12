@@ -87,7 +87,7 @@ function plItemHTML(sec, it) {
 }
 function plListCard(sec, title, hint, addLabel) {
   const items = S.plan[sec];
-  return `<h2 class="sec">${title}</h2><div class="card pl-card"><p class="hint" style="margin:0 0 10px">${hint}</p><div class="stack" style="gap:8px">${items.map(it => plItemHTML(sec, it)).join('') || '<p class="dim" style="margin:0;font-size:13px">Nada cadastrado ainda.</p>'}<button class="btn full" data-act="pl-add" data-sec="${sec}">+ ${addLabel}</button></div></div>`;
+  return `<h2 class="sec">${title}</h2><div class="card pl-card"><p class="hint" style="margin:0 0 10px">${hint}</p><div class="stack" style="gap:8px">${items.map(it => plItemHTML(sec, it)).join('') || '<p class="dim" style="margin:0;font-size:14.5px">Nada cadastrado ainda.</p>'}<button class="btn full" data-act="pl-add" data-sec="${sec}">+ ${addLabel}</button></div></div>`;
 }
 function plPumpCard() {
   const p = S.plan.pump, due = p.lastChange ? isoDate(new Date(addDays(mkTs(p.lastChange, '12:00'), p.siteDays))) : '';
@@ -245,7 +245,7 @@ document.addEventListener('click', e => { const el = e.target.closest('[data-act
 /* ----- Painel: card "Meu tratamento" (muda conforme o que foi configurado em Esquemas de tratamento) ----- */
 function plCheckDone(t) { const [h, m] = t.split(':').map(Number), a = mkTs(isoDate(new Date()), t); return S.records.some(r => !isEx(r) && !r.noTime && r.date === isoDate(new Date()) && r.ts >= a - 30 * 60000 && r.ts <= a + 90 * 60000); }
 function plChips(it, sec) {
-  if (!it.times.length) return '<span class="dim" style="font-size:12.5px">Só quando necessário</span>';
+  if (!it.times.length) return '<span class="dim" style="font-size:14px">Só quando necessário</span>';
   plDoneRoll(); const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
   return it.times.map(t => {
     const key = it.id + '@' + t, done = sec === 'checks' ? plCheckDone(t) : S.planDone.map[key] === 1, [h, mi] = t.split(':').map(Number), late = !done && m >= h * 60 + mi + 30;
@@ -253,7 +253,7 @@ function plChips(it, sec) {
   }).join('');
 }
 function plTodayCard(eyebrow, sec, items, hint) {
-  return `<div class="card" style="margin-top:12px"><div class="eyebrow">${eyebrow}</div><div class="stack" style="gap:12px;margin-top:10px">${items.map(it => `<div><div class="row" style="justify-content:space-between;gap:8px;align-items:baseline"><b style="overflow-wrap:anywhere">${esc(it.name || 'Sem nome')}</b>${it.dose ? `<span class="dim" style="font-size:12.5px;text-align:right">${esc(it.dose)}</span>` : ''}</div>${it.notes ? `<div class="dim" style="font-size:12.5px;margin-top:2px">${esc(it.notes)}</div>` : ''}<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${plChips(it, sec)}</div></div>`).join('')}</div>${hint ? `<p class="hint" style="margin:12px 0 0">${hint}</p>` : ''}</div>`;
+  return `<div class="card" style="margin-top:12px"><div class="eyebrow">${eyebrow}</div><div class="stack" style="gap:12px;margin-top:10px">${items.map(it => `<div><div class="row" style="justify-content:space-between;gap:8px;align-items:baseline"><b style="overflow-wrap:anywhere">${esc(it.name || 'Sem nome')}</b>${it.dose ? `<span class="dim" style="font-size:14px;text-align:right">${esc(it.dose)}</span>` : ''}</div>${it.notes ? `<div class="dim" style="font-size:14px;margin-top:2px">${esc(it.notes)}</div>` : ''}<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${plChips(it, sec)}</div></div>`).join('')}</div>${hint ? `<p class="hint" style="margin:12px 0 0">${hint}</p>` : ''}</div>`;
 }
 function plPumpToday() {
   const p = S.plan.pump, due = p.lastChange ? isoDate(new Date(addDays(mkTs(p.lastChange, '12:00'), p.siteDays))) : '', today = isoDate(new Date());

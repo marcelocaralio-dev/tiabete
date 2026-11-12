@@ -90,16 +90,20 @@ document.addEventListener('keydown', e => {
 /* Gesto: arrastar a partir da borda esquerda abre; arrastar para a esquerda sobre o menu fecha */
 (function drSwipe() {
   const W = () => Math.min(320, window.innerWidth * .86); let g = null;
-  const EDGE = 22;
+  const EDGE = 40;
+  /* Vale sobre qualquer superfície, menos campos, controles deslizantes e áreas que rolam na horizontal */
+  const SKIP = 'input, textarea, select, [contenteditable], [role=slider]';
+  const hScroll = el => { for (let n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return true; } return false; };
+  const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
   document.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return; const t = e.touches[0];
-    if (!DR.open && t.clientX <= EDGE && !document.querySelector('.sheet-bg, .rw-bg')) g = { m: 'open', x: t.clientX, y: t.clientY, dx: 0, on: false };
+    if (!DR.open && S.swipeMenu !== false && !blocked(e.target)) g = { m: 'open', edge: t.clientX <= EDGE, x: t.clientX, y: t.clientY, dx: 0, on: false };
     else if (DR.open && e.target.closest('#dr, #dr-bg')) g = { m: 'close', x: t.clientX, y: t.clientY, dx: 0, on: false };
     else g = null;
   }, { passive: true });
   document.addEventListener('touchmove', e => {
     if (!g) return; const t = e.touches[0], dx = t.clientX - g.x, dy = t.clientY - g.y;
-    if (!g.on) { if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { g = null; return; } if (Math.abs(dx) < 8) return; if ((g.m === 'open' && dx < 0) || (g.m === 'close' && dx > 0)) { g = null; return; } g.on = true; if (g.m === 'open') { drOpen(); } const a = document.getElementById('dr'); a.classList.add('drag'); document.getElementById('dr-bg').classList.add('drag'); }
+    if (!g.on) { if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * (g.m === 'open' && !g.edge ? .6 : 1)) { g = null; return; } if (Math.abs(dx) < (g.m === 'open' && !g.edge ? 16 : 8)) return; if (g.m === 'open' && !g.edge && Math.abs(dx) < Math.abs(dy) * 1.8) return; if ((g.m === 'open' && dx < 0) || (g.m === 'close' && dx > 0)) { g = null; return; } g.on = true; if (g.m === 'open') { drOpen(); } const a = document.getElementById('dr'); a.classList.add('drag'); document.getElementById('dr-bg').classList.add('drag'); }
     g.dx = dx; const w = W(), p = g.m === 'open' ? Math.max(0, Math.min(1, dx / w)) : Math.max(0, Math.min(1, 1 + dx / w));
     const a = document.getElementById('dr'); a.style.transform = `translateX(${(p - 1) * 100}%)`; document.getElementById('dr-bg').style.opacity = String(p);
   }, { passive: true });
@@ -111,3 +115,14 @@ document.addEventListener('keydown', e => {
   };
   document.addEventListener('touchend', end, { passive: true }); document.addEventListener('touchcancel', end, { passive: true });
 })();
+
+/* Configuração: ligar/desligar o gesto de abrir o menu */
+S.swipeMenu = true;
+function swipeCard() {
+  const on = S.swipeMenu !== false;
+  return `<h2 class="sec">Gesto do menu lateral</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Deslizar para abrir o menu</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize o dedo para a direita em qualquer parte da tela (menos em campos, controles deslizantes e áreas que rolam para o lado) para abrir o menu. Para fechar, deslize para a esquerda sobre o menu. Desligado, o menu abre só pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Deslizar para abrir o menu" data-act="swipe-menu"><i>${on ? '✓' : ''}</i></button></div></div>`;
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="swipe-menu"]'); if (!el) return;
+  S.swipeMenu = !(S.swipeMenu !== false); try { await Store.put('meta', { id: 'swipe-menu', value: S.swipeMenu }); } catch (x) { } render();
+});

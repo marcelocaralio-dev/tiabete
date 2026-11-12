@@ -51,11 +51,11 @@ function mealDeltas(recs) {
     return { name, pre, n, a: n ? mean('pre') : null, b: n ? mean('post') : null, d: n ? mean('post') - mean('pre') : null };
   });
 }
-function mealDeltaCard(recs) {
+function mealDeltaCard(recs, inner) {
   const rows = mealDeltas(recs);
-  return `<h2 class="sec">Variação da refeição (depois − antes)</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>${rows.map(r => r.n >= MIN_BUCKET
+  return (inner ? '' : '<h2 class="sec">Variação da refeição (depois − antes)</h2><div class="card">') + `<div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Variação</th></tr></thead><tbody>${rows.map(r => r.n >= MIN_BUCKET
     ? `<tr><td><b>${r.name}</b><small>${r.n} dias com par · antes = ${r.pre}</small></td><td>${fm(r.a)}</td><td>${fm(r.b)}</td><td><b>${fsign(r.d)}</b><small>mg/dL</small></td></tr>`
-    : `<tr><td><b>${r.name}</b><small>antes = ${r.pre}</small></td><td colspan="3" class="dim">${r.n ? r.n + ' dia(s) com par · insuficiente' : 'sem pares no período'}</td></tr>`).join('')}</tbody></table></div><p class="hint">Para cada dia que tem medição antes e depois da mesma refeição, calcula-se a diferença; a tabela mostra a média dessas diferenças (mínimo ${MIN_BUCKET} dias). No café da manhã, o "antes" é o jejum. Descreve o que aconteceu e não indica dose.</p></div>`;
+    : `<tr><td><b>${r.name}</b><small>antes = ${r.pre}</small></td><td colspan="3" class="dim">${r.n ? r.n + ' dia(s) com par · insuficiente' : 'sem pares no período'}</td></tr>`).join('')}</tbody></table></div><p class="hint">Para cada dia que tem medição antes e depois da mesma refeição, calcula-se a diferença; a tabela mostra a média dessas diferenças (mínimo ${MIN_BUCKET} dias). No café da manhã, o "antes" é o jejum. Descreve o que aconteceu e não indica dose.</p>` + (inner ? '' : '</div>');
 }
 
 /* ---------- 3. Mapa de calor: dia da semana × horário ---------- */
@@ -255,7 +255,7 @@ setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-
 document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el) return; S.remOff[el.dataset.k] = 1; render(); });
 S.ud = {};
 const udOk = k => { const u = parseUnits(S.ud[k] || ''); return typeof u === 'number' && u > 0; };
-const draftUnits = k => `<div class="un-row"><label for="ud-${k}">Unidades a tomar</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(S.ud[k] || '')}" aria-label="Unidades a tomar"><b>Ui</b></span></div><div class="dim" id="udh-${k}" style="font-size:12px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>`;
+const draftUnits = k => `<div class="un-row"><label for="ud-${k}">Unidades a tomar</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(S.ud[k] || '')}" aria-label="Unidades a tomar"><b>Ui</b></span></div><div class="dim" id="udh-${k}" style="font-size:13.5px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>`;
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('input.un-draft'); if (!el) return;
   const k = el.dataset.k; S.ud[k] = el.value; const ok = udOk(k), b = document.querySelector('.tgl[data-k="' + k + '"]'), h = document.getElementById('udh-' + k);
@@ -264,21 +264,21 @@ document.addEventListener('input', e => {
 });
 function swRow(k, title, sub, extra = '') {
   const on = S.ins[k], lk = isLocked(k), sk = skipped(k) && !on;
-  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:12.5px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : (lk || sk ? '' : draftUnits(k))}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
+  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:14px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : (lk || sk ? '' : draftUnits(k))}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
 }
 function insCard() {
   insRoll();
   const b = basalInfo(), pd = preDinner(), min = S.ins.dinnerMin;
   let dn = '', dnWarn = '';
-  if (!pd) dn = `<div class="dim" style="font-size:12.5px;margin-top:6px">Sem medição pré-jantar hoje (16h–19h). A chave só libera com ${min} mg/dL ou mais.</div>`;
-  else { const yes = pd.glucose >= min; dn = `<div style="margin-top:6px;font-size:12.5px">Pré-jantar <b class="num">${f0(pd.glucose)}</b> mg/dL às ${pd.time}: <span class="badge ${yes ? 'high' : 'ok'}">${yes ? '▲ ' + min + ' ou mais' : '● abaixo de ' + min}</span> <span class="dim">${yes ? 'chave liberada.' : 'chave bloqueada.'}</span>${S.ins.dinner && !yes ? ' <span class="tag warn">marcada fora da regra</span>' : ''}</div>`; }
+  if (!pd) dn = `<div class="dim" style="font-size:14px;margin-top:6px">Sem medição pré-jantar hoje (16h–19h). A chave só libera com ${min} mg/dL ou mais.</div>`;
+  else { const yes = pd.glucose >= min; dn = `<div style="margin-top:6px;font-size:14px">Pré-jantar <b class="num">${f0(pd.glucose)}</b> mg/dL às ${pd.time}: <span class="badge ${yes ? 'high' : 'ok'}">${yes ? '▲ ' + min + ' ou mais' : '● abaixo de ' + min}</span> <span class="dim">${yes ? 'chave liberada.' : 'chave bloqueada.'}</span>${S.ins.dinner && !yes ? ' <span class="tag warn">marcada fora da regra</span>' : ''}</div>`; }
   dn += `<button class="btn sm" style="margin-top:8px" data-act="ins-min">Alterar limite (${min})</button>`;
-  const basal = !b ? `<div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1">—</div><div class="dim" style="font-size:12.5px;margin-top:4px">Marque quando tomar a basal para iniciar a contagem de 24 h.</div>`
-    : `<div class="dim" style="font-size:12px;font-family:var(--f-mono);letter-spacing:.08em">${b.st === 'over' ? 'PASSARAM 24 H · ATRASO' : 'FALTAM PARA A PRÓXIMA'}</div><div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1;${b.st === 'over' ? 'color:var(--red-l)' : ''}">${b.st === 'over' ? '+' : ''}${hms(b.rem)}</div>
+  const basal = !b ? `<div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1">—</div><div class="dim" style="font-size:14px;margin-top:4px">Marque quando tomar a basal para iniciar a contagem de 24 h.</div>`
+    : `<div class="dim" style="font-size:13.5px;font-family:var(--f-mono);letter-spacing:.08em">${b.st === 'over' ? 'PASSARAM 24 H · ATRASO' : 'FALTAM PARA A PRÓXIMA'}</div><div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1;${b.st === 'over' ? 'color:var(--red-l)' : ''}">${b.st === 'over' ? '+' : ''}${hms(b.rem)}</div>
       <div class="ib-bar"><span id="ib-bar" style="width:${Math.min(100, b.el / H24 * 100).toFixed(1)}%"></span></div>
-      <div class="dim" style="font-size:12.5px;margin-top:6px">Última basal: <b class="num">${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}</b> · próxima: <b class="num">${new Date(S.ins.basalTs + H24).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã'} ${HM(S.ins.basalTs + H24)}</b></div>${b.st !== 'ok' ? `<div style="margin-top:8px"><span class="badge high">${b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora'}</span></div>` : ''}`;
+      <div class="dim" style="font-size:14px;margin-top:6px">Última basal: <b class="num">${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}</b> · próxima: <b class="num">${new Date(S.ins.basalTs + H24).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã'} ${HM(S.ins.basalTs + H24)}</b></div>${b.st !== 'ok' ? `<div style="margin-top:8px"><span class="badge high">${b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora'}</span></div>` : ''}`;
   const skB = skipped('basal'), pend = ['fast', 'lunch', 'dinner'].filter(k => !S.ins[k]), allSk = skB && pend.every(skipped);
-  const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:12.5px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
+  const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:14px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
   return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="eyebrow">Basal · lembrete de 24 h</div><div style="margin-top:10px">${basalShow}</div>${b && !skB ? unitsInline('basal') : ''}
     <div class="stack" style="margin-top:14px;gap:10px"><button class="btn ${b && b.st === 'ok' ? '' : 'pri'} full" data-act="ins-basal">Tomei a basal agora</button><div class="row"><button class="btn grow" data-act="ins-basal-at">Outro horário</button><button class="btn grow" data-act="ins-skip" data-k="basal">${skB ? 'Desfazer pulo' : 'Pular hoje'}</button></div>${b ? '<button class="btn full" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div></div>
   <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas e só liberam depois que você informa as unidades (Ui). Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
@@ -398,26 +398,26 @@ function viewInsulinas() {
   if (!bs.n) basal = `<p class="hint" style="margin:8px 0 0">Ainda sem doses de basal nos últimos 30 dias. Elas entram aqui quando você toca em “Tomei a basal agora” no Painel, ou em “Registrar dose passada”.</p>`;
   else {
     const dd = m => (m > 0 ? '+' : m < 0 ? '−' : '±') + Math.abs(m) + ' min';
-    basal = `<div class="v num" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1;margin-top:8px">${hhmm(bs.mean)}</div><div class="dim" style="font-size:12.5px;margin-top:2px">horário médio · ${bs.n} dose${bs.n > 1 ? 's' : ''} em 30 dias</div>`;
+    basal = `<div class="v num" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1;margin-top:8px">${hhmm(bs.mean)}</div><div class="dim" style="font-size:14px;margin-top:2px">horário médio · ${bs.n} dose${bs.n > 1 ? 's' : ''} em 30 dias</div>`;
     { const us = unitsStat(list.filter(x => x.kind === 'basal')); if (us) basal += `<div style="margin-top:8px;font-size:13.5px"><b class="num">${unitsTxt(us)}</b></div>`; }
     if (bs.n < 2) basal += `<p class="hint" style="margin:10px 0 0">Com 2 doses ou mais aparecem a variação e os intervalos.</p>`;
     else {
-      basal += `<div class="grid2" style="margin-top:12px"><div class="mini"><div class="dim" style="font-size:12px">MAIS CEDO – MAIS TARDE</div><b class="num">${hhmm(bs.earliest)} – ${hhmm(bs.latest)}</b><div class="dim" style="font-size:12px">amplitude ${Math.floor(bs.spread / 60)} h ${pad(bs.spread % 60)} min</div></div>
-      <div class="mini"><div class="dim" style="font-size:12px">VARIAÇÃO TÍPICA</div><b class="num">± ${bs.sd} min</b><div class="dim" style="font-size:12px">em torno da média</div></div>
-      <div class="mini"><div class="dim" style="font-size:12px">INTERVALO MÉDIO</div><b class="num">${bs.ivMean.toFixed(1).replace('.', ',')} h</b><div class="dim" style="font-size:12px">entre doses seguidas</div></div>
-      <div class="mini"><div class="dim" style="font-size:12px">PERTO DE 24 H (±1 H)</div><b class="num">${bs.near} de ${bs.iv.length}</b><div class="dim" style="font-size:12px">intervalos</div></div></div>`;
+      basal += `<div class="grid2" style="margin-top:12px"><div class="mini"><div class="dim" style="font-size:13.5px">MAIS CEDO – MAIS TARDE</div><b class="num">${hhmm(bs.earliest)} – ${hhmm(bs.latest)}</b><div class="dim" style="font-size:13.5px">amplitude ${Math.floor(bs.spread / 60)} h ${pad(bs.spread % 60)} min</div></div>
+      <div class="mini"><div class="dim" style="font-size:13.5px">VARIAÇÃO TÍPICA</div><b class="num">± ${bs.sd} min</b><div class="dim" style="font-size:13.5px">em torno da média</div></div>
+      <div class="mini"><div class="dim" style="font-size:13.5px">INTERVALO MÉDIO</div><b class="num">${bs.ivMean.toFixed(1).replace('.', ',')} h</b><div class="dim" style="font-size:13.5px">entre doses seguidas</div></div>
+      <div class="mini"><div class="dim" style="font-size:13.5px">PERTO DE 24 H (±1 H)</div><b class="num">${bs.near} de ${bs.iv.length}</b><div class="dim" style="font-size:13.5px">intervalos</div></div></div>`;
       const last = bs.iv.slice(-7).reverse();
-      basal += `<div class="eyebrow" style="margin-top:14px">Últimos intervalos</div><div class="stack" style="gap:6px;margin-top:6px">${last.map(i => { const h = Math.floor(i.h), m = Math.round((i.h - h) * 60), dev = i.h - 24, off = Math.abs(dev) > 1; return `<div class="row" style="justify-content:space-between;font-size:13px;gap:8px"><span class="num dim">${fmtDate(isoDate(new Date(i.from))).slice(0, 5)} ${HM(i.from)} → ${fmtDate(isoDate(new Date(i.to))).slice(0, 5)} ${HM(i.to)}</span><b class="num"${off ? ' style="color:var(--red-l)"' : ''}>${h} h ${pad(m)}</b></div>`; }).join('')}</div>`;
+      basal += `<div class="eyebrow" style="margin-top:14px">Últimos intervalos</div><div class="stack" style="gap:6px;margin-top:6px">${last.map(i => { const h = Math.floor(i.h), m = Math.round((i.h - h) * 60), dev = i.h - 24, off = Math.abs(dev) > 1; return `<div class="row" style="justify-content:space-between;font-size:14.5px;gap:8px"><span class="num dim">${fmtDate(isoDate(new Date(i.from))).slice(0, 5)} ${HM(i.from)} → ${fmtDate(isoDate(new Date(i.to))).slice(0, 5)} ${HM(i.to)}</span><b class="num"${off ? ' style="color:var(--red-l)"' : ''}>${h} h ${pad(m)}</b></div>`; }).join('')}</div>`;
     }
   }
-  const rapid = ['fast', 'lunch', 'dinner'].map(k => { const st = insStats(list.filter(x => x.kind === k)); return `<div class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line,var(--line))"><span><b>${k === 'fast' ? 'Jejum' : k === 'lunch' ? 'Pré-prandial do almoço' : 'Pré-prandial do jantar'}</b><div class="dim" style="font-size:12px">${st.n ? st.n + ' registro' + (st.n > 1 ? 's' : '') + ' em 30 dias' : 'Sem registros em 30 dias'}${(() => { const us = unitsStat(list.filter(x => x.kind === k)); return us ? '<br>' + unitsTxt(us) : ''; })()}</div></span><span class="num" style="text-align:right">${st.n ? '<b>' + hhmm(st.mean) + '</b><div class="dim" style="font-size:12px">' + (st.n > 1 ? hhmm(st.earliest) + ' – ' + hhmm(st.latest) : 'média') + '</div>' : '—'}</span></div>`; }).join('');
+  const rapid = ['fast', 'lunch', 'dinner'].map(k => { const st = insStats(list.filter(x => x.kind === k)); return `<div class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line,var(--line))"><span><b>${k === 'fast' ? 'Jejum' : k === 'lunch' ? 'Pré-prandial do almoço' : 'Pré-prandial do jantar'}</b><div class="dim" style="font-size:13.5px">${st.n ? st.n + ' registro' + (st.n > 1 ? 's' : '') + ' em 30 dias' : 'Sem registros em 30 dias'}${(() => { const us = unitsStat(list.filter(x => x.kind === k)); return us ? '<br>' + unitsTxt(us) : ''; })()}</div></span><span class="num" style="text-align:right">${st.n ? '<b>' + hhmm(st.mean) + '</b><div class="dim" style="font-size:13.5px">' + (st.n > 1 ? hhmm(st.earliest) + ' – ' + hhmm(st.latest) : 'média') + '</div>' : '—'}</span></div>`; }).join('');
   const byDay = {}; all.forEach(r => (byDay[r.date] = byDay[r.date] || []).push(r));
   const days = Object.keys(byDay).sort().reverse();
   const dl = days.length ? `<div class="stack" style="gap:8px">${days.map(d => `<div class="card" style="padding:12px"><div class="num" style="font-weight:700;margin-bottom:8px">${fmtDate(d)}</div><div class="row" style="flex-wrap:wrap;gap:6px">${byDay[d].sort((a, b) => a.ts - b.ts).map(r => `<button class="btn sm" data-act="ins-log-edit" data-id="${r.id}">${esc(insName(r))} · ${HM(r.ts)}${r.units != null ? ' · ' + fU(r.units) : ''}</button>`).join('')}</div></div>`).join('')}</div>` : `<div class="card"><p class="hint" style="margin:0">Nenhum registro nos últimos 30 dias.</p></div>`;
   return banners() + `<p class="hint" style="margin:0 0 12px">Mostra a que horas você costuma tomar cada insulina e quanto isso varia de um dia para o outro. Horários e unidades são só registros seus: o app não calcula nem sugere dose.</p>
   <button class="btn pri full" data-act="ins-log-new">Registrar dose passada</button>
   <h2 class="sec">Basal · últimos 30 dias</h2><div class="card">${basal}</div>
-  <h2 class="sec">Horários no gráfico</h2><div class="card">${insDotChart(list)}<div class="row" style="flex-wrap:wrap;gap:12px;font-size:12px;margin-top:8px"><span><b style="color:var(--red-t)">●</b> Basal</span><span><b style="color:var(--fg)">◆</b> Jejum</span><span><b style="color:var(--c-lunch)">▲</b> Almoço</span><span><b style="color:var(--mut)">■</b> Jantar</span></div><p class="hint" style="margin:8px 0 0">Cada ponto é uma dose; a linha pontilhada vermelha é o horário médio da basal. Toque no gráfico para ver o horário exato.</p></div>
+  <h2 class="sec">Horários no gráfico</h2><div class="card">${insDotChart(list)}<div class="row" style="flex-wrap:wrap;gap:12px;font-size:13.5px;margin-top:8px"><span><b style="color:var(--red-t)">●</b> Basal</span><span><b style="color:var(--fg)">◆</b> Jejum</span><span><b style="color:var(--c-lunch)">▲</b> Almoço</span><span><b style="color:var(--mut)">■</b> Jantar</span></div><p class="hint" style="margin:8px 0 0">Cada ponto é uma dose; a linha pontilhada vermelha é o horário médio da basal. Toque no gráfico para ver o horário exato.</p></div>
   <h2 class="sec">Insulina rápida</h2><div class="card" style="padding-top:4px">${rapid}</div>
   <h2 class="sec">Registros por dia</h2>${dl}`;
 }
@@ -455,7 +455,7 @@ document.addEventListener('click', async e => {
 /* ---------- Tópicos expansíveis / retráteis ---------- */
 S.acc = {};
 const ACC_ALL = /[?&]all\b/.test(location.search); // gancho de teste: abre todos os tópicos
-const ACC_OPEN = { ia: ['como a ia', 'assistente'], painel: ['hoje', 'meu tratamento', 'evolucao'], esquemas: ['meu', 'lembretes', 'insulinas', 'remedios', 'bomba', 'medicoes'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''], backup: ['exportar', 'google drive', 'restaurar'], perfil: ['informa', 'diabetes'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
+const ACC_OPEN = { ia: ['como a ia', 'assistente'], painel: ['hoje', 'meu tratamento', 'evolucao'], esquemas: ['meu', 'lembretes', 'insulinas', 'remedios', 'bomba', 'medicoes'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''], alertasp: ['seus alertas'], backup: ['exportar', 'google drive', 'restaurar'], perfil: ['informa', 'diabetes'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
 try { const a = JSON.parse(localStorage.getItem('tb-acc') || '{}'); if (a && typeof a === 'object') S.acc = a; } catch (e) { }
 const accSave = () => { try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } try { Store.put('meta', { id: 'acc', value: S.acc }); } catch (e) { } };
 const accKey = (route, h2, i) => route + '|' + (route === 'painel' && i === 0 ? 'hoje' : norm(h2.textContent).trim().split('·')[0].trim().slice(0, 40)); // 1º tópico do Painel muda de rótulo (Hoje/Ontem/data)
@@ -538,7 +538,7 @@ function hypoSheet() {
   let top;
   if (st) {
     const g = st.last.glucose, ago = Math.max(0, Math.round((Date.now() - st.last.ts) / 60000));
-    top = `<div class="hy-big"><span class="num">${f0(g)}</span><small>mg/dL</small></div><div class="dim" style="font-size:13px">às ${st.last.time} · há ${ago} min ${g < LIM.vlow ? '<span class="badge vlow">▼ Muito baixa</span>' : ''}</div><div class="hy-next" data-hy-next>${hypoNextTxt(st)}</div>`;
+    top = `<div class="hy-big"><span class="num">${f0(g)}</span><small>mg/dL</small></div><div class="dim" style="font-size:14.5px">às ${st.last.time} · há ${ago} min ${g < LIM.vlow ? '<span class="badge vlow">▼ Muito baixa</span>' : ''}</div><div class="hy-next" data-hy-next>${hypoNextTxt(st)}</div>`;
   } else top = `<p class="hint" style="margin:0 0 8px">Nenhuma reavaliação ativa. O protocolo começa com glicemia de 60 mg/dL ou menos. Se medir agora e estiver baixa, registre abaixo.</p>`;
   const list = st ? `<h3 class="hy-h">Medições deste episódio</h3><div class="stack" style="gap:6px">${st.ep.map(r => `<div class="row" style="justify-content:space-between;gap:8px;font-size:14px"><span class="num dim">${r.time}</span><span class="num"><b>${f0(r.glucose)}</b> mg/dL</span>${badge(r.glucose, r.context)}</div>`).join('')}</div>` : '';
   return `<h2>${st ? '⚠ Hipoglicemia' : 'Protocolo de hipoglicemia'}</h2>${top}
@@ -613,20 +613,30 @@ const RW_MS = {
   30: { g: 'Mandou muito bem!', m: 'Um mês completo. Isso é disciplina de verdade.', n: 'um mês', fx: 'shine', c: 46 },
   90: { g: 'Conquista incrível!', m: 'Três meses seguidos. Você merece comemorar.', n: 'três meses', fx: 'epic', c: 70 },
 };
+const RW_ST = { andamento: 'Em andamento', concluida: 'Concluída', quebrada: 'Quebrada', reiniciada: 'Reiniciada', aguardando: 'Aguardando validação' };
 const RW_LBL = { 7: '7 dias', 14: '14 dias', 30: '30 dias', 90: '3 meses' };
 const RW_GREENS = ['#22c55e', '#4ade80', '#86efac', '#16a34a', '#bbf7d0', '#34d399'];
 const rwSvg = (p, s = 28) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const RW_TROPHY = '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 13v4M8.5 20h7M10 17h4v3h-4z"/>';
 function rwState() { S.rw = S.rw || {}; S.rw.got = S.rw.got || {}; return S.rw; }
 const rwSave = async () => { try { await Store.put('meta', { id: 'rewards', value: S.rw }); } catch (e) { } };
-const rwEval = () => rewardEval(S.records.filter(r => !r.noTime), isoDate(new Date()));
-let rwTimer = null, rwBusy = false;
+const rwEval = () => rewardEval(S.records, isoDate(new Date()));
+let rwTimer = null, rwBusy = false, rwDay = isoDate(new Date());
+function rwTick() { const d = isoDate(new Date()); if (d !== rwDay) { rwDay = d; if (S.route === 'conquistas' && !$('#sheet-bg')) render(); } rewardSoon(); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) rwTick(); });
+setInterval(rwTick, 5 * 60000);
 function rewardSoon() { clearTimeout(rwTimer); rwTimer = setTimeout(rewardCheck, 500); }
 async function rewardCheck() {
-  if (rwBusy || typeof insLoaded === 'undefined' || !insLoaded || !S.records.length) return;
+  if (typeof insLoaded === 'undefined' || !insLoaded || !S.records.length) return;
+  const st = rwState(), ev = rwEval(), q = []; let dirty = false;
+  // quebra: selo que não vale mais no ciclo atual sai de "got" (fica bloqueado) e vai para o histórico
+  st.hist = st.hist || [];
+  for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: isoDate(new Date()) }); delete st.got[key]; dirty = true; } }
+  if (dirty) await rwSave();
+  if (rwBusy) return;
   if (!alCfg().rewards) return;
   if ($('#sheet-bg') || $('.rw-bg')) return;
-  const st = rwState(), ev = rwEval(), q = []; let dirty = false;
+  dirty = false;
   for (const k of Object.keys(RW_INFO)) {
     const fresh = RW_STEPS.filter(N => ev[k].ach[N] && !st.got[k + '-' + N]);
     fresh.forEach(N => { st.got[k + '-' + N] = isoDate(new Date()); dirty = true; });
@@ -681,27 +691,30 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#rw-bg'
 function rwBanner() {
   const l = S.rw && S.rw.last; if (!l || Date.now() - l.ts > DAY || (S.rw.seen === l.ts)) return '';
   const c = RW_INFO[l.k]; if (!c) return '';
-  return `<div class="banner rwb" role="status"><div class="row" style="gap:10px;align-items:center;min-width:0"><span class="rw-bi sm">${rwSvg(c.ic, 20)}</span><div><b>Nova conquista: ${RW_LBL[l.N]} · ${c.t}</b><div class="dim" style="font-size:12.5px">${RW_MS[l.N].g}</div></div></div><div class="row" style="gap:6px"><button class="btn sm" data-act="rw-open">Ver</button><button class="btn sm" data-act="rw-dismiss" aria-label="Dispensar">×</button></div></div>`;
+  return `<div class="banner rwb" role="status"><div class="row" style="gap:10px;align-items:center;min-width:0"><span class="rw-bi sm">${rwSvg(c.ic, 20)}</span><div><b>Nova conquista: ${RW_LBL[l.N]} · ${c.t}</b><div class="dim" style="font-size:14px">${RW_MS[l.N].g}</div></div></div><div class="row" style="gap:6px"><button class="btn sm" data-act="rw-open">Ver</button><button class="btn sm" data-act="rw-dismiss" aria-label="Dispensar">×</button></div></div>`;
 }
 function viewConquistas() {
-  const st = rwState(), ev = rwEval(), nGot = Object.keys(st.got).length;
+  const st = rwState(), ev = rwEval(), nGot = Object.keys(RW_INFO).reduce((a, k) => a + RW_STEPS.filter(N => ev[k].ach[N]).length, 0);
   const cards = Object.keys(RW_INFO).map(k => {
     const c = RW_INFO[k], e = ev[k], nxt = RW_STEPS.find(N => !e.ach[N]);
     let prog;
+    const todayNote = e.today === 'pending' ? ' Hoje está aguardando validação: só entra quando o dia terminar.' : e.today === 'bad' ? ' Hoje já teve uma medição fora do limite.' : '';
     if (!e.n) prog = `<p class="hint" style="margin:6px 0 0">${k === 'fast' ? 'Ainda sem medições de jejum registradas.' : 'Ainda sem medições registradas.'}</p>`;
-    else if (nxt === undefined) prog = `<p class="hint" style="margin:6px 0 0"><b style="color:var(--good)">Todas as conquistas desta categoria foram alcançadas. Excelente!</b></p>`;
+    else if (nxt === undefined) prog = `<p class="hint" style="margin:6px 0 0"><b style="color:var(--good)">Todas as conquistas desta categoria foram alcançadas. Excelente!</b>${todayNote}</p>`;
     else {
-      const pct = Math.min(100, Math.round(e.streak / nxt * 100)), lack = Math.max(0, Math.ceil(0.7 * nxt) - e.cov[nxt]);
-      prog = `<div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${nxt}" aria-valuenow="${Math.min(e.streak, nxt)}"><i style="width:${pct}%"></i></div><div class="dim" style="font-size:12.5px;margin-top:4px">${e.streak >= nxt ? `Faltam medições em ${lack} dia${lack > 1 ? 's' : ''} para fechar ${RW_LBL[nxt]}.` : `Faltam ${nxt - e.streak} dia${nxt - e.streak > 1 ? 's' : ''} para ${RW_LBL[nxt]}.`}</div>`;
+      const pct = Math.min(100, Math.round(e.streak / nxt * 100));
+      const msg = e.state === 'quebrada' ? `Sequência de ${e.prev} dia${e.prev > 1 ? 's' : ''} encerrada em ${fmtDate(new Date(e.brokeOn * 86400000).toISOString().slice(0, 10)).slice(0, 5)}. A nova contagem começa quando um dia for cumprido por inteiro. Os selos ficam bloqueados até você conquistar de novo.${todayNote}`
+        : `Faltam ${nxt - e.streak} dia${nxt - e.streak > 1 ? 's' : ''} para ${RW_LBL[nxt]}.${todayNote}`;
+      prog = `<div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${nxt}" aria-valuenow="${Math.min(e.streak, nxt)}"><i style="width:${pct}%"></i></div><div class="dim" style="font-size:14px;margin-top:4px">${msg}</div>`;
     }
     const badges = RW_STEPS.map(N => {
-      const got = st.got[k + '-' + N];
+      const got = e.ach[N] ? (st.got[k + '-' + N] || isoDate(new Date())) : null;
       return got ? `<button class="rw-bd on" data-act="rw-play" data-k="${k}" data-n="${N}" aria-label="${RW_LBL[N]}, conquistado em ${fmtDate(got)}. Toque para rever a comemoração"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>${fmtDate(got).slice(0, 5)}</small></button>`
         : `<div class="rw-bd" aria-label="${RW_LBL[N]}, ainda não conquistado"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>bloqueado</small></div>`;
     }).join('');
-    return `<h2 class="sec">${c.t}</h2><div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:12.5px">${c.d}</div></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:var(--good)">${e.streak}</div><div class="dim" style="font-size:11.5px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
+    return `<h2 class="sec">${c.t}</h2><div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:14px">${c.d}</div><span class="rw-st ${e.state}">${RW_ST[e.state]}</span></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:${e.streak > 0 ? 'var(--good)' : 'var(--mut)'}">${e.streak}</div><div class="dim" style="font-size:13px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
   }).join('');
-  return banners() + `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses. Contam só os seus registros reais (os dados de exemplo ficam de fora) e exigem medições em pelo menos 70% dos dias do período, para a sequência refletir o que foi de fato medido. ${nGot ? `Você já tem <b>${nGot}</b> de 12 conquistas.` : 'Você ainda não tem conquistas — a primeira sai com 7 dias seguidos.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica.</p>${cards}`;
+  return banners() + `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses. Contam só os seus registros reais (os dados de exemplo ficam de fora). Um dia só vale depois de terminar, com todas as medições dentro do limite; dia sem medição não conta e interrompe a sequência. Ao interromper, a contagem volta a zero e os selos ficam bloqueados até a conquista acontecer de novo. ${nGot ? `Você já tem <b>${nGot}</b> de 12 conquistas.` : 'Você ainda não tem conquistas — a primeira sai com 7 dias seguidos.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica.</p>${cards}`;
 }
 
 /* ---------- Unidades das chaves -> medição correspondente do histórico ---------- */
@@ -732,6 +745,7 @@ async function applyBackupState(st, replace) {
   if (!st) return;
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
+  try { if (st.customAlerts && typeof st.customAlerts === 'object' && (replace || !S.ca.rules.length)) { caLoad(st.customAlerts); S.ca.seeded = true; await caSave(); caSync(); } } catch (e) { }
   try { if (st.alerts && (replace || JSON.stringify(alCfg()) === JSON.stringify(AL_DEF))) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && typeof st.bolus === 'object') { if (replace) blLoad(st.bolus); else blMerge(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { console.error(e); }
   try {
@@ -831,6 +845,7 @@ function alertsPanel() {
   ${row('postDinner', c.postDinner, 'Medir 2 h após a insulina do jantar', 'Notifica 2 horas depois de registrar a insulina rápida do jantar. Some sozinha após 10 minutos sem medição.')}
   ${row('quiet', c.quiet, 'Silenciar à noite', 'Não notificar neste intervalo (o aviso de hipoglicemia continua).', `<span class="al-time"><input class="in al-tm" data-k="qFrom" type="time" value="${c.qFrom}" aria-label="Início do silêncio"><span>às</span><input class="in al-tm" data-k="qTo" type="time" value="${c.qTo}" aria-label="Fim do silêncio"></span>`)}
   <p class="hint" style="margin:10px 0 0">${IS_NATIVE ? 'Estas notificações tocam com o app fechado. Se o Android pedir, permita as notificações do TiaBete. Os lembretes diários de horário estão logo abaixo, cada um com sua chave.' : 'Estas notificações tocam com o app fechado no <b>aplicativo instalado (APK)</b>. Na versão web as escolhas ficam salvas, mas o navegador não notifica com o app fechado.'}</p></div>
+  <h2 class="sec">Alertas personalizados</h2><div class="card"><p class="hint" style="margin:0 0 10px">Crie avisos ligados às suas marcações (como “Dia de perna”) ou a valores de glicemia, com a sua própria mensagem.</p><button class="btn full" data-act="go" data-r="alertasp">Abrir alertas personalizados</button></div>
   <h2 class="sec">Lembretes de horário</h2>`;
 }
 document.addEventListener('change', async e => {
@@ -876,7 +891,7 @@ document.addEventListener('click', async e => {
 function viewPadroes() {
   const notes = patternNotes(S.records, MARKS, isoDate(new Date()));
   return banners() + `<p class="hint" style="margin:0 0 12px">Observações calculadas no seu aparelho a partir dos seus registros reais (os de exemplo ficam de fora). Aparecem só quando há medições suficientes. Mostram coincidências nos números, não causas, e não são orientação de tratamento.</p>
-  ${notes.length ? notes.map(x => `<h2 class="sec">${esc(x.t)}</h2><div class="card"><p style="margin:0">${esc(x.d)}</p><div class="dim" style="font-size:12px;margin-top:6px">Base: ${x.n} medições</div></div>`).join('') : '<div class="card"><p class="hint" style="margin:0">Ainda não há medições suficientes para mostrar padrões. Eles precisam de pelo menos 3 ocorrências de cada situação comparada.</p></div>'}</div>
+  ${notes.length ? notes.map(x => `<h2 class="sec">${esc(x.t)}</h2><div class="card"><p style="margin:0">${esc(x.d)}</p><div class="dim" style="font-size:13.5px;margin-top:6px">Base: ${x.n} medições</div></div>`).join('') : '<div class="card"><p class="hint" style="margin:0">Ainda não há medições suficientes para mostrar padrões. Eles precisam de pelo menos 3 ocorrências de cada situação comparada.</p></div>'}</div>
   ${HAS_CLAUDE ? '<button class="btn pri full" style="margin-top:14px" data-act="go" data-r="perguntas">Perguntar ao Claude sobre meus registros</button>' : ''}`;
 }
 
@@ -1227,7 +1242,7 @@ function viewPerfil() {
   <h2 class="sec">Diabetes</h2><div class="card"><div class="field"><label class="fl" for="pf-type">Tipo de diabetes</label><select class="in" id="pf-type"><option value="">Não informado</option>${PF_TYPES.map(t => `<option value="${esc(t)}" ${p.type === t ? 'selected' : ''}>${t === 'Outro' ? 'Outros' : esc(t)}</option>`).join('')}</select></div>
     <p class="hint" style="margin:10px 0 0">Mudar aqui atualiza também o Meu tratamento e os relatórios.</p>
     <div class="stack" style="margin-top:12px"><button class="btn full" data-act="go" data-r="esquemas">Abrir Meu tratamento</button><button class="btn full" data-act="go" data-r="bolus">Minha razão insulina/carboidratos</button></div></div>
-  <h2 class="sec">Preferências</h2><div class="stack">${mi2('aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela')}${mi2('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${mi2('config', 'Configurações', 'Meta de HbA1c, faixas e demais ajustes')}${VIEWS.ia ? mi2('ia', 'Inteligência artificial', 'Provedor e chave de IA') : ''}</div>
+  <h2 class="sec">Preferências</h2><div class="stack">${mi2('aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela')}${mi2('alertasp', 'Alertas personalizados', 'Avisos ligados a marcações como Dia de perna e à glicemia')}${mi2('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${mi2('config', 'Configurações', 'Meta de HbA1c, faixas e demais ajustes')}${VIEWS.ia ? mi2('ia', 'Inteligência artificial', 'Provedor e chave de IA') : ''}</div>
   <h2 class="sec">Dados da conta</h2><div class="card">${pfKv('Perfil criado em', has ? fmtDate(isoDate(new Date(p.createdAt))) : 'ainda não criado')}${has ? pfKv('Identificador', esc(String(p.id).slice(0, 8))) : ''}${pfKv('Plataforma', IS_NATIVE ? 'Aplicativo Android' : 'Versão web')}${gp && gp.email ? pfKv('Conta Google', esc(gp.email)) : ''}${pfKv('IA', aiTx)}${pfKv('Medições de glicemia', n.med)}${pfKv('Resultados de HbA1c', n.hba)}${pfKv('Exames', n.ex)}${pfKv('Registros de insulina', n.ins)}${pfKv('Lembretes do tratamento', n.pl)}${pfKv('Alimentos cadastrados', n.fd)}${pfKv('Refeições salvas e feitas', n.sv + n.rm)}${pfKv('Registros da razão', n.rl)}
     <p class="hint" style="margin:10px 0 0">Tudo o que você registra neste aparelho (medições, exames, tratamento, alimentos, bolus, IA, notificações e preferências) pertence a este perfil, é guardado no banco local e vai junto no backup. As atualizações do app não apagam esses dados.</p></div>
   <h2 class="sec">Privacidade e segurança</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no TiaBete nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (o seu backup, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} O app não tem senha própria: use o bloqueio de tela do aparelho.</p>
@@ -1287,13 +1302,13 @@ document.addEventListener('click', async e => {
 /* ================= Configurações (tudo que o usuário pode ajustar) ================= */
 function viewConfig() {
   const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + themeCard() + scaleCard() + `
+  return banners() + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
-    <div class="row sp"><span><b>Limite da insulina do jantar</b><br><span class="dim" style="font-size:12.5px">Hoje: ${S.ins.dinnerMin} mg/dL (definido por você e seu médico)</span></span><button class="btn sm" data-act="ins-min">Alterar</button></div>
+    <div class="row sp"><span><b>Limite da insulina do jantar</b><br><span class="dim" style="font-size:14px">Hoje: ${S.ins.dinnerMin} mg/dL (definido por você e seu médico)</span></span><button class="btn sm" data-act="ins-min">Alterar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
   </div></div>
-  <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
+  <h2 class="sec">Outras configurações</h2><div class="stack">${link('perfil', 'Perfil', 'Nome, nascimento, tipo de diabetes e equipe de saúde')}${link('alertasp', 'Alertas personalizados', 'Avisos ligados a marcações como Dia de perna e à glicemia')}${link('lembretes', 'Alertas e notificações', 'Chaves de cada aviso, lembretes de horário e silêncio noturno')}${link('bolus', 'Cálculo de bolus', 'Razão insulina/carboidrato, alimentos e refeições')}${VIEWS.ia ? link('ia', 'Inteligência artificial', 'Provedor, modelo e chave da API') : ''}${link('backup', 'Backup e dados', 'Backup manual, Google Drive e restauração')}${link('esquemas', 'Esquemas de tratamento', 'Insulinas e horários do tratamento')}</div>`;
 }
 
 
@@ -1318,7 +1333,7 @@ function shareText() {
 function shareSheet() {
   const t = shareText(), q = encodeURIComponent(t), canNative = !!navigator.share || IS_NATIVE, r = S.rep;
   openSheet(`<h2>Enviar ao meu médico</h2><p class="hint" style="margin:0 0 12px">O TiaBete não envia nada sozinho: você escolhe o destino e confere a mensagem antes. Ao compartilhar, dados de saúde saem deste aparelho.</p>
-  ${t ? `<label class="fl" for="sh-text">Texto do resumo (${fmtDate(r.from)} a ${fmtDate(r.to)})</label><textarea class="in" id="sh-text" style="min-height:140px;font-size:13px" readonly>${esc(t)}</textarea>` : '<p class="hint">Não há medições no período escolhido em Relatórios. O PDF de resumo ainda pode ser enviado.</p>'}
+  ${t ? `<label class="fl" for="sh-text">Texto do resumo (${fmtDate(r.from)} a ${fmtDate(r.to)})</label><textarea class="in" id="sh-text" style="min-height:140px;font-size:14.5px" readonly>${esc(t)}</textarea>` : '<p class="hint">Não há medições no período escolhido em Relatórios. O PDF de resumo ainda pode ser enviado.</p>'}
   <div class="stack" style="margin-top:12px">
   <button class="btn pri full" data-act="sh-pdf-sum">Compartilhar PDF · resumo para a consulta</button>
   <button class="btn full" data-act="sh-pdf-rep" ${t ? '' : 'disabled'}>Compartilhar PDF · relatório do período</button>

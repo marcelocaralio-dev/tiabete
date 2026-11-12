@@ -173,7 +173,7 @@ async function handleExamFiles(files) {
 const QST = { fila: '…', lendo: '…', analisando: '…', ok: '✓', dup: '=', erro: '!' };
 function queueHTML() {
   if (!S.ex.queue.length) return '';
-  return `<div class="stack" style="margin-top:12px" aria-live="polite">${S.ex.queue.map(q => `<div class="card soft" style="padding:12px 14px"><div class="row sp" style="gap:10px"><span style="min-width:0;overflow-wrap:anywhere"><b>${QST[q.st] || ''} ${esc(q.name)}</b><br><span class="dim" style="font-size:12.5px">${esc(q.msg || '')}${q.warn ? ' ' + esc(q.warn) : ''}</span></span>${q.exId ? `<button class="btn sm" data-act="ex-open" data-id="${q.exId}">Abrir</button>` : ''}</div></div>`).join('')}</div>`;
+  return `<div class="stack" style="margin-top:12px" aria-live="polite">${S.ex.queue.map(q => `<div class="card soft" style="padding:12px 14px"><div class="row sp" style="gap:10px"><span style="min-width:0;overflow-wrap:anywhere"><b>${QST[q.st] || ''} ${esc(q.name)}</b><br><span class="dim" style="font-size:14px">${esc(q.msg || '')}${q.warn ? ' ' + esc(q.warn) : ''}</span></span>${q.exId ? `<button class="btn sm" data-act="ex-open" data-id="${q.exId}">Abrir</button>` : ''}</div></div>`).join('')}</div>`;
 }
 function examCard(e) {
   const sc = examScore(e.items), bd = examBand(sc && sc.score), out = e.items.filter(i => i.flag === 'alto' || i.flag === 'baixo').length;
@@ -215,7 +215,7 @@ function viewExames() {
 function itemRow(it) {
   const val = it.value != null ? `<b class="num">${fnum(it.value)}</b> <span class="dim">${esc(it.unit)}</span>` : `<b>${esc(it.text || '—')}</b>`;
   const ref = it.refText || (it.refLow != null || it.refHigh != null ? `${it.refLow != null ? fnum(it.refLow) : ''}–${it.refHigh != null ? fnum(it.refHigh) : ''}` : '');
-  return `<div class="exi"><div class="row sp" style="gap:10px;align-items:flex-start"><span style="min-width:0;overflow-wrap:anywhere"><span style="font-weight:700">${esc(it.name)}</span><br>${val}</span>${flagBadge(it.flag)}</div>${ref ? `<div class="dim" style="font-size:12px;margin-top:4px">Referência do laudo: ${esc(ref)}</div>` : ''}${it.note ? `<div class="exn">${esc(it.note)}</div>` : ''}</div>`;
+  return `<div class="exi"><div class="row sp" style="gap:10px;align-items:flex-start"><span style="min-width:0;overflow-wrap:anywhere"><span style="font-weight:700">${esc(it.name)}</span><br>${val}</span>${flagBadge(it.flag)}</div>${ref ? `<div class="dim" style="font-size:13.5px;margin-top:4px">Referência do laudo: ${esc(ref)}</div>` : ''}${it.note ? `<div class="exn">${esc(it.note)}</div>` : ''}</div>`;
 }
 function viewExame() {
   const e = S.exams.find(x => x.id === S.ex.id);
@@ -275,7 +275,7 @@ function trendSheet(key) {
   const all = S.exams.filter(e => e.date).sort((a, b) => a.date.localeCompare(b.date)), pts = [];
   let name = key, unit = '', last = null;
   all.forEach(e => { const it = e.items.find(i => i.key === key); if (!it) return; name = it.name; unit = it.unit || unit; if (it.value != null) { pts.push({ ts: mkTs(e.date, '12:00'), value: it.value, tip: `<b>${fnum(it.value)} ${esc(it.unit)}</b><br><span>${fmtDate(e.date)}</span>` }); last = it; } });
-  let h = `<h2>${esc(name)}${unit ? ' <span class="dim" style="font-size:13px">(' + esc(unit) + ')</span>' : ''}</h2>`;
+  let h = `<h2>${esc(name)}${unit ? ' <span class="dim" style="font-size:14.5px">(' + esc(unit) + ')</span>' : ''}</h2>`;
   if (pts.length < 2) h += `<p class="hint">São necessários ao menos 2 resultados numéricos para o gráfico.</p>`;
   else h += trendChart(pts, { refLow: last.refLow, refHigh: last.refHigh, label: 'Evolução de ' + name }) + `<p class="hint">A faixa vermelha clara é a referência do exame mais recente. Toque no gráfico para ver cada valor.</p>`;
   h += `<div class="row" style="margin-top:12px"><button class="btn grow" data-act="close">Fechar</button></div>`;

@@ -592,20 +592,105 @@ const RW_CATS = {
   norm: { rel: () => true, bad: r => r.glucose > LIM.high },
 };
 const dayNum = d => Math.round(Date.parse(d + 'T00:00:00Z') / 86400000);
+/* Regra única de validação (todas as categorias):
+   - um dia só conta depois de ENCERRADO (hoje fica "aguardando validação");
+   - dia válido = ao menos uma medição relevante e NENHUMA fora do limite (todas as medições do dia são consideradas);
+   - dia sem medição relevante não cumpre a meta (ausência nunca vira cumprimento) e interrompe a sequência;
+   - uma medição fora do limite hoje já é falha definitiva (nenhuma medição nova desfaz) e zera a sequência;
+   - a sequência é sempre recalculada do histórico completo, então editar/excluir registros antigos corrige tudo. */
 function rewardEval(records, todayIso) {
   const real = (records || []).filter(r => r && r.source !== 'exemplo' && r.date && typeof r.glucose === 'number'), t = dayNum(todayIso), out = {};
   for (const [k, c] of Object.entries(RW_CATS)) {
-    const rel = real.filter(c.rel).filter(r => dayNum(r.date) <= t);
-    if (!rel.length) { out[k] = { streak: 0, ach: {}, cov: {}, n: 0 }; continue; }
-    const first = Math.min(...rel.map(r => dayNum(r.date))), bads = rel.filter(c.bad).map(r => dayNum(r.date)), lastBad = bads.length ? Math.max(...bads) : null;
-    // a sequência só conta até o último dia COM medição da categoria: dia sem registro não avança conquista
-    const last = Math.max(...rel.map(r => dayNum(r.date))), streak = lastBad === null ? last - first + 1 : last - lastBad, days = new Set(rel.map(r => dayNum(r.date))), ach = {}, cov = {};
-    for (const N of RW_STEPS) { let c2 = 0; for (let d = last - N + 1; d <= last; d++) if (days.has(d)) c2++; cov[N] = c2; ach[N] = streak >= N && c2 >= Math.ceil(0.7 * N); }
-    out[k] = { streak, ach, cov, n: rel.length };
+    const byDay = new Map();
+    for (const r of real) { const d = dayNum(r.date); if (d > t || !c.rel(r)) continue; const e = byDay.get(d) || { n: 0, bad: 0 }; e.n++; if (c.bad(r)) e.bad++; byDay.set(d, e); }
+    if (!byDay.size) { out[k] = { streak: 0, ach: {}, n: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0 }; continue; }
+    const first = Math.min(...byDay.keys());
+    let run = 0, prev = 0, brokeOn = null, cycles = 0, n = 0;
+    for (const e of byDay.values()) n += e.n;
+    for (let d = first; d < t; d++) {
+      const e = byDay.get(d);
+      if (e && !e.bad) run++;
+      else { if (run > 0) { prev = run; brokeOn = d; cycles++; } run = 0; }
+    }
+    const te = byDay.get(t), today = !te ? 'empty' : te.bad ? 'bad' : 'pending';
+    if (today === 'bad') { if (run > 0) { prev = run; brokeOn = t; cycles++; } run = 0; }
+    const ach = {}; for (const N of RW_STEPS) ach[N] = run >= N;
+    const state = run > 0 ? (ach[RW_STEPS[RW_STEPS.length - 1]] ? 'concluida' : cycles > 0 ? 'reiniciada' : 'andamento') : (prev > 0 ? 'quebrada' : 'aguardando');
+    out[k] = { streak: run, ach, n, state, today, prev, brokeOn, cycles };
   }
   return out;
 }
 
+
+
+/* ---------- Alertas personalizados (lógica pura; não calcula nem sugere doses) ----------
+   Regra: { id, name, on, trig:{k:'mark'|'low'|'high', mark?, v?}, when:{t:'meal'|'time'|'after', meal?, lead?, time?, min?}, freq:'each'|'daily'|'once', msg }
+   Um alerta só existe enquanto a condição existir nos registros de HOJE: apagar/editar o registro cancela o aviso. */
+const CA_MEAL_DEF = { cafe: '07:00', almoco: '12:00', lanche: '16:00', jantar: '19:00' };
+const CA_MAXMSG = 240;
+function caMealTimes(records, now) {
+  const out = { ...CA_MEAL_DEF }, from = now - 45 * 864e5;
+  for (const k of Object.keys(CA_MEAL_DEF)) {
+    const ms = (records || []).filter(r => r && r.source !== 'exemplo' && r.meal === k && r.time && r.ts >= from && r.ts <= now && (!r.context || r.context === 'antes' || r.context === 'jejum')).map(r => { const [h, m] = r.time.split(':').map(Number); return h * 60 + m; }).sort((a, b) => a - b);
+    if (ms.length >= 3) { const md = ms[Math.floor(ms.length / 2)]; out[k] = pad(Math.floor(md / 60)) + ':' + pad(md % 60); }
+  }
+  return out;
+}
+function caClean(r) {
+  r = r || {}; const t = r.trig || {}, w = r.when || {};
+  const k = ['mark', 'low', 'high'].includes(t.k) ? t.k : 'mark', num = x => { x = +x; return isFinite(x) ? Math.min(600, Math.max(20, Math.round(x))) : (k === 'low' ? 70 : 250); };
+  const wt = ['meal', 'time', 'after'].includes(w.t) ? w.t : 'meal';
+  return {
+    id: String(r.id || ('ca' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6))), name: String(r.name || 'Meu alerta').slice(0, 60).trim() || 'Meu alerta', on: r.on !== false,
+    trig: k === 'mark' ? { k, mark: String(t.mark || 'perna').slice(0, 20) } : { k, v: num(t.v) },
+    when: wt === 'meal' ? { t: wt, meal: ['next', ...Object.keys(CA_MEAL_DEF)].includes(w.meal) ? w.meal : 'next', lead: [0, 15, 30, 60].includes(+w.lead) ? +w.lead : 0 } : wt === 'time' ? { t: wt, time: /^\d\d:\d\d$/.test(w.time) ? w.time : '12:00' } : { t: wt, min: Math.min(720, Math.max(5, Math.round(+w.min) || 30)) },
+    freq: ['each', 'daily', 'once'].includes(r.freq) ? r.freq : 'daily', msg: String(r.msg || '').slice(0, CA_MAXMSG).trim()
+  };
+}
+function caHash(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return 710000 + (Math.abs(h) % 80000); }
+/* o id dos registros manuais começa com a hora de criação em base 36 */
+function caBorn(r) { const n = parseInt(String(r.id || '').slice(0, 8), 36); return isFinite(n) && n > 1.7e12 && n < 4.1e12 && Math.abs(n - r.ts) < 30 * 864e5 ? n : r.ts; }
+function caOccur(rule, records, today) {
+  const t = rule.trig;
+  return (records || []).filter(r => r && r.source !== 'exemplo' && r.date === today && typeof r.ts === 'number' && (t.k === 'mark' ? (r.marks || []).includes(t.mark) : t.k === 'low' ? typeof r.glucose === 'number' && r.glucose < t.v : typeof r.glucose === 'number' && r.glucose > t.v)).sort((a, b) => a.ts - b.ts);
+}
+function caInQuiet(ts, q) { if (!q || !q.on) return false; const d = new Date(ts), v = d.getHours() * 60 + d.getMinutes(), m = x => { const [h, mi] = String(x).split(':').map(Number); return h * 60 + mi; }, f = m(q.from), e = m(q.to); return f === e ? false : f < e ? (v >= f && v < e) : (v >= f || v < e); }
+function caAfterQuiet(ts, q) { let t = ts, n = 0; while (caInQuiet(t, q) && n++ < 400) t += 5 * 60000; return t; }
+function caCompute(rules, records, now, opts) {
+  opts = opts || {}; const st = opts.state || {}, today = isoDate(new Date(now)), mt = opts.mealTimes || caMealTimes(records, now), q = opts.quiet, out = [], seen = new Set();
+  const dayTs = (day, hm) => mkTs(day, hm), tomorrow = isoDate(new Date(dayTs(today, '12:00') + 864e5));
+  for (const raw of rules || []) {
+    const rule = caClean(raw); if (!raw || raw.on === false || (rule.freq === 'once' && st.once && st.once[rule.id])) continue;
+    let occ = caOccur(rule, records, today); if (!occ.length) continue;
+    occ = rule.freq === 'each' ? occ.slice(0, 6) : [occ[0]];
+    for (const o of occ) {
+      const t0 = o.ts, w = rule.when; let at = null;
+      if (w.t === 'after') at = t0 + w.min * 60000;
+      else if (w.t === 'time') { at = dayTs(today, w.time); if (at <= t0) at = dayTs(tomorrow, w.time); }
+      else {
+        const cand = (w.meal === 'next' ? Object.entries(mt) : [[w.meal, mt[w.meal]]]).map(([k, hm]) => dayTs(today, hm)).sort((a, b) => a - b);
+        const base = Math.max(t0, caBorn(o)); /* registro lançado depois da hora: conta a partir do momento em que foi criado (estável, sem duplicar avisos) */
+        let m = cand.find(x => x - w.lead * 60000 > base);
+        if (m == null && w.meal === 'next') m = Math.min(...Object.values(mt).map(hm => dayTs(tomorrow, hm)));
+        if (m == null) continue;
+        at = m - w.lead * 60000;
+      }
+      at = caAfterQuiet(at, q); if (at < now - 3 * 3600e3) continue;
+      const key = rule.id + '|' + Math.round(at / 60000); if (seen.has(key)) continue; seen.add(key);
+      out.push({ key, id: caHash(key), ruleId: rule.id, name: rule.name, at, title: 'TiaBete · ' + rule.name, body: rule.msg || 'Alerta personalizado: confira sua orientação.', route: 'alertasp' });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+function caPresets() {
+  return [
+    { name: 'Dia de perna', trig: { k: 'mark', mark: 'perna' }, when: { t: 'meal', meal: 'next', lead: 0 }, freq: 'daily', msg: 'Dia de perna identificado! Lembre-se de considerar seu ajuste personalizado de insulina na próxima refeição. Confira sua orientação antes de aplicar.' },
+    { name: 'Treino de membros superiores', trig: { k: 'mark', mark: 'superiores' }, when: { t: 'meal', meal: 'next', lead: 0 }, freq: 'daily', msg: 'Dia de treino de membros superiores. Confira sua orientação pessoal antes da próxima refeição.' },
+    { name: 'Atividade física prolongada', trig: { k: 'mark', mark: 'ativ' }, when: { t: 'after', min: 120 }, freq: 'daily', msg: 'Atividade física prolongada registrada. Meça sua glicemia e confira seu plano.' },
+    { name: 'Glicemia abaixo de…', trig: { k: 'low', v: 70 }, when: { t: 'after', min: 15 }, freq: 'each', msg: 'Passou um tempo desde uma glicemia baixa. Meça de novo e siga o protocolo do seu médico.' },
+    { name: 'Glicemia acima de…', trig: { k: 'high', v: 250 }, when: { t: 'after', min: 60 }, freq: 'each', msg: 'Glicemia alta registrada. Meça de novo e confira a orientação do seu médico.' }
+  ];
+}
 
 /* ---------- Episódios de hipoglicemia: sequência a partir de uma medição < 70, até a primeira ≥ 70 (ou 60 min sem medir) ---------- */
 function hypoEpisodes(recs, gapMin = 60) {
@@ -663,5 +748,5 @@ function patternNotes(records, markLabels, todayIso) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { HYPO_PROTO, HYPO_TAG, hypoClass, hypoEpisode, hypoStamp, LIM, hypoEpisodes, patternNotes, typicalDay, pctl, rewardEval, RW_STEPS, circMean, wrapDiff, hhmm, insStats, minOfDay, a1cEval, A1C_TARGET_DEFAULT, examFlag, examDev, examScore, examBand, cleanExam, hashText, compareExams, examKey, inferFromTags, targetFor, TIME_RULE, ruleFor, applyRule, undoRule, FAST, highOf, MONTHS, norm, parseMySugr, parseNum, parseDate, parseTime, parseCSV, detectDelim, stats, periodRanges, compareStats, bandOf, mkTs, isoDate, dedupKey, trend, byTimeBlock, estimatedA1c, schemeOf, weekStart, dailyMeans, bandCounts, inRange, addDays, startOfDay, endOfDay };
+  module.exports = { caClean, caCompute, caMealTimes, caPresets, caHash, CA_MEAL_DEF, HYPO_PROTO, HYPO_TAG, hypoClass, hypoEpisode, hypoStamp, LIM, hypoEpisodes, patternNotes, typicalDay, pctl, rewardEval, RW_STEPS, circMean, wrapDiff, hhmm, insStats, minOfDay, a1cEval, A1C_TARGET_DEFAULT, examFlag, examDev, examScore, examBand, cleanExam, hashText, compareExams, examKey, inferFromTags, targetFor, TIME_RULE, ruleFor, applyRule, undoRule, FAST, highOf, MONTHS, norm, parseMySugr, parseNum, parseDate, parseTime, parseCSV, detectDelim, stats, periodRanges, compareStats, bandOf, mkTs, isoDate, dedupKey, trend, byTimeBlock, estimatedA1c, schemeOf, weekStart, dailyMeans, bandCounts, inRange, addDays, startOfDay, endOfDay };
 }

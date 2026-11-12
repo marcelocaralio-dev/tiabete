@@ -3,6 +3,16 @@
   "appName": "TiaBete",
   "webDir": "www",
   "backgroundColor": "#0a090c",
-  "android": { "allowMixedContent": false },
-  "server": { "androidScheme": "https" }
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_tiabete",
+      "iconColor": "#FF2E3E"
+    }
+  }
 }

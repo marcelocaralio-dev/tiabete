@@ -1,12 +1,12 @@
 {
   "name": "tiabete",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "TiaBete – controle de glicemia para diabetes MODY (app local, sem conta, sem nuvem)",
   "license": "MIT",
   "scripts": {
     "build:web": "node scripts/build-web.js",
-    "test": "node tests/test.js && node tests/test2.js && node tests/test3.js && node tests/test4.js && node tests/test5.js",
+    "test": "node tests/test.js && node tests/test2.js && node tests/test3.js && node tests/test4.js && node tests/test5.js && node tests/test6.js",
     "android:prepare": "npm run build:web && (test -d android || npx cap add android) && node scripts/patch-android.js && npx capacitor-assets generate --android --assetPath assets && npx cap sync android",
     "android:debug": "npm run android:prepare && cd android && ./gradlew assembleDebug",
     "android:release": "npm run android:prepare && cd android && ./gradlew assembleRelease"

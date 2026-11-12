@@ -139,7 +139,7 @@ function mealIcon(r) {
 }
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { config: 'Configurações', perfil: 'Meu Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', 'g-trat': 'Insulina e tratamento', 'g-exames': 'Exames e HbA1c', 'g-analises': 'Padrões e conquistas', 'g-ia': 'Inteligência artificial', 'g-dados': 'Dados e relatórios', 'g-ajustes': 'Ajustes e conta' };
+const TITLES = { alertasp: 'Alertas personalizados', config: 'Configurações', perfil: 'Meu Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', 'g-trat': 'Insulina e tratamento', 'g-exames': 'Exames e HbA1c', 'g-analises': 'Padrões e conquistas', 'g-ia': 'Inteligência artificial', 'g-dados': 'Dados e relatórios', 'g-ajustes': 'Ajustes e conta' };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
@@ -181,7 +181,7 @@ const curRange = () => periodRanges(S.period, Date.now());
 function banners() {
   let h = '';
   if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte um backup antes de sair.</span></div>`;
-  h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner();
+  h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner() + caBanner();
   if (hasExamples()) h += `<div class="banner"><span><b>Dados de exemplo.</b> Eles somem sozinhos quando você importar ou registrar a primeira medição real.</span><button class="btn sm" data-act="rm-examples">Remover agora</button></div>`;
   return h;
 }
@@ -367,7 +367,7 @@ function viewHistorico() {
 }
 
 /* ---------- Registro (formulário) ---------- */
-const MARKS = { hipo: 'Reavaliação de hipoglicemia', fora: 'Comi fora', semtreino: 'Dia sem treino', perna: 'Dia de perna', alcool: 'Bebi álcool', estresse: 'Estresse', doente: 'Doente', sono: 'Dormi mal', atraso: 'Refeição atrasada', viagem: 'Viagem' };
+const MARKS = { hipo: 'Reavaliação de hipoglicemia', fora: 'Comi fora', semtreino: 'Dia sem treino', perna: 'Dia de perna', alcool: 'Bebi álcool', estresse: 'Estresse', doente: 'Doente', sono: 'Dormi mal', atraso: 'Refeição atrasada', viagem: 'Viagem', superiores: 'Dia de membros superiores', ativ: 'Atividade física prolongada' };
 const MARKS_OLD = { treino: 'Treino' }; // marcação antiga: só aparece em registros que já a tinham
 const markTxt = r => (r.marks || []).map(k => MARKS[k] || MARKS_OLD[k]).filter(Boolean);
 const numAttr = v => v == null ? '' : String(v).replace('.', ',');
@@ -475,43 +475,50 @@ function compareCardHTML() {
   if (sa.n < 10 || sb.n < 10) h += '<p class="hint"><b>Poucas medições</b> em um dos períodos (menos de 10). A comparação pode não representar a rotina.</p>';
   return h;
 }
+const fmDMY = ms => fmtDM(ms) + '/' + String(new Date(ms).getFullYear()).slice(2);
 function viewAnalise() {
   let h = banners();
   if (!S.records.length) return h + emptyBlock('Sem dados para analisar', 'Importe o CSV do mySugr ou registre medições.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar CSV</button>');
   const a = S.ana, now = Date.now();
   const recs = a.range === 'all' ? S.records : inRange(S.records, startOfDay(addDays(now, -(+a.range - 1))), endOfDay(now));
   const st = stats(recs);
-  h += `<div class="seg" role="group" aria-label="Intervalo">${[['all', 'Tudo'], ['30', '30 d'], ['90', '90 d'], ['180', '180 d']].map(([k, l]) => `<button data-act="ana-range" data-v="${k}" aria-pressed="${a.range === k}">${l}</button>`).join('')}</div>`;
-  if (!recs.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Sem medições', 'Não há medições neste intervalo.')}</div>`;
-  h += `<h2 class="sec">Resumo geral</h2><div class="card"><div class="grid3" style="gap:14px 10px">
-    <div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div>
-    <div class="tile"><div class="lb">Desvio-padrão</div><div class="v num" style="font-size:22px">${fm(st.sd)}</div></div>
-    <div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:22px">${st.n}</div></div>
-    <div class="tile"><div class="lb">Menor</div><div class="v num" style="font-size:22px">${f0(st.min)}</div></div>
-    <div class="tile ${st.hypo ? 'alert' : ''}"><div class="lb">&lt; 70</div><div class="v num" style="font-size:22px">${st.hypo}<small>${(st.hypo / st.n * 100).toFixed(0)}%</small></div></div>
-    <div class="tile ${st.hyper ? 'alert' : ''}"><div class="lb">Acima da faixa</div><div class="v num" style="font-size:22px">${st.hyper}<small>${(st.hyper / st.n * 100).toFixed(0)}%</small></div></div></div></div>`;
-  /* evolução semanal / mensal */
-  const wk = a.agg === 'week', g = groupBy(recs, r => wk ? weekStart(r.ts) : monthStart(r.ts));
-  let buckets = [...g.entries()].sort((x, y) => x[0] - y[0]).map(([t, rs]) => ({ t, ...stats(rs) }));
-  const total = buckets.length; buckets = buckets.slice(-12);
-  h += `<div class="row sp" style="margin:26px 0 10px"><h2 class="sec" style="margin:0">Evolução ${wk ? 'semanal' : 'mensal'}</h2><div class="seg"><button data-act="ana-agg" data-v="week" aria-pressed="${wk}">Semana</button><button data-act="ana-agg" data-v="month" aria-pressed="${!wk}">Mês</button></div></div><div class="card">`;
-  h += barChart(buckets.map(b => ({ label: wk ? fmtDM(b.t) : new Date(b.t).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''), value: b.mean, n: b.n, sub: `Menor ${f0(b.min)} · maior ${f0(b.max)}` })), { label: 'Média por ' + (wk ? 'semana' : 'mês') });
-  h += `<p class="hint">Média de mg/dL por ${wk ? 'semana (início na segunda)' : 'mês'}. ${total > 12 ? `Mostrando os últimos 12 de ${total}. ` : ''}Barras com menos de ${MIN_BUCKET} medições não mostram média.</p>`;
+  const rl = a.range === 'all' ? 'todo o histórico' : 'últimos ' + a.range + ' dias';
+  const tag = k => ({ int: `<span class="atag">Intervalo: ${rl}</span>`, agg: `<span class="atag">Intervalo: ${rl} · Agrupamento</span>`, ind: '<span class="atag ind">Não muda com o filtro</span>' }[k]);
+  const span = recs.length ? (() => { const t = recs.map(r => r.ts); return fmtDM(Math.min(...t)) + '/' + new Date(Math.min(...t)).getFullYear() + ' a ' + fmtDM(Math.max(...t)) + '/' + new Date(Math.max(...t)).getFullYear(); })() : '';
+  h += `<div class="card anaf"><div class="fl">Intervalo de dias</div><div class="seg" role="group" aria-label="Intervalo de dias">${[['all', 'Tudo'], ['30', '30 d'], ['90', '90 d'], ['180', '180 d']].map(([k, l]) => `<button data-act="ana-range" data-v="${k}" aria-pressed="${a.range === k}">${l}</button>`).join('')}</div><p class="hint" id="ana-span">${recs.length ? `Mostrando <b>${span}</b> · ${st.n} medições.` : 'Sem medições neste intervalo.'} Vale para os cartões marcados com “Intervalo”.</p></div>`;
+  if (!recs.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Sem medições', 'Não há medições neste intervalo. Escolha “Tudo” para ver todo o histórico.')}</div>`;
+  const days = new Set(recs.map(r => r.date)).size;
   const tr = trend(recs);
-  h += `<p class="hint">${tr ? `<b>Tendência aproximada:</b> ${fsign(tr.perWeek)} mg/dL por semana, calculada sobre ${tr.days} dias com medição. Descreve o passado e não prevê o futuro.` : '<b>Tendência:</b> dados insuficientes (precisa de ao menos 10 dias e 20 medições).'}</p></div>`;
-  h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${distBars(recs)}</div>`;
-  h += `<h2 class="sec">Média por horário</h2><div class="card">${barChart(byTimeBlock(recs).map(b => ({ label: b.label, value: b.mean, n: b.n })), { label: 'Média por faixa horária' })}<p class="hint">Medições sem horário (importadas sem hora) ficam de fora.</p></div>`;
-  h += `<h2 class="sec">Dia típico</h2><div class="card">${typicalDayChart(recs)}<p class="hint" style="margin:8px 0 0">Junta todos os dias do intervalo escolhido em um só dia de 24 horas. A linha é a mediana por horário (janela de 3 h) e as faixas mostram onde ficou a maioria das medições. Mostra o que aconteceu, sem prever nem orientar tratamento.</p></div>`;
-  h += heatmapCard(recs);
+  h += `<h2 class="sec">Resumo geral</h2><div class="card">${tag('int')}<div class="grid3" style="gap:14px 10px">
+    <div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:27px">${fm(st.mean)}</div></div>
+    <div class="tile"><div class="lb">Desvio-padrão</div><div class="v num" style="font-size:27px">${fm(st.sd)}</div></div>
+    <div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:27px">${st.n}</div></div>
+    <div class="tile"><div class="lb">Menor</div><div class="v num" style="font-size:27px">${f0(st.min)}</div></div>
+    <div class="tile"><div class="lb">Maior</div><div class="v num" style="font-size:27px">${f0(st.max)}</div></div>
+    <div class="tile"><div class="lb">Dias com medição</div><div class="v num" style="font-size:27px">${days}</div></div></div>
+    <p class="hint">Valores em mg/dL.</p>
+    <p class="hint">${tr ? `<b>Tendência aproximada:</b> ${fsign(tr.perWeek)} mg/dL por semana, calculada sobre ${tr.days} dias com medição. Descreve o passado e não prevê o futuro.` : '<b>Tendência:</b> dados insuficientes (precisa de ao menos 10 dias e 20 medições).'}</p></div>`;
+  /* evolução: intervalo + agrupamento */
+  const wk = a.agg === 'week', g = groupBy(recs, r => wk ? weekStart(r.ts) : monthStart(r.ts));
+  const all = [...g.entries()].sort((x, y) => x[0] - y[0]).map(([t, rs]) => ({ t, ...stats(rs) }));
+  const total = all.length, buckets = all.slice(-12);
+  const lbl = t => wk ? fmDMY(t) : new Date(t).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+  h += `<h2 class="sec">Evolução</h2><div class="card">${tag('agg')}<div class="row sp" style="margin:0 0 10px"><span class="fl" style="margin:0">Agrupar por</span><div class="seg" role="group" aria-label="Agrupamento temporal"><button data-act="ana-agg" data-v="week" aria-pressed="${wk}">Semana</button><button data-act="ana-agg" data-v="month" aria-pressed="${!wk}">Mês</button></div></div>`;
+  h += barChart(buckets.map(b => ({ label: wk ? fmtDM(b.t) : lbl(b.t), value: b.mean, n: b.n, sub: `Menor ${f0(b.min)} · maior ${f0(b.max)}` })), { label: 'Média por ' + (wk ? 'semana' : 'mês') });
+  h += `<p class="hint">Média por ${wk ? 'semana (início na segunda)' : 'mês'}, em mg/dL. ${total > 12 ? `Gráfico: últimos 12 de ${total}; a tabela abaixo traz todos. ` : ''}Barras com menos de ${MIN_BUCKET} medições não mostram média.</p>`;
+  h += `<details class="allper"><summary>Ver todos os ${wk ? 'semanas' : 'meses'} (${total})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>${wk ? 'Semana de' : 'Mês'}</th><th>Média</th><th>Min–máx</th><th>n</th></tr></thead><tbody>${all.slice().reverse().map(b => `<tr><td>${wk ? fmDMY(b.t) : lbl(b.t)}</td><td>${b.n >= MIN_BUCKET ? fm(b.mean) : '<span class="dim">insuf.</span>'}</td><td>${f0(b.min)}–${f0(b.max)}</td><td>${b.n}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+  h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${tag('int')}<div class="chips"><span class="chip ${st.hypo ? 'alert' : ''}">&lt; 70: <b>${st.hypo}</b> (${(st.hypo / st.n * 100).toFixed(0)}%)</span><span class="chip ${st.hyper ? 'alert' : ''}">Acima da faixa: <b>${st.hyper}</b> (${(st.hyper / st.n * 100).toFixed(0)}%)</span></div>${distBars(recs)}</div>`;
+  const td = typicalDay(recs);
+  h += `<h2 class="sec">Perfil do dia</h2><div class="card">${tag('int')}<h3 class="sub">Dia típico</h3>${typicalDayChart(recs)}${td.ok >= 6 ? '<p class="hint" style="margin:8px 0 0">Junta todos os dias do intervalo em um só dia de 24 horas. A linha é a mediana por horário (janela de 3 h) e as faixas mostram onde ficou a maioria das medições. Mostra o que aconteceu, sem prever nem orientar tratamento.</p>' : ''}<h3 class="sub">Média por faixa horária</h3>${barChart(byTimeBlock(recs).map(b => ({ label: b.label, value: b.mean, n: b.n })), { label: 'Média por faixa horária' })}<p class="hint">Medições sem horário (importadas sem hora) ficam de fora.</p></div>`;
+  h += heatmapCard(recs).replace('<div class="card">', '<div class="card">' + tag('int'));
   const ctxRows = Object.entries(CONTEXTS).map(([k, l]) => ({ label: l, hi: k === 'jejum' ? FAST.high : LIM.high, ...stats(recs.filter(r => r.context === k)) })).filter(r => r.n);
   const none = stats(recs.filter(r => !r.context));
-  h += `<h2 class="sec">Antes e depois das refeições</h2><div class="card">${ctxRows.length ? meanBars(ctxRows.map(r => ({ ...r, label: r.label.replace(' da refeição', '') }))) : '<div class="empty">Nenhuma medição com contexto informado.</div>'}${none.n ? `<p class="hint">${none.n} medições sem contexto não entram nesta lista.</p>` : ''}</div>`;
+  h += `<h2 class="sec">Antes e depois das refeições</h2><div class="card">${tag('int')}${ctxRows.length ? meanBars(ctxRows.map(r => ({ ...r, label: r.label.replace(' da refeição', '') }))) : '<div class="empty">Nenhuma medição com contexto informado.</div>'}${none.n ? `<p class="hint">${none.n} medições sem contexto não entram nesta lista.</p>` : ''}</div>`;
   const mealRows = Object.entries(MEALS).map(([k, l]) => { const ar = recs.filter(r => r.meal === k); return { l, all: stats(ar), antes: stats(ar.filter(r => r.context === 'antes')), depois: stats(ar.filter(r => r.context === 'depois')) }; });
   const cell = s => s.n >= MIN_BUCKET ? `${fm(s.mean)}<small>n=${s.n}</small>` : `<span class="dim">${s.n ? 'n=' + s.n : '—'}</span>`;
-  h += `<h2 class="sec">Por tipo de refeição</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Todas</th></tr></thead><tbody>${mealRows.map(m => `<tr><td>${m.l}</td><td>${cell(m.antes)}</td><td>${cell(m.depois)}</td><td>${cell(m.all)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Médias em mg/dL. Mostradas só com ${MIN_BUCKET} ou mais medições.</p></div>`;
-  h += mealDeltaCard(recs);
-  h += `<h2 class="sec">Médias por período do calendário</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Período</th><th>Média</th><th>Min–máx</th><th>n</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>${[7, 30, 90, 180].map(d => statsBlock(d + ' dias', inRange(S.records, startOfDay(addDays(now, -(d - 1))), endOfDay(now))).html).join('')}</tbody></table></div></div>`;
-  h += `<h2 class="sec">Comparar dois períodos</h2><div class="card" id="cmp">${compareCardHTML()}</div>`;
+  h += `<h2 class="sec">Por refeição</h2><div class="card">${tag('int')}<h3 class="sub">Média por tipo de refeição</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Todas</th></tr></thead><tbody>${mealRows.map(m => `<tr><td>${m.l}</td><td>${cell(m.antes)}</td><td>${cell(m.depois)}</td><td>${cell(m.all)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Médias em mg/dL. Mostradas só com ${MIN_BUCKET} ou mais medições.</p><h3 class="sub">Variação (depois − antes, no mesmo dia)</h3>${mealDeltaCard(recs, true)}</div>`;
+  h += `<h2 class="sec">Janelas fixas · 7, 30, 90 e 180 dias</h2><div class="card">${tag('ind')}<div class="tbl-wrap"><table class="t"><thead><tr><th>Período</th><th>Média</th><th>Min–máx</th><th>n</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>${[7, 30, 90, 180].map(d => statsBlock(d + ' dias', inRange(S.records, startOfDay(addDays(now, -(d - 1))), endOfDay(now))).html).join('')}</tbody></table></div><p class="hint">Sempre contam a partir de hoje, com todos os registros, qualquer que seja o intervalo escolhido acima.</p></div>`;
+  h += `<h2 class="sec">Comparar dois períodos</h2><div class="card">${tag('ind')}<div id="cmp">${compareCardHTML()}</div></div>`;
   return h;
 }
 
@@ -537,7 +544,7 @@ function viewHba() {
   else {
     h += `<div class="card">${lineSimple(S.hba.map(x => ({ ts: mkTs(x.date, '12:00'), value: x.value, tip: `<b>${fn(x.value, 1)}%</b><br><span>${fmtDate(x.date)}${x.lab ? ' · ' + esc(x.lab) : ''}</span>` })), { label: 'Evolução da HbA1c laboratorial' })}`;
     if (S.hba.length > 1) { const a = S.hba[S.hba.length - 2], b = S.hba[S.hba.length - 1]; h += `<p class="hint">Entre os dois últimos exames (${fmtDate(a.date)} e ${fmtDate(b.date)}): <b>${fsign(b.value - a.value)} ponto percentual</b>.</p>`; }
-    h += `</div><div class="stack" style="margin-top:12px">` + [...S.hba].reverse().map(x => `<button class="rec" style="grid-template-columns:1fr auto" data-act="hba-edit" data-id="${x.id}"><span class="info"><span class="num">${fmtDate(x.date)}</span><span class="chips">${a1cBadge(x.value)}${x.lab ? `<span class="tag">${esc(x.lab)}</span>` : ''}${x.source === 'mysugr' ? '<span class="tag">Importado do mySugr</span>' : ''}${x.source === 'exame' ? '<span class="tag">Do exame enviado</span>' : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span>${x.notes ? `<span class="dim" style="font-size:12.5px">${esc(x.notes)}</span>` : ''}</span><span class="gl num">${fn(x.value, 1)}%<small>laboratório</small></span></button>`).join('') + `</div>`;
+    h += `</div><div class="stack" style="margin-top:12px">` + [...S.hba].reverse().map(x => `<button class="rec" style="grid-template-columns:1fr auto" data-act="hba-edit" data-id="${x.id}"><span class="info"><span class="num">${fmtDate(x.date)}</span><span class="chips">${a1cBadge(x.value)}${x.lab ? `<span class="tag">${esc(x.lab)}</span>` : ''}${x.source === 'mysugr' ? '<span class="tag">Importado do mySugr</span>' : ''}${x.source === 'exame' ? '<span class="tag">Do exame enviado</span>' : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span>${x.notes ? `<span class="dim" style="font-size:14px">${esc(x.notes)}</span>` : ''}</span><span class="gl num">${fn(x.value, 1)}%<small>laboratório</small></span></button>`).join('') + `</div>`;
   }
   h += `<h2 class="sec">Estimativa matemática (opcional)</h2><div class="card soft" style="border-style:dashed">`;
   if (!S.est) h += `<p class="hint" style="margin:0 0 12px">Calcula um valor aproximado a partir da média das suas glicemias capilares. <b>Não é um exame</b> e não é o GMI.</p><button class="btn" data-act="est-on">Mostrar estimativa</button>`;
@@ -576,7 +583,7 @@ function viewEsquemas() {
   if (!S.schemes.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Nenhum esquema', 'Cadastre o esquema atual e os anteriores para poder compará-los.')}</div>`;
   h += `<h2 class="sec">Esquemas cadastrados</h2><div class="stack">` + [...S.schemes].reverse().map(x => {
     const act = !x.end || x.end >= isoDate(new Date());
-    return `<button class="rec" style="grid-template-columns:1fr auto" data-act="sch-edit" data-id="${x.id}"><span class="info"><b>${esc(x.name)}</b><span class="dim num" style="font-size:12.5px">${fmtDate(x.start)} → ${x.end ? fmtDate(x.end) : 'em uso'}</span><span class="chips">${x.basalInsulin ? `<span class="tag">Basal: ${esc(x.basalInsulin)}${x.basalDose ? ' ' + esc(x.basalDose) : ''}</span>` : ''}${x.rapidInsulin ? `<span class="tag">Rápida: ${esc(x.rapidInsulin)}</span>` : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span></span>${act ? '<span class="badge high">Em uso</span>' : '<span class="badge">Encerrado</span>'}</button>`;
+    return `<button class="rec" style="grid-template-columns:1fr auto" data-act="sch-edit" data-id="${x.id}"><span class="info"><b>${esc(x.name)}</b><span class="dim num" style="font-size:14px">${fmtDate(x.start)} → ${x.end ? fmtDate(x.end) : 'em uso'}</span><span class="chips">${x.basalInsulin ? `<span class="tag">Basal: ${esc(x.basalInsulin)}${x.basalDose ? ' ' + esc(x.basalDose) : ''}</span>` : ''}${x.rapidInsulin ? `<span class="tag">Rápida: ${esc(x.rapidInsulin)}</span>` : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span></span>${act ? '<span class="badge high">Em uso</span>' : '<span class="badge">Encerrado</span>'}</button>`;
   }).join('') + `</div>`;
   const rows = S.schemes.map(sc => ({ sc, ...schemeStats(sc) }));
   h += `<h2 class="sec">Comparação de resultados</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Esquema</th><th>Dias</th><th>n</th><th>Média</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>` +
@@ -699,7 +706,7 @@ function viewRelatorios() {
   const a = mkTs(r.from, '00:00'), b = endOfDay(mkTs(r.to, '00:00')), recs = inRange(S.records, a, b), st = stats(recs);
   return banners() + `<div class="card"><div class="form-grid"><div class="field"><label class="fl" for="r-from">De</label><input class="in" type="date" id="r-from" value="${r.from}"></div><div class="field"><label class="fl" for="r-to">Até</label><input class="in" type="date" id="r-to" value="${r.to}"></div></div>
     <div class="row" style="margin-top:12px">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias']].map(([d, l]) => `<button class="btn sm" data-act="rep-quick" data-d="${d}">${l}</button>`).join('')}</div></div>
-    <h2 class="sec">O que entra</h2><div class="card"><div class="grid3"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:22px">${st.n}</div></div><div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div><div class="tile"><div class="lb">&lt;70 / acima</div><div class="v num" style="font-size:22px">${st.hypo}/${st.hyper}</div></div></div>
+    <h2 class="sec">O que entra</h2><div class="card"><div class="grid3"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${st.n}</div></div><div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div><div class="tile"><div class="lb">&lt;70 / acima</div><div class="v num" style="font-size:22px">${st.hypo}/${st.hyper}</div></div></div>
     <ul class="plain"><li>Resumo, estatísticas, gráfico de medições e distribuição por faixa</li><li>Comparação com o período anterior de mesma duração</li><li>Episódios de hipoglicemia e hiperglicemia</li><li>Resultados laboratoriais de HbA1c (sem estimativas)</li><li>Esquemas de tratamento e comparação</li><li>Histórico completo de medições</li></ul></div>
     <div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rep-pdf" ${st.n ? '' : 'disabled'}>Gerar PDF</button><button class="btn full" data-act="rep-xlsx" ${st.n ? '' : 'disabled'}>Gerar Excel</button><button class="btn full" data-act="rep-summary">Resumo para a consulta (PDF, últimos 90 dias)</button><button class="btn full" data-act="sh-open">Enviar ao meu médico…</button></div>
     ${st.n ? '' : '<p class="hint">Não há medições neste intervalo.</p>'}<p class="hint" id="rep-status" role="status"></p>`;
@@ -708,7 +715,7 @@ function viewRelatorios() {
 /* ---------- Backup ---------- */
 function viewBackup() {
   const nReal = S.records.filter(r => !isEx(r)).length;
-  let h = banners() + `<div class="card"><div class="eyebrow">Seus dados</div><div class="grid3" style="margin-top:12px"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:22px">${S.records.length}</div></div><div class="tile"><div class="lb">HbA1c</div><div class="v num" style="font-size:22px">${S.hba.length}</div></div><div class="tile"><div class="lb">Esquemas</div><div class="v num" style="font-size:22px">${S.schemes.length}</div></div></div>
+  let h = banners() + `<div class="card"><div class="eyebrow">Seus dados</div><div class="grid3" style="margin-top:12px"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${S.records.length}</div></div><div class="tile"><div class="lb">HbA1c</div><div class="v num" style="font-size:22px">${S.hba.length}</div></div><div class="tile"><div class="lb">Esquemas</div><div class="v num" style="font-size:22px">${S.schemes.length}</div></div></div>
     <p class="hint" id="persist-note">Armazenamento: ${Store.persistent ? 'banco IndexedDB neste navegador' : 'indisponível (somente sessão)'}.</p>
     <p class="hint"><b>Atenção:</b> limpar os dados do site ou do navegador apaga tudo daqui. Faça backups regulares.</p></div>
     <h2 class="sec">Exportar</h2><div class="stack"><button class="btn pri full" data-act="bk-json">Backup completo (.json)</button><button class="btn full" data-act="bk-csv">Medições em CSV (.csv)</button></div>
@@ -754,6 +761,7 @@ const MI = {
   importar: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
   eventos: '<path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/>',
   lembretes: '<path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4zM10 21h4"/>',
+  alertasp: '<path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4zM10 21h4M12 3v2"/>',
   esquemas: '<path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/>',
   relatorios: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',
   backup: '<path d="M7 18a4 4 0 0 1-.500-8 6 6 0 0 1 11.500 1.500A3.500 3.500 0 0 1 17.500 18zM12 11v6M9.500 13.500L12 11l2.500 2.500"/>',
@@ -772,7 +780,7 @@ function menuGroups() {
     'g-analises': { t: 'Padrões e conquistas', d: 'Padrões, conquistas, classificação de medições e eventos', items: [['padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses sem hipoglicemia, jejum até 130 e glicemia até 180'], ['classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições'], ['eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos']] },
     'g-ia': { t: 'Inteligência artificial', d: 'Perguntas sobre o seu histórico e provedor de IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor de IA e informe a sua chave'] : null] },
     'g-dados': { t: 'Dados e relatórios', d: 'Relatórios, importação do mySugr, backup e restauração', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia'], ['backup', 'Backup e dados', 'Exportar, restaurar, CSV']] },
-    'g-ajustes': { t: 'Ajustes e conta', d: 'Configurações, alertas, perfil e aparência', items: [['config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes'], ['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno'], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático']] }
+    'g-ajustes': { t: 'Ajustes e conta', d: 'Configurações, alertas, perfil e aparência', items: [['config', 'Configurações', 'Tema, tamanho da tela, metas, alertas e demais ajustes'], ['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno'], ['alertasp', 'Alertas personalizados', 'Avisos ligados às suas marcações, como Dia de perna, e à glicemia'], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático']] }
   };
   for (const g of Object.values(G)) g.items = g.items.filter(Boolean);
   return G;
@@ -803,7 +811,7 @@ function viewMais() {
   const q = S.maisQ || '';
   return banners() + `<div class="mais-s"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="in" id="mais-q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Buscar em Mais…" aria-label="Buscar em Mais" value="${esc(q)}">${q ? '<button class="mais-x" data-act="mais-clear" aria-label="Limpar busca">×</button>' : ''}</div><div class="stack" id="mais-list">${q.trim() ? maisResults(q) : maisMenu()}</div>`;
 }
-function viewAparencia() { return banners() + themeCard() + scaleCard(); }
+function viewAparencia() { return banners() + themeCard() + scaleCard() + swipeCard(); }
 
 function viewSobre() {
   const kv = (k, v) => `<div class="row sp" style="gap:12px;padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start"><span class="dim" style="flex:none">${k}</span><b style="text-align:right;overflow-wrap:anywhere">${v}</b></div>`;
@@ -820,7 +828,7 @@ function viewSobre() {
 
 /* ================= Roteamento e renderização ================= */
 
-const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, 'g-trat': hubView('g-trat'), 'g-exames': hubView('g-exames'), 'g-analises': hubView('g-analises'), 'g-ia': hubView('g-ia'), 'g-dados': hubView('g-dados'), 'g-ajustes': hubView('g-ajustes') };
+const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, alertasp: viewAlertasP, padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, 'g-trat': hubView('g-trat'), 'g-exames': hubView('g-exames'), 'g-analises': hubView('g-analises'), 'g-ia': hubView('g-ia'), 'g-dados': hubView('g-dados'), 'g-ajustes': hubView('g-ajustes') };
 /* ---- Aviso de segurança e responsabilidade médica (páginas com exames, bolus, estimativas, IA e tratamento) ---- */
 const SF_SHORT = { exames: 'A IA pode errar. Os resultados não substituem o seu médico.', exame: 'A IA pode errar. Os resultados não substituem o seu médico.', comparar: 'A IA pode errar. Os resultados não substituem o seu médico.', perguntas: 'As respostas da IA podem ter imprecisões e não substituem o seu médico.', hba1c: 'Estimativas não são exame e não decidem tratamento.', bolus: 'Cálculos não substituem o seu médico. Não mude doses por conta própria.', esquemas: 'Doses e remédios só mudam com orientação médica.', painel: 'Ferramenta de apoio ao acompanhamento. Não substitui o seu médico.' };
 function safetyNote(view, route) {
@@ -957,7 +965,7 @@ window.addEventListener('hashchange', () => { const r = routeFromHash(); if (r !
 async function saveFile(name, data, textFallback) {
   let dl = null; try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { }
   if (!dl) {
-    if (textFallback) { openSheet(`<h2>Copie o conteúdo</h2><p class="hint" style="margin:0 0 10px">Este visualizador não permite baixar arquivos. Copie o texto abaixo e salve como <b>${esc(name)}</b>.</p><textarea class="in" id="fb-text" style="min-height:200px;font-family:var(--f-mono);font-size:12px" readonly>${esc(textFallback)}</textarea><div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="close">Fechar</button></div>`); setTimeout(() => { const t = $('#fb-text'); if (t) t.select(); }, 80); return false; }
+    if (textFallback) { openSheet(`<h2>Copie o conteúdo</h2><p class="hint" style="margin:0 0 10px">Este visualizador não permite baixar arquivos. Copie o texto abaixo e salve como <b>${esc(name)}</b>.</p><textarea class="in" id="fb-text" style="min-height:200px;font-family:var(--f-mono);font-size:13.5px" readonly>${esc(textFallback)}</textarea><div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="close">Fechar</button></div>`); setTimeout(() => { const t = $('#fb-text'); if (t) t.select(); }, 80); return false; }
     toast('Download indisponível neste visualizador.'); return false;
   }
   try { await dl.save({ filename: name, data }); toast('Arquivo salvo: ' + name); return true; }
@@ -965,7 +973,7 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blDirty() ? S.bl : null, plan: plHas() ? S.plan : undefined } };
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blDirty() ? S.bl : null, plan: plHas() ? S.plan : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined } };
   if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }

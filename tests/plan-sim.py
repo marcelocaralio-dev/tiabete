@@ -19,5 +19,11 @@ async def main():
         print('sem alarme da metformina:', len(await L()), '(esperado 3)')
         await pg.evaluate("(async()=>{S.alerts={...alCfg(),plan:false};await alSave();})()"); await pg.wait_for_timeout(1200)
         print('chave geral desligada:', len(await L()), '(esperado 0)')
+        await pg.evaluate("(async()=>{S.alerts={...alCfg(),plan:true,quiet:true,qFrom:'22:00',qTo:'06:00',plQuiet:false};S.plan.meds[0].alarm=true;S.plan.meds[0].days=[1,3];S.plan.meds[0].off=['20:00'];await plSave();await alSave();})()"); await pg.wait_for_timeout(1500)
+        W = lambda: pg.evaluate("Object.values(__pend).filter(n=>n.channelId==='tratamento').map(n=>[n.body,n.schedule.on?JSON.stringify(n.schedule.on):'único'])")
+        l = await W(); print('dias+mute (esperado: metformina 08:00 em weekday 2 e 4, sem 20:00, basal 22:00 mesmo no silêncio):'); [print('  ', x) for x in l]
+        await pg.evaluate("(async()=>{S.alerts={...alCfg(),plQuiet:true};await alSave();})()"); await pg.wait_for_timeout(1500)
+        print('com silêncio ligado, basal 22:00 some:', not any('22:00' in x[0] and 'basal' in x[0] for x in await W()))
+        print('status no app:', await pg.evaluate("[window.TB_PLAN_N, window.TB_PLAN_PERM]"))
         print('erros', errs); await b.close()
 asyncio.run(main())

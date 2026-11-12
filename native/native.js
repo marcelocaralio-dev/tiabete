@@ -191,9 +191,26 @@ if (NATIVE) {
     } catch (e) { }
     remResync(); postSync(); postClean(); planSync();
   }
+  /* ---- Alertas personalizados: agenda no Android (toca com o app fechado), cancela os que deixaram de valer e abre a tela ao tocar ---- */
+  const CA_KEY = 'tb-ca-ids'; let caBusy = false;
+  window.caNativeSync = async list => {
+    const ln = LN(); if (!ln || caBusy) return; caBusy = true;
+    try {
+      const now = Date.now(), fut = (list || []).filter(x => x.at > now + 3000); let old = [];
+      try { old = JSON.parse(localStorage.getItem(CA_KEY) || '[]'); } catch (e) { }
+      const keep = new Set(fut.map(x => x.id)), stale = old.filter(id => !keep.has(id));
+      if (stale.length) await ln.cancel({ notifications: stale.map(id => ({ id })) });
+      if (!fut.length) { try { localStorage.setItem(CA_KEY, '[]'); } catch (e) { } return; }
+      if (!(await ensurePerm())) return;
+      try { await ln.createChannel({ id: 'alertasp', name: 'Alertas personalizados', description: 'Avisos que você configurou no TiaBete', importance: 4, vibration: true }); } catch (e) { }
+      await ln.schedule({ notifications: fut.map(x => ({ id: x.id, title: x.title, body: x.body, largeBody: x.body, channelId: 'alertasp', extra: { route: 'alertasp', rule: x.ruleId }, schedule: { at: new Date(x.at), allowWhileIdle: true } })) });
+      try { localStorage.setItem(CA_KEY, JSON.stringify(fut.map(x => x.id))); } catch (e) { }
+    } catch (e) { console.error(e); } finally { caBusy = false; }
+  };
+  try { const l0 = LN(); if (l0 && l0.addListener) l0.addListener('localNotificationActionPerformed', ev => { const x = ev && ev.notification && ev.notification.extra; if (x && x.route === 'alertasp' && typeof go === 'function') go('alertasp'); }); } catch (e) { }
   setTimeout(notifInit, 5000);
   setInterval(() => { postClean(); postSync(); }, 60000);
-  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); setTimeout(() => { try { if (typeof drvAuto === 'function') drvAuto(); } catch (e) { } }, 1500); });
+  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); try { caSync(); } catch (e) { } setTimeout(() => { try { if (typeof drvAuto === 'function') drvAuto(); } catch (e) { } }, 1500); });
   /* backup programado no Drive falhou: avisa também com notificação do Android */
   window.addEventListener('tb-drv-fail', async ev => {
     try {
@@ -204,7 +221,7 @@ if (NATIVE) {
   });
   const _loadAll = loadAll;
   loadAll = async function () { const r = await _loadAll.apply(this, arguments); hypoSync(); postSync(); return r; };
-  setTimeout(hypoSync, 2000);
+  setTimeout(hypoSync, 2000); setTimeout(() => { try { caSync(); } catch (e) { } }, 3000);
   document.addEventListener('change', e => { if (e.target.closest('.al-on, .al-sel, .al-tm')) setTimeout(() => { hypoSync(); postSync(); remResync(); }, 60); });
   document.addEventListener('click', async e => {
     const el = e.target.closest('[data-act^="nt-"]'); if (!el) return; const ln = LN(); if (!ln) return toast('Notificações não estão disponíveis neste aparelho.');
