@@ -1,6 +1,6 @@
 /* ---------- Segurança: backup cifrado (AES-GCM), Drive cifrado e bloqueio por PIN ----------
    Tudo roda no aparelho (Web Crypto). Não há servidor, e senha/PIN esquecidos não têm recuperação. */
-const SEC = { bioAvail: false, bioMsg: '', form: null, pend: null, msg: '', drvOn: false, hiddenAt: 0, locked: false };
+const SEC = { bioAvail: false, bioMsg: '', form: null, pend: null, msg: '', drvOn: false, hiddenAt: 0, locked: false, bioBusy: false, bioSt: null };
 const SEC_ITER = 250000, SEC_MIN = 8;
 const secOk = () => !!(window.crypto && crypto.subtle);
 const b64e = u => { let s = ''; for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); };
@@ -44,11 +44,23 @@ async function lkHash(pin, salt) {
 async function lkCheck(pin) { const c = lkCfg(); return !!c && (await lkHash(pin, c.salt)) === c.hash; }
 const lkWait = () => { const c = lkCfg(); return c && c.until > Date.now() ? Math.ceil((c.until - Date.now()) / 1000) : 0; };
 /* ---- Biometria / rosto (WebAuthn, autenticador do próprio aparelho) ---- */
-const bioOk = () => !!(window.PublicKeyCredential && navigator.credentials && secOk());
+/* No APK: biometria nativa do Android (BiometricPrompt, via plugin TbBiometric). Nos demais ambientes: WebAuthn. */
+const bioNat = () => { try { const C = window.Capacitor; return (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.TbBiometric) || null; } catch (e) { return null; } };
+const BIO_TXT = { none_hardware: 'Este aparelho não tem leitor de digital nem reconhecimento facial compatível.', none_enrolled: 'O aparelho tem biometria, mas nenhuma digital ou rosto está cadastrado. Cadastre nas configurações do Android e volte aqui.', hw_unavailable: 'O sensor de biometria está indisponível agora. Tente de novo em instantes.', security_update: 'O Android pede uma atualização de segurança antes de liberar a biometria.', unsupported: 'Este Android não oferece este nível de biometria ao app.', lockout: 'Biometria bloqueada por muitas tentativas. Aguarde um pouco ou use o PIN.', lockout_permanent: 'O Android bloqueou a biometria. Desbloqueie o aparelho com o PIN ou a senha dele para liberá-la. Enquanto isso, use o PIN do TiaBete.', user_cancel: 'Autenticação cancelada.', timeout: 'Tempo esgotado. Tente de novo ou use o PIN.', unavailable: 'A biometria não está disponível agora. Use o PIN.', unknown: 'Não foi possível verificar a biometria deste aparelho.' };
+const bioWhy = code => BIO_TXT[code] || BIO_TXT.unknown;
+const bioDo = async fn => { SEC.bioBusy = true; try { return await fn(); } finally { setTimeout(() => { SEC.bioBusy = false; SEC.hiddenAt = 0; }, 1200); } };
+const bioOk = () => !!(bioNat() || (window.PublicKeyCredential && navigator.credentials && secOk()));
 const b64u = u => b64e(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const bioRnd = n => crypto.getRandomValues(new Uint8Array(n));
-async function bioProbe() { try { SEC.bioAvail = bioOk() && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch (e) { SEC.bioAvail = false; } if (S.route === 'backup' && typeof render === 'function') { try { render(); } catch (e) { } } }
+async function bioProbe() { const N = bioNat(); if (N) { try { SEC.bioSt = await N.status(); SEC.bioAvail = !!SEC.bioSt.available; } catch (e) { SEC.bioSt = { available: false, code: 'unknown' }; SEC.bioAvail = false; } } else { try { SEC.bioAvail = bioOk() && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch (e) { SEC.bioAvail = false; } } if ((S.route === 'backup' || S.route === 'seguranca') && typeof render === 'function') { try { render(); } catch (e) { } } }
 async function bioEnroll() {
+  const N = bioNat();
+  if (N) {
+    await bioProbe(); if (!SEC.bioAvail) { const e = new Error(bioWhy(SEC.bioSt && SEC.bioSt.code)); e.bioCode = SEC.bioSt && SEC.bioSt.code; throw e; }
+    try { await bioDo(() => N.authenticate({ title: 'Ativar biometria no TiaBete', subtitle: 'Confirme com a digital ou o rosto cadastrados no aparelho', negative: 'Cancelar' })); }
+    catch (er) { const e = new Error(bioWhy(er && er.code)); e.bioCode = er && er.code; throw e; }
+    return { native: 1 };
+  }
   const cred = await navigator.credentials.create({ publicKey: { rp: { name: 'TiaBete' }, user: { id: bioRnd(16), name: 'tiabete', displayName: 'TiaBete' }, challenge: bioRnd(32), pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
   const pk = cred && cred.response.getPublicKey && cred.response.getPublicKey(); if (!pk) throw new Error('Este aparelho não devolveu a chave de verificação.');
   return { id: b64e(new Uint8Array(cred.rawId)), pk: b64e(new Uint8Array(pk)) };
@@ -58,6 +70,7 @@ function bioDer(sig) { // assinatura ECDSA DER -> r||s (64 bytes)
   const r = rd(), s = rd(), o = new Uint8Array(64); o.set(r); o.set(s, 32); return o;
 }
 async function bioVerify(bio) {
+  if (bio && bio.native) { const N = bioNat(); if (!N) return false; await bioDo(() => N.authenticate({ title: 'Abrir o TiaBete', subtitle: 'Use a digital ou o rosto cadastrados no aparelho', negative: 'Usar PIN' })); return true; }
   const ch = bioRnd(32);
   const a = await navigator.credentials.get({ publicKey: { challenge: ch, allowCredentials: [{ type: 'public-key', id: b64d(bio.id), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } });
   const r = a.response, cd = new Uint8Array(r.clientDataJSON), cj = JSON.parse(new TextDecoder().decode(cd)), ad = new Uint8Array(r.authenticatorData);
@@ -69,8 +82,12 @@ async function bioVerify(bio) {
 async function lkBio(silent) {
   const c = lkCfg(); if (!c || !c.bio || !SEC.locked) return;
   const msg = document.getElementById('lk-msg');
+  if (SEC.bioBusy) return;
   try { if (await bioVerify(c.bio)) { c.fails = 0; c.until = 0; lkSave(c); lkHide(); return; } if (msg && !silent) msg.textContent = 'Não foi possível confirmar. Use o PIN.'; }
-  catch (e) { if (msg && !silent) msg.textContent = 'Biometria cancelada ou indisponível. Use o PIN.'; }
+  catch (e) {
+    const code = e && e.code; if (c.bio && c.bio.native && msg && (code !== 'user_cancel' || !silent)) msg.textContent = (code === 'user_cancel' ? 'Autenticação cancelada. Digite o PIN ou toque em “Usar biometria ou rosto”.' : bioWhy(code) + (code === 'lockout' || code === 'lockout_permanent' || code === 'none_enrolled' || code === 'none_hardware' || code === 'hw_unavailable' ? '' : ' Use o PIN.'));
+    else if (msg && !silent) msg.textContent = 'Biometria cancelada ou indisponível. Use o PIN.';
+  }
 }
 function lkShow(forgot) {
   const c = lkCfg(); if (!c || !document.body) return;
@@ -103,6 +120,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('visibilitychange', () => {
   if (!lkCfg()) return;
+  if (SEC.bioBusy) return;
   if (document.hidden) { SEC.hiddenAt = Date.now(); return; }
   const c = lkCfg(); if (!SEC.locked && SEC.hiddenAt && Date.now() - SEC.hiddenAt >= (c.after || 0) * 1000) lkShow();
 });
@@ -124,7 +142,7 @@ function secCard() {
   if (!secOk()) return `<h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0">Este navegador não oferece criptografia segura (Web Crypto). Use o app em endereço seguro (https).</p></div>`;
   const lk = lkCfg(), f = SEC.form, open = k => f === k;
   const blk = (t, d, btn, k) => `<div style="padding:12px 0;border-top:1px solid var(--line)"><div class="row sp" style="gap:10px;align-items:center"><div style="min-width:0"><b>${t}</b><p class="hint" style="margin:2px 0 0">${d}</p></div>${open(k) ? '' : btn}</div>${open(k) ? `<div style="margin-top:12px">${secForm()}</div>` : ''}</div>`;
-  const bio = lk ? `<div style="padding:12px 0;border-top:1px solid var(--line)"><div class="row sp" style="gap:10px;align-items:center"><div style="min-width:0"><b>Biometria ou rosto</b><p class="hint" style="margin:2px 0 0">${lk.bio ? '✓ Ativa: você pode abrir o app com a biometria do aparelho. O PIN continua valendo.' : SEC.bioAvail ? 'Abre o app com a digital ou o rosto cadastrados no aparelho. O PIN continua como reserva.' : 'Não disponível aqui: o aparelho ou o ambiente (por exemplo, o visualizador) não oferece biometria ao app.'}</p></div>${lk.bio ? '<button class="btn" data-sec="bio-off">Desativar</button>' : SEC.bioAvail ? '<button class="btn" data-sec="bio-on">Ativar</button>' : ''}</div>${SEC.bioMsg ? `<p class="hint" role="alert" style="color:var(--red-t);margin:8px 0 0">${esc(SEC.bioMsg)}</p>` : ''}</div>` : '';
+  const bio = lk ? `<div style="padding:12px 0;border-top:1px solid var(--line)"><div class="row sp" style="gap:10px;align-items:center"><div style="min-width:0"><b>Biometria ou rosto</b><p class="hint" style="margin:2px 0 0">${lk.bio ? '✓ Ativa: você pode abrir o app com a biometria do aparelho. O PIN continua valendo.' : SEC.bioAvail ? 'Abre o app com a digital ou o rosto cadastrados no aparelho. O PIN continua como reserva.' : (bioNat() ? bioWhy(SEC.bioSt && SEC.bioSt.code) : 'Não disponível aqui: o aparelho ou o ambiente (por exemplo, o visualizador) não oferece biometria ao app.')}</p></div>${lk.bio ? '<button class="btn" data-sec="bio-off">Desativar</button>' : SEC.bioAvail ? '<button class="btn" data-sec="bio-on">Ativar</button>' : bioNat() ? '<button class="btn" data-sec="bio-recheck">Verificar de novo</button>' : ''}</div>${!lk.bio && !SEC.bioAvail && bioNat() && SEC.bioSt && SEC.bioSt.code === 'none_enrolled' ? '<button class="btn full" style="margin-top:10px" data-sec="bio-settings">Abrir as configurações de biometria do Android</button>' : ''}${SEC.bioMsg ? `<p class="hint" role="alert" style="color:var(--red-t);margin:8px 0 0">${esc(SEC.bioMsg)}</p>` : ''}</div>` : '';
   const sel = lk ? `<div style="padding:12px 0;border-top:1px solid var(--line)"><label class="fl" for="sec-after">Pedir o PIN ao voltar para o app</label><select id="sec-after" class="in" style="width:100%">${[[0, 'Sempre'], [60, 'Após 1 minuto fora'], [300, 'Após 5 minutos fora']].map(([v, t]) => `<option value="${v}" ${(lk.after || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
   return `<h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0 0 4px">Seus dados de saúde ficam só neste aparelho. Estas opções protegem o <b>arquivo de backup</b>, os backups do <b>Drive</b> e o <b>acesso ao app</b>.</p>
     ${blk('Backup protegido por senha', 'Gera um arquivo .json cifrado (AES-256). Sem a senha ele é ilegível.', '<button class="btn" data-sec="bk">Gerar</button>', 'bk')}
@@ -142,7 +160,9 @@ document.addEventListener('click', async e => {
   if (['bk', 'drv', 'pin', 'pin-off'].includes(a)) { SEC.form = a; SEC.msg = ''; render(); setTimeout(() => { const i = document.getElementById('sec-p1'); if (i) i.focus(); }, 30); }
   else if (a === 'cancel') { SEC.form = null; SEC.msg = ''; render(); }
   else if (a === 'cancel-open') { SEC.pend = null; SEC.msg = ''; render(); }
-  else if (a === 'bio-on') { SEC.bioMsg = ''; try { const bio = await bioEnroll(), c = lkCfg(); if (c) { c.bio = bio; lkSave(c); toast('Biometria ativada.'); } } catch (er) { SEC.bioMsg = er && er.name === 'NotAllowedError' ? 'Cancelado, ou este ambiente não permite biometria. Se estiver no visualizador, abra o app pelo endereço dele.' : (er && er.message && er.message.length < 120 ? er.message : 'Não foi possível ativar a biometria.'); } render(); }
+  else if (a === 'bio-on') { SEC.bioMsg = ''; try { const bio = await bioEnroll(), c = lkCfg(); if (c) { c.bio = bio; lkSave(c); toast('Biometria ativada.'); } } catch (er) { SEC.bioMsg = er && er.bioCode ? er.message : er && er.name === 'NotAllowedError' ? 'Cancelado, ou este ambiente não permite biometria. Se estiver no visualizador, abra o app pelo endereço dele.' : (er && er.message && er.message.length < 120 ? er.message : 'Não foi possível ativar a biometria.'); } render(); }
+  else if (a === 'bio-recheck') { await bioProbe(); render(); }
+  else if (a === 'bio-settings') { try { await bioNat().openSettings(); } catch (er) { SEC.bioMsg = 'Não consegui abrir as configurações. Abra Configurações do Android → Segurança → Biometria.'; render(); } }
   else if (a === 'bio-off') { const c = lkCfg(); if (c) { delete c.bio; lkSave(c); } SEC.bioMsg = ''; render(); toast('Biometria desativada. O PIN continua ativo.'); }
   else if (a === 'drv-off') { try { await Store.del('meta', 'enc-key'); } catch (er) { } SEC.drvOn = false; render(); toast('Cifra do Drive desativada. Os próximos backups serão sem senha.'); }
 });
@@ -165,3 +185,5 @@ document.addEventListener('submit', async e => {
 });
 (async () => { const r = await secDriveRec(); SEC.drvOn = !!r; })();
 bioProbe();
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden && bioNat() && !SEC.bioBusy) bioProbe(); });

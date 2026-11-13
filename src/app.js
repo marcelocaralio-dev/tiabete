@@ -156,7 +156,7 @@ function openSheet(html) {
   document.body.appendChild(bg); document.body.style.overflow = 'hidden';
   const f = bg.querySelector('[autofocus]'); if (f) setTimeout(() => f.focus(), 60);
 }
-function closeSheet() { const b = $('#sheet-bg'); if (b) b.remove(); document.body.style.overflow = ''; }
+function closeSheet() { const b = $('#sheet-bg'); if (b) b.remove(); document.body.style.overflow = (typeof pmOpenNow === 'function' && pmOpenNow()) ? 'hidden' : ''; }
 function relTime(ms) {
   const d = Date.now() - ms, h = d / 3600000;
   if (d < 0) return 'agora';
@@ -180,7 +180,7 @@ const curRange = () => periodRanges(S.period, Date.now());
 
 /* ================= Telas ================= */
 function banners() {
-  if (acBubbleOn() && !S._acCollect) return '';
+  if (typeof acBubbleOn === 'function' && acBubbleOn() && !S._acCollect) return '';
   let h = '';
   if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte um backup antes de sair.</span></div>`;
   h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner() + caBanner();
@@ -245,7 +245,7 @@ function lastExtremes(all) {
   const avg = `<div class="lx"><div class="lx-l" style="color:var(--fg)">● Média 7 dias</div>${w7.n ? `<b class="num">${fn(w7.mean, 0)}<small> mg/dL</small></b><div class="lx-d num">${w7.n} medi${w7.n > 1 ? 'ções' : 'ção'}</div>` : '<div class="lx-d">sem medições</div>'}</div>`;
   return `<div class="lxs">${item('▼ Última baixa (<' + LIM.low + ')', find(r => r.glucose < LIM.low), 'var(--red-t)')}${item('▲ Última alta (>' + LIM.high + ')', find(r => r.glucose > LIM.high), 'var(--warn, var(--red-t))')}${avg}</div>`;
 }
-function viewPainel() {
+function viewPainelClassic() {
   let h = banners() + labelBanner() + pfInvite();
   const all = S.records;
   if (!all.length) {
@@ -870,6 +870,7 @@ function render() {
   pfSync();
   try { acSync(); } catch (e) { }
   attachCharts(view);
+  try { if (S.pm) pmDraw(); } catch (e) { }
   rewardSoon();
   setTimeout(drvAuto, 2500);
   setTimeout(insLink, 50); setTimeout(scrSetup, 30);

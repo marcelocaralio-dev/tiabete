@@ -3,7 +3,7 @@ const fs = require('fs'), path = require('path');
 const f = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 if (!fs.existsSync(f)) { console.error('AndroidManifest.xml não encontrado. Rode "npx cap add android" antes.'); process.exit(1); }
 let x = fs.readFileSync(f, 'utf8');
-const perms = ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM'];
+const perms = ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.USE_BIOMETRIC'];
 for (const p of perms) if (!x.includes(p)) x = x.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
 /* Retorno do login Google (backup no Drive): o app recebe app.tiabete.glicose:/oauth2redirect */
 if (!x.includes('app.tiabete.glicose"')) {
@@ -38,8 +38,8 @@ if (fs.existsSync(g)) {
     if (j.includes('setTextZoom')) return;
     if (!/extends\s+BridgeActivity\s*\{\s*\}/.test(j)) { console.warn('MainActivity.java com formato inesperado; textZoom não aplicado.'); return; }
     const pk = (/package\s+([\w.]+)\s*;/.exec(j) || [])[1];
-    if (pk) writeExpire(path.dirname(f), pk); else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
-    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
+    if (pk) { writeExpire(path.dirname(f), pk); writeBiometric(path.dirname(f), pk); } else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
+    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        registerPlugin(TbBiometricPlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
     fs.writeFileSync(f, j); console.log('textZoom 100% aplicado em', e.name);
   }
 })(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java'));
@@ -126,3 +126,142 @@ public class TbExpirePlugin extends Plugin {
   }
   console.log('Ícone de notificação (gota) instalado em', n, 'densidades.');
 })();
+
+
+/* Biometria nativa: AndroidX Biometric (BiometricPrompt). Digital e rosto pelo sistema; o WebView não oferece WebAuthn. */
+(function bioGradle() {
+  const g = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
+  if (!fs.existsSync(g)) return;
+  let t = fs.readFileSync(g, 'utf8');
+  if (t.includes('androidx.biometric:biometric')) { console.log('Dependência biometric já presente.'); return; }
+  if (!/dependencies\s*\{/.test(t)) { console.warn('Bloco dependencies não achado no build.gradle; biometria nativa sem dependência!'); return; }
+  t = t.replace(/dependencies\s*\{/, 'dependencies {\n    implementation "androidx.biometric:biometric:1.1.0"');
+  fs.writeFileSync(g, t); console.log('Dependência androidx.biometric:biometric:1.1.0 adicionada.');
+})();
+function writeBiometric(dir, pk) {
+  fs.writeFileSync(path.join(dir, 'TbBiometricPlugin.java'), `package ${pk};
+
+import android.app.KeyguardManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.provider.Settings;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+@CapacitorPlugin(name = "TbBiometric")
+public class TbBiometricPlugin extends Plugin {
+    private static final int WEAK = BiometricManager.Authenticators.BIOMETRIC_WEAK;
+    private static final int STRONG = BiometricManager.Authenticators.BIOMETRIC_STRONG;
+    private BiometricPrompt prompt;
+
+    private String codeOf(int r) {
+        switch (r) {
+            case 0: return "ok";
+            case 12: return "none_hardware";
+            case 1: return "hw_unavailable";
+            case 11: return "none_enrolled";
+            case 15: return "security_update";
+            case -2: return "unsupported";
+            default: return "unknown";
+        }
+    }
+
+    @PluginMethod
+    public void status(PluginCall call) {
+        try {
+            Context c = getContext();
+            BiometricManager bm = BiometricManager.from(c);
+            int rw = bm.canAuthenticate(WEAK), rs = bm.canAuthenticate(STRONG);
+            boolean ok = rw == 0 || rs == 0;
+            PackageManager pm = c.getPackageManager();
+            KeyguardManager km = (KeyguardManager) c.getSystemService(Context.KEYGUARD_SERVICE);
+            JSObject o = new JSObject();
+            o.put("available", ok);
+            o.put("strong", rs == 0);
+            o.put("code", ok ? "ok" : codeOf(rw != 0 ? rw : rs));
+            o.put("fingerprint", pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT));
+            o.put("face", pm.hasSystemFeature("android.hardware.biometrics.face"));
+            o.put("iris", pm.hasSystemFeature("android.hardware.biometrics.iris"));
+            o.put("deviceSecure", km != null && km.isDeviceSecure());
+            call.resolve(o);
+        } catch (Exception e) {
+            call.reject("status failed", "unknown");
+        }
+    }
+
+    @PluginMethod
+    public void authenticate(final PluginCall call) {
+        if (getActivity() == null || !(getActivity() instanceof FragmentActivity)) { call.reject("Sem atividade", "unavailable"); return; }
+        final FragmentActivity act = (FragmentActivity) getActivity();
+        final String title = call.getString("title", "TiaBete");
+        final String sub = call.getString("subtitle", "");
+        final String neg = call.getString("negative", "Usar PIN");
+        act.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    BiometricManager bm = BiometricManager.from(act);
+                    int rw = bm.canAuthenticate(WEAK);
+                    if (rw != 0 && bm.canAuthenticate(STRONG) != 0) { call.reject("Biometria indisponível", codeOf(rw)); return; }
+                    BiometricPrompt.PromptInfo.Builder b = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(title).setNegativeButtonText(neg).setAllowedAuthenticators(WEAK).setConfirmationRequired(false);
+                    if (sub != null && sub.length() > 0) b.setSubtitle(sub);
+                    prompt = new BiometricPrompt(act, ContextCompat.getMainExecutor(act), new BiometricPrompt.AuthenticationCallback() {
+                        @Override
+                        public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                            JSObject o = new JSObject(); o.put("ok", true); call.resolve(o);
+                        }
+                        @Override
+                        public void onAuthenticationError(int code, CharSequence msg) {
+                            String k;
+                            switch (code) {
+                                case 10: case 13: case 5: k = "user_cancel"; break;
+                                case 7: k = "lockout"; break;
+                                case 9: k = "lockout_permanent"; break;
+                                case 3: k = "timeout"; break;
+                                case 11: k = "none_enrolled"; break;
+                                case 12: k = "none_hardware"; break;
+                                case 1: k = "hw_unavailable"; break;
+                                default: k = "unavailable";
+                            }
+                            call.reject(String.valueOf(msg), k);
+                        }
+                        @Override
+                        public void onAuthenticationFailed() { /* digital ou rosto não reconhecidos: o Android mantém o diálogo aberto */ }
+                    });
+                    prompt.authenticate(b.build());
+                } catch (Exception e) {
+                    call.reject("Falha ao abrir a biometria", "unavailable");
+                }
+            }
+        });
+    }
+
+    @PluginMethod
+    public void openSettings(PluginCall call) {
+        try {
+            Intent i;
+            if (Build.VERSION.SDK_INT >= 30) { i = new Intent(Settings.ACTION_BIOMETRIC_ENROLL); i.putExtra(Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED, WEAK); }
+            else if (Build.VERSION.SDK_INT >= 28) i = new Intent(Settings.ACTION_FINGERPRINT_ENROLL);
+            else i = new Intent(Settings.ACTION_SECURITY_SETTINGS);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { getContext().startActivity(i); }
+            catch (Exception e) { Intent j = new Intent(Settings.ACTION_SECURITY_SETTINGS); j.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); getContext().startActivity(j); }
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Não foi possível abrir as configurações", "unavailable");
+        }
+    }
+}
+`);
+  console.log('Plugin TbBiometric gravado em', dir);
+}
