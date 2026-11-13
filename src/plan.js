@@ -66,7 +66,7 @@ function plPending() {
   return planAlarms().filter(a => { const [h, mi] = a.time.split(':').map(Number), mm = h * 60 + mi, st = S.planDone.map[a.key]; if (st === 1) return false; if (typeof st === 'number' && st > Date.now()) return false; if (a.sec === 'Medição' && plCheckDone(a.time)) return false; return m >= mm && (a.pump || m < mm + 120); });
 }
 function planBanner() {
-  if (S.route !== 'painel') return ''; const l = plPending(); S._pk = l.map(x => x.key).join(',');
+  if (S.route !== 'painel' && !S._acCollect) return ''; const l = plPending(); S._pk = l.map(x => x.key).join(',');
   return l.slice(0, 3).map(a => `<div class="banner"><span><b>${a.sec === 'Medição' ? 'Medir.' : 'Hora do tratamento.'}</b> ${esc(a.label)} · <span class="num">${a.time}</span></span><span class="row" style="gap:6px;flex-wrap:nowrap">${a.sec === 'Medição' ? `<button class="btn sm pri" data-act="new">Registrar</button>` : ''}<button class="btn sm ${a.sec === 'Medição' ? '' : 'pri'}" data-act="pl-done" data-k="${esc(a.key)}">Feito</button><button class="btn sm" data-act="pl-snooze" data-k="${esc(a.key)}">+10 min</button></span></div>`).join('');
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const k = plPending().map(x => x.key).join(','); if (k !== (S._pk || '')) render(); } }, 30000);

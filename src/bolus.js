@@ -412,6 +412,7 @@ const blDirty = () => { try { return JSON.stringify(S.bl) !== JSON.stringify(blD
 function blMerge(b) {
   if (!b || typeof b !== 'object' || !Array.isArray(b.foods)) return { foods: 0, days: 0 };
   const nm = x => String(x || '').trim().toLowerCase(), map = {}, st = { foods: 0, days: 0 };
+  const D = blDefault(), same = (p, q) => { try { return JSON.stringify(p) === JSON.stringify(q); } catch (e) { return false; } }; /* valor local igual ao padrão do app = ainda não personalizado */
   b.foods.filter(f => f && f.id && typeof f.name === 'string').forEach(f => {
     const same = S.bl.foods.find(x => x.id === f.id && nm(x.name) === nm(f.name)), byName = S.bl.foods.find(x => nm(x.name) === nm(f.name));
     if (same) map[f.id] = same.id; else if (byName) map[f.id] = byName.id;
@@ -419,9 +420,10 @@ function blMerge(b) {
   });
   const rl = m => { const o = {}; BL_MEALS.forEach(x => { if (Array.isArray(m && m[x.id])) o[x.id] = m[x.id].filter(it => it && map[it.f]).map(it => ({ ...it, f: map[it.f] })); }); return o; };
   const empty = m => !m || BL_MEALS.every(x => !(m[x.id] || []).length);
-  if (b.tpl && typeof b.tpl === 'object') ['sem', 'fds'].forEach(k => { if (b.tpl[k] && empty(S.bl.tpl[k])) { const r = rl(b.tpl[k]); S.bl.tpl[k] = { cafe: [], almoco: [], jantar: [], lanche: [], ...r }; } });
+  if (b.tpl && typeof b.tpl === 'object') ['sem', 'fds'].forEach(k => { if (b.tpl[k] && (empty(S.bl.tpl[k]) || same(S.bl.tpl[k], D.tpl[k]))) { const r = rl(b.tpl[k]); S.bl.tpl[k] = { cafe: [], almoco: [], jantar: [], lanche: [], ...r }; } });
   if (b.days && typeof b.days === 'object') Object.keys(b.days).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d) && !S.bl.days[d] && b.days[d] && typeof b.days[d] === 'object') { S.bl.days[d] = { cafe: [], almoco: [], jantar: [], lanche: [], ...rl(b.days[d]) }; st.days++; } });
-  if (!(S.bl.ratio >= 1) && b.ratio >= 1 && b.ratio <= 200) { S.bl.ratio = b.ratio; if (b.bolusOn && typeof b.bolusOn === 'object') S.bl.bolusOn = { ...S.bl.bolusOn, ...b.bolusOn }; }
+  if ((!(S.bl.ratio >= 1) || S.bl.ratio === D.ratio) && b.ratio >= 1 && b.ratio <= 200) S.bl.ratio = b.ratio;
+  if (b.bolusOn && typeof b.bolusOn === 'object' && same(S.bl.bolusOn, D.bolusOn)) S.bl.bolusOn = { ...S.bl.bolusOn, ...b.bolusOn };
   const rr = blCleanRatios(b.ratios); S.bl.ratios = S.bl.ratios || {}; Object.keys(rr).forEach(k => { if (!(S.bl.ratios[k] >= 1)) S.bl.ratios[k] = rr[k]; });
   const hk = new Set((S.bl.rhist || []).map(x => x.ts + '|' + x.p)); S.bl.rhist = (S.bl.rhist || []).concat(blCleanRhist(b.rhist).filter(x => !hk.has(x.ts + '|' + x.p))).sort((x, y) => x.ts - y.ts).slice(-60);
   const hm = new Set(blMeals().map(m => m.id)); S.bl.meals = blMeals().concat(blCleanMeals(b.meals).filter(m => !hm.has(m.id)));

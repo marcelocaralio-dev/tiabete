@@ -248,23 +248,32 @@ function remPending() {
 }
 function remBanner() {
   if (!alCfg().bMiss) return '';
-  if (S.route !== 'painel') return ''; const r = remPending(); S._rk = r ? r.key : '';
+  if (S.route !== 'painel' && !S._acCollect) return ''; const r = remPending(); S._rk = r ? r.key : '';
   return r ? `<div class="banner"><span><b>Medição.</b> Ainda sem glicemia ${r.t} hoje (janela ${hhmm(r.a)}–${hhmm(r.b)}).</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="new" data-ctx="${r.ctx}" data-meal="${r.meal}">Registrar</button><button class="btn sm" data-act="rem-off" data-k="${r.key}">Dispensar</button></span></div>` : '';
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const r = remPending(), k = r ? r.key : ''; if (k !== (S._rk || '')) render(); } }, 5000);
 document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el) return; S.remOff[el.dataset.k] = 1; render(); });
 S.ud = {};
-const udOk = k => { const u = parseUnits(S.ud[k] || ''); return typeof u === 'number' && u > 0; };
-const draftUnits = k => `<div class="un-row"><label for="ud-${k}">Unidades a tomar</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(S.ud[k] || '')}" aria-label="Unidades a tomar"><b>Ui</b></span></div><div class="dim" id="udh-${k}" style="font-size:13.5px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>`;
+/* doses memorizadas: última quantidade registrada de cada insulina, independente; só muda quando uma aplicação é registrada */
+const fnU = u => u == null ? '' : String(u).replace('.', ',');
+const lastUnits = k => { const l = [...S.inslog].reverse().find(x => x.kind === k && x.units != null); return l ? l.units : null; };
+const memU = k => S.ud[k] !== undefined ? S.ud[k] : fnU(S.ins.lastU && S.ins.lastU[k] != null ? S.ins.lastU[k] : lastUnits(k));
+const memNum = k => { const u = parseUnits(memU(k)); return typeof u === 'number' ? u : null; };
+function memSet(k, u) { if (typeof u !== 'number' || !(u > 0)) return; S.ins.lastU = S.ins.lastU || {}; S.ins.lastU[k] = u; S.ud[k] = fnU(u); }
+let insBusy = false;
+const udOk = k => { const u = parseUnits(memU(k)); return typeof u === 'number' && u > 0; };
+const draftUnits = (k, req = true) => `<div class="un-row"><label for="ud-${k}">Unidades</label><span class="un-f"><input class="in un-in un-draft" id="ud-${k}" data-k="${k}" inputmode="decimal" autocomplete="off" placeholder="ex.: 8" value="${esc(memU(k))}" aria-label="Unidades de ${k === 'basal' ? 'basal' : 'insulina rápida'}"><b>Ui</b></span></div>${req ? `<div class="dim" id="udh-${k}" style="font-size:13.5px;margin-top:4px${udOk(k) ? ';display:none' : ''}">Informe as unidades (Ui) para liberar a chave.</div>` : ''}`;
 document.addEventListener('input', e => {
   const el = e.target.closest && e.target.closest('input.un-draft'); if (!el) return;
   const k = el.dataset.k; S.ud[k] = el.value; const ok = udOk(k), b = document.querySelector('.tgl[data-k="' + k + '"]'), h = document.getElementById('udh-' + k);
   if (h) h.style.display = ok ? 'none' : '';
   if (b && !b.dataset.lk) { b.disabled = !ok; b.setAttribute('aria-disabled', String(!ok)); b.style.opacity = ok ? '' : '.35'; }
+  const nb = document.querySelector('[data-act="ins-now"][data-k="' + k + '"]'); if (nb) { nb.disabled = !ok; nb.setAttribute('aria-disabled', String(!ok)); }
 });
 function swRow(k, title, sub, extra = '') {
   const on = S.ins[k], lk = isLocked(k), sk = skipped(k) && !on;
-  return `<div class="sw-row"><div style="min-width:0"><b>${title}</b><div class="dim" style="font-size:14px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${on ? unitsInline(k) : (lk || sk ? '' : draftUnits(k))}${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Tomei em outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
+  const nowBtn = on ? `<button class="btn ins-act" disabled aria-label="${title}: dose já registrada">✓ Registrada</button>` : `<button class="btn pri ins-act" data-act="ins-now" data-k="${k}" ${udOk(k) ? '' : 'disabled aria-disabled="true"'}>Tomei agora</button>`;
+  return `<div class="sw-row"><div style="min-width:0;flex:1"><b>${title}</b><div class="dim" style="font-size:14px;margin-top:2px;overflow-wrap:anywhere">${on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}${on && unitsEntry(k) && unitsEntry(k).units != null ? ' · ' + fU(unitsEntry(k).units) : ''}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada'}${sub ? ' · ' + sub : ''}</div>${sk ? `<button class="btn sm" style="margin-top:8px" data-act="ins-skip" data-k="${k}">Desfazer</button>` : lk ? '' : `${draftUnits(k)}<div class="ins-line" style="margin-top:8px">${nowBtn}</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`}${extra}</div><button class="tgl" role="switch" ${lk || sk ? 'data-lk="1" ' : ''}${lk || sk || (!on && !udOk(k)) ? 'disabled aria-disabled="true" style="opacity:.35" ' : ''}aria-checked="${!!on}" aria-label="${title}: ${on ? 'tomada' : 'não tomada'}" data-act="ins-tgl" data-k="${k}"><i>${on ? '✓' : ''}</i></button></div>`;
 }
 function insCard() {
   insRoll();
@@ -279,9 +288,10 @@ function insCard() {
       <div class="dim" style="font-size:14px;margin-top:6px">Última basal: <b class="num">${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}</b> · próxima: <b class="num">${new Date(S.ins.basalTs + H24).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã'} ${HM(S.ins.basalTs + H24)}</b></div>${b.st !== 'ok' ? `<div style="margin-top:8px"><span class="badge high">${b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora'}</span></div>` : ''}`;
   const skB = skipped('basal'), pend = ['fast', 'lunch', 'dinner'].filter(k => !S.ins[k]), allSk = skB && pend.every(skipped);
   const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:14px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
-  return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="eyebrow">Basal · lembrete de 24 h</div><div style="margin-top:10px">${basalShow}</div>${b && !skB ? unitsInline('basal') : ''}
-    <div class="stack" style="margin-top:14px;gap:10px"><button class="btn ${b && b.st === 'ok' ? '' : 'pri'} full" data-act="ins-basal">Tomei a basal agora</button><div class="row"><button class="btn grow" data-act="ins-basal-at">Outro horário</button><button class="btn grow" data-act="ins-skip" data-k="basal">${skB ? 'Desfazer pulo' : 'Pular hoje'}</button></div>${b ? '<button class="btn full" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div></div>
-  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:6px 0 4px">As chaves ficam desligadas e só liberam depois que você informa as unidades (Ui). Ligue cada uma ao tomar a dose; elas voltam a desligar sozinhas a cada novo dia.</p>
+  return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="eyebrow">Basal · lembrete de 24 h</div><div style="margin-top:8px">${basalShow}</div>
+    ${skB ? '' : `<div class="ins-line">${draftUnits('basal', false)}<button class="btn ${b && b.st === 'ok' ? '' : 'pri'} ins-act" data-act="ins-basal">Tomei a basal agora</button></div>`}
+    <div class="ins-sec"><button class="btn sm" data-act="ins-basal-at">Outro horário</button><button class="btn sm" data-act="ins-skip" data-k="basal">${skB ? 'Desfazer pulo' : 'Pular hoje'}</button>${b ? '<button class="btn sm" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div></div>
+  <div class="card" style="margin-top:12px"><div class="eyebrow">Insulina rápida · hoje</div><p class="hint" style="margin:4px 0 2px">Unidades memorizadas da última dose; edite quando precisar. A chave fica verde ao registrar e desliga sozinha a cada dia.</p>
     ${swRow('fast', 'Jejum', '')}${swRow('lunch', 'Pré-prandial do almoço', '')}${swRow('dinner', 'Pré-prandial do jantar', '', dn)}
     <button class="btn full" style="margin-top:12px" data-act="go" data-r="insulinas">Ver histórico de insulinas</button>
     <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>${extraInsCard()}`;
@@ -301,11 +311,18 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="ins-"]'); if (!el) return;
   const act = el.dataset.act;
   try {
-    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const inp = document.getElementById('ud-' + k), u = parseUnits(inp ? inp.value : (S.ud[k] || '')); if (typeof u !== 'number' || !(u > 0)) { toast('Informe as unidades (Ui) antes de marcar.'); return; } const r = await logAdd(k, Date.now(), u); S.ins[k] = r.ts; S.ud[k] = ''; } await insSave(); render(); }
+    if (act === 'ins-tgl') { insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } setSkip(k, false); if (S.ins[k]) { await logDayClear(k); S.ins[k] = null; } else { const inp = document.getElementById('ud-' + k), u = parseUnits(inp ? inp.value : (S.ud[k] || '')); if (typeof u !== 'number' || !(u > 0)) { toast('Informe as unidades (Ui) antes de marcar.'); return; } if (insBusy) return; insBusy = true; try { const r = await logAdd(k, Date.now(), u); S.ins[k] = r.ts; memSet(k, u); } finally { insBusy = false; } } await insSave(); render(); }
+    else if (act === 'ins-now') {
+      insRoll(); const k = el.dataset.k; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } if (S.ins[k] || insBusy) return;
+      const inp = document.getElementById('ud-' + k), u = parseUnits(inp ? inp.value : memU(k)); if (typeof u !== 'number' || !(u > 0)) { toast('Informe as unidades (Ui) antes de registrar.'); return; }
+      insBusy = true; try { const r = await logAdd(k, Date.now(), u); S.ins[k] = r.ts; setSkip(k, false); memSet(k, u); await insSave(); } finally { insBusy = false; }
+      render(); toast(INS_KIND[k] + ' registrada às ' + HM(S.ins[k]) + ' · ' + fU(u) + '.');
+    }
     else if (act === 'ins-basal') {
-      const b = basalInfo();
-      if (b && b.st === 'ok' && Date.now() - basalConfirm > 5000) { basalConfirm = Date.now(); el.textContent = 'Toque de novo para confirmar nova dose'; el.classList.add('pri'); setTimeout(() => { basalConfirm = 0; if (el.isConnected) render(); }, 5000); return; }
-      { const r = await logAdd('basal', Date.now()); S.ins.basalTs = r.ts; setSkip('basal', false); } basalConfirm = 0; await insSave(); render(); toast('Basal registrada às ' + HM(S.ins.basalTs) + '. Contagem de 24 h iniciada.');
+      if (insBusy) return; const b = basalInfo(), inp = document.getElementById('ud-basal'), u = parseUnits(inp ? inp.value : memU('basal'));
+      if (u === 'bad') { toast('Unidades: informe um número entre 0,5 e 300.'); return; }
+      if (b && b.st === 'ok' && Date.now() - basalConfirm > 5000) { basalConfirm = Date.now(); el.textContent = 'Confirmar nova dose'; el.classList.add('pri'); setTimeout(() => { basalConfirm = 0; if (el.isConnected) render(); }, 5000); return; }
+      insBusy = true; try { const r = await logAdd('basal', Date.now(), u == null ? undefined : u); S.ins.basalTs = r.ts; setSkip('basal', false); memSet('basal', u); } finally { insBusy = false; } basalConfirm = 0; await insSave(); render(); toast('Basal registrada às ' + HM(S.ins.basalTs) + (typeof u === 'number' ? ' · ' + fU(u) : '') + '. Contagem de 24 h iniciada.');
     }
     else if (act === 'ins-basal-at') {
       const cur = S.ins.basalTs, d = isoDate(new Date(cur || Date.now())), t = HM(cur || Date.now());
@@ -313,9 +330,9 @@ document.addEventListener('click', async e => {
         ${cur ? `<div class="field full"><label class="fl" for="ia-m">O que fazer</label><select class="in" id="ia-m"><option value="fix">Corrigir a dose em contagem</option><option value="new">Registrar uma nova dose</option></select></div>` : ''}
         <div class="field"><label class="fl" for="ia-d">Data</label><input class="in" type="date" id="ia-d" value="${d}" max="${isoDate(new Date())}"></div>
         <div class="field"><label class="fl" for="ia-t">Tomada às</label><input class="in" type="time" id="ia-t" value="${t}"></div>
-        ${unitsField('ia-u', (unitsEntry('basal') || {}).units)}</div><p class="err" id="ia-err" role="alert"></p><div class="row" style="margin-top:10px"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div></form>`);
+        ${unitsField('ia-u', (unitsEntry('basal') || {}).units != null ? unitsEntry('basal').units : memNum('basal'))}</div><p class="err" id="ia-err" role="alert"></p><div class="row" style="margin-top:10px"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div></form>`);
     }
-    else if (act === 'ins-time') { insRoll(); const k = el.dataset.k, cur = S.ins[k]; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } openSheet(`<h2>Horário · ${esc(el.dataset.t)}</h2><p class="hint" style="margin:0 0 12px">Informe a hora em que você tomou a insulina rápida hoje.</p><form id="ins-time-form" data-k="${k}" novalidate><div class="form-grid"><div class="field"><label class="fl" for="it-t">Tomada às</label><input class="in" type="time" id="it-t" value="${cur ? HM(cur) : nowHM()}"></div>${unitsField('it-u', (unitsEntry(k) || {}).units)}</div><p class="err" id="it-err" role="alert"></p><div class="row"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div>${cur ? `<button class="btn danger full" type="button" style="margin-top:10px" data-act="ins-time-off" data-k="${k}">Desmarcar (não tomei)</button>` : ''}</form>`); }
+    else if (act === 'ins-time') { insRoll(); const k = el.dataset.k, cur = S.ins[k]; if (isLocked(k)) { toast('Bloqueada: só libera com glicemia pré-jantar de ' + S.ins.dinnerMin + ' ou mais.'); return; } openSheet(`<h2>Horário · ${esc(el.dataset.t)}</h2><p class="hint" style="margin:0 0 12px">Informe a hora em que você tomou a insulina rápida hoje.</p><form id="ins-time-form" data-k="${k}" novalidate><div class="form-grid"><div class="field"><label class="fl" for="it-t">Tomada às</label><input class="in" type="time" id="it-t" value="${cur ? HM(cur) : nowHM()}"></div>${unitsField('it-u', (unitsEntry(k) || {}).units != null ? unitsEntry(k).units : memNum(k))}</div><p class="err" id="it-err" role="alert"></p><div class="row"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div>${cur ? `<button class="btn danger full" type="button" style="margin-top:10px" data-act="ins-time-off" data-k="${k}">Desmarcar (não tomei)</button>` : ''}</form>`); }
     else if (act === 'ins-time-off') { await logDayClear(el.dataset.k); S.ins[el.dataset.k] = null; await insSave(); closeSheet(); render(); }
     else if (act === 'ins-basal-stop') { S.ins.basalTs = null; await insSave(); render(); toast('Lembrete da basal desligado.'); }
     else if (act === 'ins-skip') { insRoll(); const k = el.dataset.k; setSkip(k, !skipped(k)); await insSave(); render(); }
@@ -338,12 +355,13 @@ document.addEventListener('submit', async e => {
     const mode = $('#ia-m') ? $('#ia-m').value : 'new', en = unitsEntry('basal');
     if (mode === 'fix' && en) { const nb = { ...en, ts, date: isoDate(new Date(ts)) }; if (un != null) nb.units = un; else delete nb.units; await logPut(nb); S.ins.basalTs = ts; }
     else { await logAdd('basal', ts, un); if (!S.ins.basalTs || ts >= S.ins.basalTs) S.ins.basalTs = ts; }
+    memSet('basal', typeof un === 'number' ? un : null);
     setSkip('basal', false); await insSave(); closeSheet(); render(); toast('Basal registrada: ' + fmtDate(isoDate(new Date(ts))).slice(0, 5) + ' às ' + HM(ts) + '.');
   } else if (e.target.id === 'ins-time-form') {
     e.preventDefault(); const t = parseTime($('#it-t').value); if (!t) { $('#it-err').textContent = 'Informe um horário válido.'; return; }
     const un = parseUnits($('#it-u').value); if (un === 'bad') { $('#it-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
     const ts = mkTs(isoDate(new Date()), t); if (ts > Date.now() + 60000) { $('#it-err').textContent = 'Esse horário ainda não chegou hoje.'; return; }
-    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } await logDayClear(kk); await logAdd(kk, ts, u2); S.ins[kk] = ts; setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
+    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } await logDayClear(kk); await logAdd(kk, ts, u2); S.ins[kk] = ts; memSet(kk, u2); setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
   } else if (e.target.id === 'ins-log-form') {
     e.preventDefault(); const id = e.target.dataset.id, old = id ? S.inslog.find(x => x.id === id) : null;
     const kind = old ? old.kind : $('#il-k').value, d = $('#il-d').value, t = parseTime($('#il-t').value);
@@ -499,9 +517,11 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('h2.acc-h')) { e.preventDefault(); e.target.click(); } });
 
 
+/* campo de unidades do card: só valida; não altera registros anteriores */
+document.addEventListener('change', e => { const el = e.target.closest && e.target.closest('input.un-draft'); if (!el) return; const u = parseUnits(el.value); if (u === 'bad') { toast('Unidades: número entre 0,5 e 300.'); S.ud[el.dataset.k] = undefined; delete S.ud[el.dataset.k]; el.value = memU(el.dataset.k); } });
 /* unidades: salva ao sair do campo */
 document.addEventListener('change', async e => {
-  const el = e.target.closest && e.target.closest('input.un-in'); if (!el) return;
+  const el = e.target.closest && e.target.closest('input.un-in:not(.un-draft)'); if (!el) return;
   const k = el.dataset.k, u = parseUnits(el.value), en = unitsEntry(k);
   if (u === 'bad') { toast('Unidades: número entre 0,5 e 300.'); const o = en && en.units != null ? String(en.units).replace('.', ',') : ''; el.value = o; return; }
   if (!en) return;
@@ -509,7 +529,7 @@ document.addEventListener('change', async e => {
   await logPut(nb); el.value = u != null ? String(u).replace('.', ',') : ''; toast(u != null ? 'Unidades salvas: ' + fU(u) + '.' : 'Unidades removidas.'); insLink();
 });
 
-document.addEventListener('change', e => { if (e.target.id !== 'ia-m') return; const n = e.target.value === 'new', now = Date.now(), c = S.ins.basalTs || now; $('#ia-d').value = isoDate(new Date(n ? now : c)); $('#ia-t').value = HM(n ? now : c); const en = unitsEntry('basal'); $('#ia-u').value = n || !en || en.units == null ? '' : String(en.units).replace('.', ','); });
+document.addEventListener('change', e => { if (e.target.id !== 'ia-m') return; const n = e.target.value === 'new', now = Date.now(), c = S.ins.basalTs || now; $('#ia-d').value = isoDate(new Date(n ? now : c)); $('#ia-t').value = HM(n ? now : c); const en = unitsEntry('basal'); $('#ia-u').value = n ? fnU(memNum('basal')) : (!en || en.units == null ? '' : String(en.units).replace('.', ',')); });
 
 
 /* ---------- Alerta e protocolo de hipoglicemia (< 70 mg/dL) ---------- */
@@ -745,13 +765,16 @@ async function applyBackupState(st, replace) {
   if (!st) return;
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
   try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
+  try { if (st.alertCenter && typeof st.alertCenter === 'object' && (replace || !S.ac.items.length)) { const have = new Set(S.ac.items.map(x => x.id)); const inc = (Array.isArray(st.alertCenter.items) ? st.alertCenter.items : []).filter(x => x && x.id && x.key && !have.has(x.id)); S.ac.items = replace ? inc : S.ac.items.concat(inc); S.ac.items = S.ac.items.slice(0, AC_MAX); acSave(); } } catch (e) { }
   try { if (st.customAlerts && typeof st.customAlerts === 'object' && (replace || !S.ca.rules.length)) { caLoad(st.customAlerts); S.ca.seeded = true; await caSave(); caSync(); } } catch (e) { }
   try { if (st.alerts && (replace || JSON.stringify(alCfg()) === JSON.stringify(AL_DEF))) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
   try { if (st.bolus && typeof st.bolus === 'object') { if (replace) blLoad(st.bolus); else blMerge(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { console.error(e); }
   try {
     const i = st.insulin;
     if (i && typeof i === 'object') {
-      const clean = { basalTs: typeof i.basalTs === 'number' ? i.basalTs : null, day: typeof i.day === 'string' ? i.day : '', fast: i.fast || null, lunch: i.lunch || null, dinner: i.dinner || null, dinnerMin: i.dinnerMin >= 100 && i.dinnerMin <= 400 ? i.dinnerMin : 140, skip: i.skip && typeof i.skip === 'object' ? i.skip : {} };
+      const lu = {}; if (i.lastU && typeof i.lastU === 'object') ['basal', 'fast', 'lunch', 'dinner'].forEach(k => { const u = +i.lastU[k]; if (isFinite(u) && u > 0 && u <= 300) lu[k] = u; });
+      const clean = { lastU: lu, basalTs: typeof i.basalTs === 'number' ? i.basalTs : null, day: typeof i.day === 'string' ? i.day : '', fast: i.fast || null, lunch: i.lunch || null, dinner: i.dinner || null, dinnerMin: i.dinnerMin >= 100 && i.dinnerMin <= 400 ? i.dinnerMin : 140, skip: i.skip && typeof i.skip === 'object' ? i.skip : {} };
+      { const cur = S.ins.lastU || {}; const mg = replace ? { ...clean.lastU } : { ...clean.lastU, ...cur }; S.ins.lastU = mg; insLoaded = true; await insSave(); }
       if (replace || (clean.basalTs && clean.basalTs > (S.ins.basalTs || 0))) { S.ins = replace ? clean : { ...S.ins, basalTs: clean.basalTs }; if (replace || clean.day === isoDate(new Date())) { if (clean.day === isoDate(new Date())) { S.ins.day = clean.day; S.ins.fast = clean.fast; S.ins.lunch = clean.lunch; S.ins.dinner = clean.dinner; S.ins.skip = clean.skip; } } insLoaded = true; insSync(); await insSave(); }
     }
     const r = st.rewards;
@@ -858,7 +881,7 @@ document.addEventListener('change', async e => {
 });
 function viewLembretes() {
   const sv = S.icsPref || {};
-  return banners() + alertsPanel() + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário: abra o arquivo no celular e o seu calendário cria alarmes que se repetem todo dia. Escolha os horários.</p>
+  return banners() + acModeCard() + alertsPanel() + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário: abra o arquivo no celular e o seu calendário cria alarmes que se repetem todo dia. Escolha os horários.</p>
   <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row-reverse;justify-content:space-between;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on swt" role="switch" data-k="${x.k}" ${on ? 'checked' : ''}><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
   <div class="field" style="margin-top:14px"><label class="fl" for="ics-adv">Avisar com antecedência</label><select class="in" id="ics-adv"><option value="0">Na hora</option><option value="5">5 minutos antes</option><option value="10">10 minutos antes</option><option value="15">15 minutos antes</option></select></div></div>
   <button class="btn pri full" style="margin-top:12px" data-act="ics-make">Gerar arquivo de calendário</button>
@@ -1245,10 +1268,7 @@ function viewPerfil() {
   <h2 class="sec">Preferências</h2><div class="stack">${mi2('aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela')}${mi2('alertasp', 'Alertas personalizados', 'Avisos ligados a marcações como Dia de perna e à glicemia')}${mi2('lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário e silêncio noturno')}${mi2('config', 'Configurações', 'Meta de HbA1c, faixas e demais ajustes')}${VIEWS.ia ? mi2('ia', 'Inteligência artificial', 'Provedor e chave de IA') : ''}</div>
   <h2 class="sec">Dados da conta</h2><div class="card">${pfKv('Perfil criado em', has ? fmtDate(isoDate(new Date(p.createdAt))) : 'ainda não criado')}${has ? pfKv('Identificador', esc(String(p.id).slice(0, 8))) : ''}${pfKv('Plataforma', IS_NATIVE ? 'Aplicativo Android' : 'Versão web')}${gp && gp.email ? pfKv('Conta Google', esc(gp.email)) : ''}${pfKv('IA', aiTx)}${pfKv('Medições de glicemia', n.med)}${pfKv('Resultados de HbA1c', n.hba)}${pfKv('Exames', n.ex)}${pfKv('Registros de insulina', n.ins)}${pfKv('Lembretes do tratamento', n.pl)}${pfKv('Alimentos cadastrados', n.fd)}${pfKv('Refeições salvas e feitas', n.sv + n.rm)}${pfKv('Registros da razão', n.rl)}
     <p class="hint" style="margin:10px 0 0">Tudo o que você registra neste aparelho (medições, exames, tratamento, alimentos, bolus, IA, notificações e preferências) pertence a este perfil, é guardado no banco local e vai junto no backup. As atualizações do app não apagam esses dados.</p></div>
-  <h2 class="sec">Privacidade e segurança</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no TiaBete nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (o seu backup, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} O app não tem senha própria: use o bloqueio de tela do aparelho.</p>
-    <p class="hint" style="margin:0 0 10px">Armazenamento persistente: <b>${S.persisted ? 'ativo' : 'não confirmado'}</b>. Ele reduz o risco de o navegador apagar os dados por falta de espaço.</p>
-    <div class="stack"><button class="btn full" data-act="pf-persist">Pedir armazenamento persistente</button>${has ? '<button class="btn full" data-act="pf-clear">Apagar meu perfil (nome e foto) deste aparelho</button>' : ''}</div>
-    <p class="hint" style="margin:10px 0 0">Apagar o perfil não apaga medições nem outros registros. Para apagar tudo, use Backup e dados → Apagar dados.</p></div>
+  <h2 class="sec">Privacidade e segurança</h2><div class="card"><p class="hint" style="margin:0 0 10px">Bloqueio por PIN, biometria, armazenamento persistente e apagar o perfil estão em Segurança e privacidade.</p><div class="stack"><button class="btn full" data-act="go" data-r="seguranca">Bloqueio e proteção</button><button class="btn full" data-act="go" data-r="privacidade">Privacidade e armazenamento</button></div></div>
   <h2 class="sec">Dados e backups</h2><div class="card">${pfKv('Último backup (arquivo)', S.lastBackup ? new Date(S.lastBackup).toLocaleDateString('pt-BR') : 'nenhum ainda')}${pfKv('Último backup no Drive', drvTx)}${pfKv('Backup programado', S.drv.auto ? 'ligado' : 'desligado')}
     <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="go" data-r="backup">Backup, restauração e Google Drive</button></div></div>`;
 }
@@ -1350,3 +1370,13 @@ document.addEventListener('click', async e => {
   else if (a === 'sh-native') { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share; if (IS_NATIVE && P) await P.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText(), dialogTitle: 'Enviar resumo' }); else await navigator.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText() }); } catch (err) { } }
   else if (a === 'sh-copy') { const t = shareText(); try { await navigator.clipboard.writeText(t); toast('Texto copiado.'); } catch (err) { const ta = $('#sh-text'); if (ta) { ta.focus(); ta.select(); } toast('Selecione o texto e copie.'); } }
 });
+
+/* ---- Segurança e privacidade (movidos do Backup e do Perfil; mesmas funções) ---- */
+function viewSeguranca() { return banners() + secCard(); }
+function viewPrivacidade() {
+  const has = !!S.profile;
+  return banners() + `<h2 class="sec">Privacidade e armazenamento</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no TiaBete nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (o seu backup, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} Para proteger o acesso, use o bloqueio por PIN (Bloqueio e proteção) ou o bloqueio de tela do aparelho.</p>
+    <p class="hint" style="margin:0 0 10px">Armazenamento persistente: <b>${S.persisted ? 'ativo' : 'não confirmado'}</b>. Ele reduz o risco de o navegador apagar os dados por falta de espaço.</p>
+    <div class="stack"><button class="btn full" data-act="pf-persist">Pedir armazenamento persistente</button>${has ? '<button class="btn full" data-act="pf-clear">Apagar meu perfil (nome e foto) deste aparelho</button>' : ''}</div>
+    <p class="hint" style="margin:10px 0 0">Apagar o perfil não apaga medições nem outros registros. Para apagar tudo, use Backup e dados → Apagar dados.</p></div>`;
+}

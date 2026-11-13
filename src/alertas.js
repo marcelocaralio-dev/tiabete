@@ -27,7 +27,7 @@ async function caTick() {
 setInterval(caTick, 30000);
 (function () { const _l = loadAll; loadAll = async function () { const r = await _l.apply(this, arguments); caSync(); caTick(); return r; }; })();
 function caBanner() {
-  if (S.route !== 'painel') return '';
+  if (S.route !== 'painel' && !S._acCollect) return '';
   return caDue().slice(0, 2).map(x => `<div class="banner"><span><b>${esc(x.name)}.</b> ${esc(x.body)}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="go" data-r="alertasp">Ver</button><button class="btn sm pri" data-act="ca-ok" data-key="${esc(x.key)}">Entendi</button></span></div>`).join('');
 }
 /* ----- texto das regras ----- */
