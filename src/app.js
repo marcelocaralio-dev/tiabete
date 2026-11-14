@@ -727,6 +727,7 @@ function viewBackup() {
   if (S.rest) {
     const x = S.rest;
     h += `<div style="margin-top:14px"><div class="eyebrow">Arquivo lido</div><p style="margin:6px 0 4px" class="num">${x.records.length} medições · ${x.hba.length} HbA1c · ${x.schemes.length} esquemas</p><p class="hint" style="margin:0 0 12px">Exportado em ${esc(x.exportedAt ? new Date(x.exportedAt).toLocaleString('pt-BR') : 'data desconhecida')}.</p>
+      ${(() => { const b = x.state && x.state.bolus; return `<p class="hint" style="margin:0 0 12px">${b && Array.isArray(b.foods) ? `<b>Cálculo de bolus incluído:</b> ${b.foods.length} alimento${b.foods.length === 1 ? '' : 's'}${b.meals && b.meals.length ? ' · ' + b.meals.length + ' refeição(ões) registrada(s)' : ''}${b.days && Object.keys(b.days).length ? ' · ' + Object.keys(b.days).length + ' dia(s)' : ''}${b.ratio ? ' · razão 1:' + b.ratio : ''}.` : '<b>Este arquivo não traz dados do Cálculo de bolus.</b> Ele foi gerado antes de haver dados nessa página, ou sem eles.'}</p>`; })()}
       <div class="stack"><button class="btn pri full" data-act="rest-merge">Mesclar com meus dados (sem duplicar)</button>
       <button class="btn danger full" data-act="rest-replace-ask">Substituir tudo por este backup</button></div></div>`;
   }
@@ -1043,5 +1044,5 @@ async function restoreBackup(replace) {
     if (fix.length) await Store.putMany('inslog', fix); }
   if (replace && x.settings && x.settings.a1cTarget >= 4 && x.settings.a1cTarget <= 12) { S.a1cT = x.settings.a1cTarget; await Store.put('meta', { id: 'a1c-target', value: S.a1cT }); }
   await applyBackupState(x.state, replace);
-  S.rest = null; await loadAll(); render(); toast(`Restaurado: ${added} medições novas, ${dup} já existiam` + (addE.length ? `, ${addE.length} exame(s).` : '.'));
+  S.rest = null; await loadAll(); render(); toast(`Restaurado: ${added} medições novas, ${dup} já existiam` + (addE.length ? `, ${addE.length} exame(s)` : '') + (S._blRes ? `. Bolus: ${S._blRes.foods + S._blRes.upd} alimento(s), ${S._blRes.tpl} modelo(s), ${S._blRes.meals} refeição(ões)` : (x.state && x.state.bolus && replace ? '. Bolus restaurado' : '')) + '.');
 }

@@ -1045,3 +1045,7 @@ body.acb-drag { overscroll-behavior: none; }
 .pn-c.st-ok::after { content: "✓"; color: var(--good-fill); }
 .pn-c.st-bad::after { content: "▲"; color: var(--red-t); }
 .pn-c.st-ok:hover { border-color: var(--good-fill); } .pn-c.st-bad:hover { border-color: var(--red); }
+.pn-clk { display: inline-flex; align-items: baseline; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pn-clk .pn-s { font-family: var(--f-display); font-weight: 600; font-size: .5em; letter-spacing: -.02em; color: var(--mut); margin-left: 1px; }
+.pn-clk.over { color: var(--red-l); }
+.pn-clk.over .pn-s { color: var(--red-l); }

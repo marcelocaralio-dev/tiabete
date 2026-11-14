@@ -39,6 +39,18 @@ function pnData() {
 const pnDayLab = (iso, isToday) => isToday ? 'Hoje' : iso === isoDate(new Date(addDays(Date.now(), -1))) ? 'Ontem' : fmtDate(iso);
 
 /* ---------- Tratamento (resumo) ---------- */
+/* relógio igual ao do card de Insulinas: horas e minutos grandes, segundos menores */
+function pnClock(b) {
+  const t = hms(b.rem), over = b.st === 'over';
+  return `<span class="pn-clk${over ? ' over' : ''}" data-st="${b.st}"><span class="pn-hm">${over ? '+' : ''}${t.slice(0, -3)}</span><small class="pn-s">${t.slice(-3)}</small></span>`;
+}
+setInterval(() => {
+  const el = document.querySelector('.pn-clk'); if (!el || typeof insLoaded === 'undefined' || !insLoaded) return;
+  const b = basalInfo(); if (!b) { render(); return; }
+  if (b.st !== el.dataset.st) { render(); return; }
+  const t = hms(b.rem), hm = el.querySelector('.pn-hm'), sec = el.querySelector('.pn-s');
+  if (hm) hm.textContent = (b.st === 'over' ? '+' : '') + t.slice(0, -3); if (sec) sec.textContent = t.slice(-3);
+}, 500);
 function pnTrat() {
   const p = S.plan, on = k => p.types.includes(k), lines = []; let big = '—', unit = '', st = null;
   if (!p.types.length) return { big, unit, sub: 'Escolha como você trata o diabetes.' };
@@ -46,7 +58,7 @@ function pnTrat() {
     try { insRoll(); } catch (e) { }
     const b = basalInfo(), done = ['fast', 'lunch', 'dinner'].filter(k => S.ins[k]).length, sk = skipped('basal');
     if (sk) { big = 'Pulada'; unit = 'basal hoje'; }
-    else if (b) { st = b.st === 'ok'; big = HM(S.ins.basalTs + H24); unit = 'próxima basal'; lines.push(`Última basal: ${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}`); if (b.st !== 'ok') lines.push(b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora da basal'); }
+    else if (b) { st = b.st === 'ok'; big = pnClock(b); unit = b.st === 'over' ? 'passaram 24 h · atraso' : 'faltam para a próxima'; lines.push(`Última basal: ${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}`); if (b.st !== 'ok') lines.push(b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora da basal'); }
     else { big = '—'; unit = 'basal sem contagem'; }
     lines.push(`Rápida hoje: ${done} de 3`);
   }

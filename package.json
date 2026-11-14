@@ -1,6 +1,6 @@
 {
   "name": "tiabete",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "private": true,
   "description": "TiaBete – controle de glicemia para diabetes MODY (app local, sem conta, sem nuvem)",
   "license": "MIT",
