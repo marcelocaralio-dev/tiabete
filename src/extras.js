@@ -640,7 +640,7 @@ const rwSvg = (p, s = 28) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}
 const RW_TROPHY = '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 13v4M8.5 20h7M10 17h4v3h-4z"/>';
 function rwState() { S.rw = S.rw || {}; S.rw.got = S.rw.got || {}; return S.rw; }
 const rwSave = async () => { try { await Store.put('meta', { id: 'rewards', value: S.rw }); } catch (e) { } };
-const rwEval = () => rewardEval(S.records, isoDate(new Date()));
+const rwEval = () => rewardEval(S.records, isoDate(new Date()), rwSkips());
 let rwTimer = null, rwBusy = false, rwDay = isoDate(new Date());
 function rwTick() { const d = isoDate(new Date()); if (d !== rwDay) { rwDay = d; if (S.route === 'conquistas' && !$('#sheet-bg')) render(); } rewardSoon(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rwTick(); });
@@ -651,13 +651,16 @@ async function rewardCheck() {
   const st = rwState(), ev = rwEval(), q = []; let dirty = false;
   // quebra: selo que não vale mais no ciclo atual sai de "got" (fica bloqueado) e vai para o histórico
   st.hist = st.hist || [];
-  for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: isoDate(new Date()) }); delete st.got[key]; dirty = true; } }
+  for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (rwOn(k) && st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: isoDate(new Date()) }); delete st.got[key]; dirty = true; } }
+  if (cwCheck(st, q, isoDate(new Date()), false)) dirty = true; /* personalizadas perdidas (só remove selo) */
   if (dirty) await rwSave();
   if (rwBusy) return;
   if (!alCfg().rewards) return;
   if ($('#sheet-bg') || $('.rw-bg')) return;
   dirty = false;
+  if (cwCheck(st, q, isoDate(new Date()), true)) dirty = true;
   for (const k of Object.keys(RW_INFO)) {
+    if (!rwOn(k)) continue;
     const fresh = RW_STEPS.filter(N => ev[k].ach[N] && !st.got[k + '-' + N]);
     fresh.forEach(N => { st.got[k + '-' + N] = isoDate(new Date()); dirty = true; });
     if (fresh.length) q.push({ k, N: Math.max(...fresh) });
@@ -684,14 +687,15 @@ function rwFx(box, kind, count) {
 }
 function rwCelebrate(k, N, done) {
   closeRw(true);
-  const c = RW_INFO[k], m = RW_MS[N], big = N >= 90;
+  const cu = cwMeta(k); if (!cu && !RW_INFO[k]) { if (done) done(); return; }
+  const c = cu ? { t: esc(cu.name), ic: cu.icp } : RW_INFO[k], m = cu ? { ...CW_MS, m: cu.c.desc ? esc(cu.c.desc) : 'Você chegou lá. Continue assim!' } : RW_MS[N], big = !cu && N >= 90;
   const bg = document.createElement('div'); bg.className = 'rw-bg rw-m' + N; bg.id = 'rw-bg'; bg.setAttribute('role', 'alertdialog'); bg.setAttribute('aria-modal', 'true'); bg.setAttribute('aria-label', m.g);
   bg.innerHTML = `<div class="rw-fx" aria-hidden="true"></div><div class="rw-card">
     <div class="rw-medal"><span class="rw-ring"></span><span class="rw-ring r2"></span><span class="rw-core">${rwSvg(c.ic, 44)}</span>${big ? `<span class="rw-crown">${rwSvg(RW_TROPHY, 26)}</span>` : ''}</div>
-    <div class="rw-lbl">${RW_LBL[N]} · ${c.t}</div>
+    <div class="rw-lbl">${cu ? 'Minha conquista · ' + c.t : RW_LBL[N] + ' · ' + c.t}</div>
     <h2 class="rw-g">${m.g}</h2>
     <p class="rw-m">${m.m}</p>
-    <p class="rw-d">Foram ${N} dias seguidos com ${c.d}, pelos seus registros.</p>
+    <p class="rw-d">${cu ? esc(cwRule(cu.c)) + ' Pelos seus registros.' : `Foram ${N} dias seguidos com ${c.d}, pelos seus registros.`}</p>
     <button class="btn pri full" id="rw-ok" autofocus>Continuar</button>
     <button class="btn full" id="rw-see" style="margin-top:8px">Ver minhas conquistas</button></div>`;
   document.body.appendChild(bg); document.body.style.overflow = 'hidden';
@@ -710,33 +714,9 @@ function closeRw(silent) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#rw-bg')) closeRw(); });
 function rwBanner() {
   const l = S.rw && S.rw.last; if (!l || Date.now() - l.ts > DAY || (S.rw.seen === l.ts)) return '';
-  const c = RW_INFO[l.k]; if (!c) return '';
-  return `<div class="banner rwb" role="status"><div class="row" style="gap:10px;align-items:center;min-width:0"><span class="rw-bi sm">${rwSvg(c.ic, 20)}</span><div><b>Nova conquista: ${RW_LBL[l.N]} · ${c.t}</b><div class="dim" style="font-size:14px">${RW_MS[l.N].g}</div></div></div><div class="row" style="gap:6px"><button class="btn sm" data-act="rw-open">Ver</button><button class="btn sm" data-act="rw-dismiss" aria-label="Dispensar">×</button></div></div>`;
+  const cu = cwMeta(l.k), c = cu ? { t: esc(cu.name), ic: cu.icp } : RW_INFO[l.k]; if (!c || !rwOn(l.k)) return '';
+  return `<div class="banner rwb" role="status"><div class="row" style="gap:10px;align-items:center;min-width:0"><span class="rw-bi sm">${rwSvg(c.ic, 20)}</span><div><b>Nova conquista: ${cu ? c.t : RW_LBL[l.N] + ' · ' + c.t}</b><div class="dim" style="font-size:14px">${cu ? CW_MS.g : RW_MS[l.N].g}</div></div></div><div class="row" style="gap:6px"><button class="btn sm" data-act="rw-open">Ver</button><button class="btn sm" data-act="rw-dismiss" aria-label="Dispensar">×</button></div></div>`;
 }
-function viewConquistas() {
-  const st = rwState(), ev = rwEval(), nGot = Object.keys(RW_INFO).reduce((a, k) => a + RW_STEPS.filter(N => ev[k].ach[N]).length, 0);
-  const cards = Object.keys(RW_INFO).map(k => {
-    const c = RW_INFO[k], e = ev[k], nxt = RW_STEPS.find(N => !e.ach[N]);
-    let prog;
-    const todayNote = e.today === 'pending' ? ' Hoje está aguardando validação: só entra quando o dia terminar.' : e.today === 'bad' ? ' Hoje já teve uma medição fora do limite.' : '';
-    if (!e.n) prog = `<p class="hint" style="margin:6px 0 0">${k === 'fast' ? 'Ainda sem medições de jejum registradas.' : 'Ainda sem medições registradas.'}</p>`;
-    else if (nxt === undefined) prog = `<p class="hint" style="margin:6px 0 0"><b style="color:var(--good)">Todas as conquistas desta categoria foram alcançadas. Excelente!</b>${todayNote}</p>`;
-    else {
-      const pct = Math.min(100, Math.round(e.streak / nxt * 100));
-      const msg = e.state === 'quebrada' ? `Sequência de ${e.prev} dia${e.prev > 1 ? 's' : ''} encerrada em ${fmtDate(new Date(e.brokeOn * 86400000).toISOString().slice(0, 10)).slice(0, 5)}. A nova contagem começa quando um dia for cumprido por inteiro. Os selos ficam bloqueados até você conquistar de novo.${todayNote}`
-        : `Faltam ${nxt - e.streak} dia${nxt - e.streak > 1 ? 's' : ''} para ${RW_LBL[nxt]}.${todayNote}`;
-      prog = `<div class="rw-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${nxt}" aria-valuenow="${Math.min(e.streak, nxt)}"><i style="width:${pct}%"></i></div><div class="dim" style="font-size:14px;margin-top:4px">${msg}</div>`;
-    }
-    const badges = RW_STEPS.map(N => {
-      const got = e.ach[N] ? (st.got[k + '-' + N] || isoDate(new Date())) : null;
-      return got ? `<button class="rw-bd on" data-act="rw-play" data-k="${k}" data-n="${N}" aria-label="${RW_LBL[N]}, conquistado em ${fmtDate(got)}. Toque para rever a comemoração"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>${fmtDate(got).slice(0, 5)}</small></button>`
-        : `<div class="rw-bd" aria-label="${RW_LBL[N]}, ainda não conquistado"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>bloqueado</small></div>`;
-    }).join('');
-    return `<h2 class="sec">${c.t}</h2><div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:14px">${c.d}</div><span class="rw-st ${e.state}">${RW_ST[e.state]}</span></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:${e.streak > 0 ? 'var(--good)' : 'var(--mut)'}">${e.streak}</div><div class="dim" style="font-size:13px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
-  }).join('');
-  return banners() + `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses. Contam só os seus registros reais (os dados de exemplo ficam de fora). Um dia só vale depois de terminar, com todas as medições dentro do limite; dia sem medição não conta e interrompe a sequência. Ao interromper, a contagem volta a zero e os selos ficam bloqueados até a conquista acontecer de novo. ${nGot ? `Você já tem <b>${nGot}</b> de 12 conquistas.` : 'Você ainda não tem conquistas — a primeira sai com 7 dias seguidos.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica.</p>${cards}`;
-}
-
 /* ---------- Unidades das chaves -> medição correspondente do histórico ---------- */
 const INS_MATCH = { fast: r => r.context === 'jejum', lunch: r => r.context === 'antes' && r.meal === 'almoco', dinner: r => r.context === 'antes' && r.meal === 'jantar' };
 let linkBusy = false;
@@ -768,6 +748,7 @@ async function applyBackupState(st, replace) {
   try { if (st.alertCenter && typeof st.alertCenter === 'object' && (replace || !S.ac.items.length)) { const have = new Set(S.ac.items.map(x => x.id)); const inc = (Array.isArray(st.alertCenter.items) ? st.alertCenter.items : []).filter(x => x && x.id && x.key && !have.has(x.id)); S.ac.items = replace ? inc : S.ac.items.concat(inc); S.ac.items = S.ac.items.slice(0, AC_MAX); acSave(); } } catch (e) { }
   try { if (st.customAlerts && typeof st.customAlerts === 'object' && (replace || !S.ca.rules.length)) { caLoad(st.customAlerts); S.ca.seeded = true; await caSave(); caSync(); } } catch (e) { }
   try { if (st.alerts && (replace || JSON.stringify(alCfg()) === JSON.stringify(AL_DEF))) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
+  try { if (typeof st.swipeNav === 'boolean' && replace) { S.swipeNav = st.swipeNav; await Store.put('meta', { id: 'swipe-nav', value: S.swipeNav }); } } catch (e) { }
   try { if (st.bolus && typeof st.bolus === 'object') { S._blRes = null; if (replace) blLoad(st.bolus); else S._blRes = blMerge(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { console.error(e); }
   try {
     const i = st.insulin;
@@ -778,7 +759,7 @@ async function applyBackupState(st, replace) {
       if (replace || (clean.basalTs && clean.basalTs > (S.ins.basalTs || 0))) { S.ins = replace ? clean : { ...S.ins, basalTs: clean.basalTs }; if (replace || clean.day === isoDate(new Date())) { if (clean.day === isoDate(new Date())) { S.ins.day = clean.day; S.ins.fast = clean.fast; S.ins.lunch = clean.lunch; S.ins.dinner = clean.dinner; S.ins.skip = clean.skip; } } insLoaded = true; insSync(); await insSave(); }
     }
     const r = st.rewards;
-    if (r && r.got && typeof r.got === 'object') { const cur = rwState(); for (const [k, d] of Object.entries(r.got)) if (/^(hypo|fast|norm)-(7|14|30|90)$/.test(k) && typeof d === 'string' && (!cur.got[k] || d < cur.got[k])) cur.got[k] = d; cur.init = true; await rwSave(); }
+    if (r && r.got && typeof r.got === 'object') { const cur = rwState(); try { cwRestore(r, replace); } catch (e) { console.error(e); } for (const [k, d] of Object.entries(r.got)) if (/^(hypo|fast|norm)-(7|14|30|90)$/.test(k) && typeof d === 'string' && (!cur.got[k] || d < cur.got[k])) cur.got[k] = d; cur.init = true; await rwSave(); }
     if (Array.isArray(st.saved)) { const have = new Set((S.saved || []).map(m => m.id)); S.saved = (S.saved || []).concat(st.saved.filter(m => m && m.id && m.name && !have.has(m.id))); await savedSave(); }
   } catch (e) { console.error(e); }
 }
@@ -913,7 +894,7 @@ document.addEventListener('click', async e => {
 /* ---------- Padrões (calculados no aparelho) ---------- */
 function viewPadroes() {
   const notes = patternNotes(S.records, MARKS, isoDate(new Date()));
-  return banners() + `<p class="hint" style="margin:0 0 12px">Observações calculadas no seu aparelho a partir dos seus registros reais (os de exemplo ficam de fora). Aparecem só quando há medições suficientes. Mostram coincidências nos números, não causas, e não são orientação de tratamento.</p>
+  return banners() + prNotice('padroes') + `<p class="hint" style="margin:0 0 12px">Observações calculadas no seu aparelho a partir dos seus registros reais (os de exemplo ficam de fora). Aparecem só quando há medições suficientes. Mostram coincidências nos números, não causas, e não são orientação de tratamento.</p>
   ${notes.length ? notes.map(x => `<h2 class="sec">${esc(x.t)}</h2><div class="card"><p style="margin:0">${esc(x.d)}</p><div class="dim" style="font-size:13.5px;margin-top:6px">Base: ${x.n} medições</div></div>`).join('') : '<div class="card"><p class="hint" style="margin:0">Ainda não há medições suficientes para mostrar padrões. Eles precisam de pelo menos 3 ocorrências de cada situação comparada.</p></div>'}</div>
   ${HAS_CLAUDE ? '<button class="btn pri full" style="margin-top:14px" data-act="go" data-r="perguntas">Perguntar ao Claude sobre meus registros</button>' : ''}`;
 }

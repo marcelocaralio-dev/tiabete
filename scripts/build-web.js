@@ -1,7 +1,7 @@
 // Monta www/index.html (um único arquivo) a partir de src/ + native/native.js, com fontes locais (@fontsource).
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..'), rd = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
-const order = ['native/ai-core.js', 'src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'src/plan.js', 'src/alertas.js', 'src/alertcenter.js', 'src/painel2.js', 'src/drawer.js', 'src/secure.js', 'native/native.js', 'native/ai-ui.js', 'native/drive.js', 'native/login.js', 'src/init.js'];
+const order = ['native/ai-core.js', 'src/logic.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolus.js', 'src/plan.js', 'src/alertas.js', 'src/alertcenter.js', 'src/painel2.js', 'src/conquistas2.js', 'src/prontidao.js', 'src/iastatus.js', 'src/drawer.js', 'src/secure.js', 'native/native.js', 'native/ai-ui.js', 'native/drive.js', 'native/login.js', 'src/init.js'];
 /* ID do cliente Google (OAuth) para o backup no Drive: arquivo config/google-client-id.txt (não é segredo). Se não existir, o app pede para colar na tela. */
 let gid = ''; try { gid = rd('config', 'google-client-id.txt').trim().split(/\s+/)[0] || ''; } catch (e) { }
 /* Textos do app web que citam o Claude viram textos neutros: no APK a IA é a que o usuário configurar. */

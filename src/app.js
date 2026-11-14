@@ -252,6 +252,7 @@ function viewPainelClassic() {
     return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Seu painel começa aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o CSV do mySugr ou registre uma medição. Os dados ficam só neste navegador.</p>
     <div class="big-cta"><button class="btn pri full" data-act="go" data-r="importar">Importar CSV do mySugr</button><button class="btn full" data-act="new">Registrar medição</button></div></div>`;
   }
+  h += prNotice('painel');
   const last = all[all.length - 1];
   const gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
   const bnd = bandOf(last.glucose, last.context), gLbl = `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}. Mostrador de 70 a 250 mg/dL.`;
@@ -482,6 +483,7 @@ function viewAnalise() {
   let h = banners();
   if (!S.records.length) return h + emptyBlock('Sem dados para analisar', 'Importe o CSV do mySugr ou registre medições.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar CSV</button>');
   const a = S.ana, now = Date.now();
+  h += prNotice('analise');
   const recs = a.range === 'all' ? S.records : inRange(S.records, startOfDay(addDays(now, -(+a.range - 1))), endOfDay(now));
   const st = stats(recs);
   const rl = a.range === 'all' ? 'todo o histórico' : 'últimos ' + a.range + ' dias';
@@ -536,7 +538,7 @@ function hbaForm(x) {
     ${x.id ? `<button class="btn danger full" type="button" style="margin-top:10px" data-act="del-ask-hba" data-id="${x.id}">Excluir resultado</button>` : ''}</form>`;
 }
 function viewHba() {
-  let h = banners();
+  let h = banners() + prNotice('hba1c');
   h += `<p class="hint" style="margin:0 0 12px">Resultados de <b>exames de laboratório</b>. Estimativas calculadas ficam separadas, mais abaixo.</p><button class="btn pri full" data-act="hba-new">Adicionar resultado</button>`;
   h += lastExamBox();
   if (S.hba.length) { const L = S.hba[S.hba.length - 1], ev = a1cEval(L.value, S.a1cT), key = 'l' + L.id + L.value + '|' + S.a1cT, an = S.a1mKey2 !== key; S.a1mKey2 = key; h += `<h2 class="sec">Último exame de laboratório</h2><div class="card hba2 hb-${ev.k}"><div class="hr-top"><div class="eyebrow">${fmtDate(L.date)}${L.lab ? ' · ' + esc(L.lab) : ''}</div></div><div class="hba2-v"><span class="num">${fn(L.value, 1)}</span><small>%</small></div><div class="hr-state" style="margin-top:6px">${a1cBadge(L.value)}</div>${a1cMeter(L.value, S.a1cT, an)}</div>`; }
@@ -706,7 +708,7 @@ function viewRelatorios() {
   const r = S.rep;
   if (!r.from) { r.to = isoDate(new Date()); r.from = isoDate(new Date(addDays(Date.now(), -29))); }
   const a = mkTs(r.from, '00:00'), b = endOfDay(mkTs(r.to, '00:00')), recs = inRange(S.records, a, b), st = stats(recs);
-  return banners() + `<div class="card"><div class="form-grid"><div class="field"><label class="fl" for="r-from">De</label><input class="in" type="date" id="r-from" value="${r.from}"></div><div class="field"><label class="fl" for="r-to">Até</label><input class="in" type="date" id="r-to" value="${r.to}"></div></div>
+  return banners() + prNotice('relatorios') + `<div class="card"><div class="form-grid"><div class="field"><label class="fl" for="r-from">De</label><input class="in" type="date" id="r-from" value="${r.from}"></div><div class="field"><label class="fl" for="r-to">Até</label><input class="in" type="date" id="r-to" value="${r.to}"></div></div>
     <div class="row" style="margin-top:12px">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias']].map(([d, l]) => `<button class="btn sm" data-act="rep-quick" data-d="${d}">${l}</button>`).join('')}</div></div>
     <h2 class="sec">O que entra</h2><div class="card"><div class="grid3"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${st.n}</div></div><div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div><div class="tile"><div class="lb">&lt;70 / acima</div><div class="v num" style="font-size:22px">${st.hypo}/${st.hyper}</div></div></div>
     <ul class="plain"><li>Resumo, estatísticas, gráfico de medições e distribuição por faixa</li><li>Comparação com o período anterior de mesma duração</li><li>Episódios de hipoglicemia e hiperglicemia</li><li>Resultados laboratoriais de HbA1c (sem estimativas)</li><li>Esquemas de tratamento e comparação</li><li>Histórico completo de medições</li></ul></div>
@@ -720,14 +722,14 @@ function viewBackup() {
   let h = banners() + `<div class="card"><div class="eyebrow">Seus dados</div><div class="grid3" style="margin-top:12px"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${S.records.length}</div></div><div class="tile"><div class="lb">HbA1c</div><div class="v num" style="font-size:22px">${S.hba.length}</div></div><div class="tile"><div class="lb">Esquemas</div><div class="v num" style="font-size:22px">${S.schemes.length}</div></div></div>
     <p class="hint" id="persist-note">Armazenamento: ${Store.persistent ? 'banco IndexedDB neste navegador' : 'indisponível (somente sessão)'}.</p>
     <p class="hint"><b>Atenção:</b> limpar os dados do site ou do navegador apaga tudo daqui. Faça backups regulares.</p></div>
-    <h2 class="sec">Exportar</h2><div class="stack"><button class="btn pri full" data-act="bk-json">Backup completo (.json)</button><button class="btn full" data-act="bk-csv">Medições em CSV (.csv)</button></div>
+    <h2 class="sec">Exportar</h2>${(() => { const d = blExport(), nf = (S.bl.foods || []).length, nm = (S.bl.meals || []).length, nd = Object.keys(S.bl.days || {}).length; return `<p class="hint" style="margin:0 0 10px">${d ? `<b>Cálculo de bolus entra no backup:</b> ${nf} alimento${nf === 1 ? '' : 's'}, ${nd} dia(s), ${nm} refeição(ões) registrada(s).` : '<b>Cálculo de bolus:</b> ainda sem dados neste aparelho (nada a incluir).'}</p>`; })()}<div class="stack"><button class="btn pri full" data-act="bk-json">Backup completo (.json)</button><button class="btn full" data-act="bk-csv">Medições em CSV (.csv)</button></div>
     ${driveCard()}
     <h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0 0 10px">Backup protegido por senha, Drive com criptografia e bloqueio por PIN ou biometria ficam agora em Segurança e privacidade.</p><button class="btn full" data-act="go" data-r="seguranca">Abrir Bloqueio e proteção</button></div>
     <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher backup</button>${secPrompt()}`;
   if (S.rest) {
     const x = S.rest;
     h += `<div style="margin-top:14px"><div class="eyebrow">Arquivo lido</div><p style="margin:6px 0 4px" class="num">${x.records.length} medições · ${x.hba.length} HbA1c · ${x.schemes.length} esquemas</p><p class="hint" style="margin:0 0 12px">Exportado em ${esc(x.exportedAt ? new Date(x.exportedAt).toLocaleString('pt-BR') : 'data desconhecida')}.</p>
-      ${(() => { const b = x.state && x.state.bolus; return `<p class="hint" style="margin:0 0 12px">${b && Array.isArray(b.foods) ? `<b>Cálculo de bolus incluído:</b> ${b.foods.length} alimento${b.foods.length === 1 ? '' : 's'}${b.meals && b.meals.length ? ' · ' + b.meals.length + ' refeição(ões) registrada(s)' : ''}${b.days && Object.keys(b.days).length ? ' · ' + Object.keys(b.days).length + ' dia(s)' : ''}${b.ratio ? ' · razão 1:' + b.ratio : ''}.` : '<b>Este arquivo não traz dados do Cálculo de bolus.</b> Ele foi gerado antes de haver dados nessa página, ou sem eles.'}</p>`; })()}
+      ${(() => { const b = x.state && x.state.bolus; return `<p class="hint" style="margin:0 0 12px">${b && Array.isArray(b.foods) ? `<b>Cálculo de bolus incluído:</b> ${b.foods.length} alimento${b.foods.length === 1 ? '' : 's'}${b.meals && b.meals.length ? ' · ' + b.meals.length + ' refeição(ões) registrada(s)' : ''}${b.days && Object.keys(b.days).length ? ' · ' + Object.keys(b.days).length + ' dia(s)' : ''}${b.ratio ? ' · razão 1:' + b.ratio : ''}.` : '<b>Este arquivo não traz dados do Cálculo de bolus.</b> Ele foi gerado por uma versão antiga do app ou antes de haver dados nessa página. Em Exportar (acima) veja se os dados do bolus estão no aparelho de origem e gere um backup novo.'}</p>`; })()}
       <div class="stack"><button class="btn pri full" data-act="rest-merge">Mesclar com meus dados (sem duplicar)</button>
       <button class="btn danger full" data-act="rest-replace-ask">Substituir tudo por este backup</button></div></div>`;
   }
@@ -872,6 +874,7 @@ function render() {
   try { acSync(); } catch (e) { }
   attachCharts(view);
   try { if (S.pm) pmDraw(); } catch (e) { }
+  try { iaMount(view, route); } catch (e) { }
   rewardSoon();
   setTimeout(drvAuto, 2500);
   setTimeout(insLink, 50); setTimeout(scrSetup, 30);
@@ -992,8 +995,8 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blDirty() ? S.bl : null, plan: plHas() ? S.plan : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
-  if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
+  if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.rw && S.rw.cust && S.rw.cust.length) && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }
 async function exportBackup() {

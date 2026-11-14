@@ -14,7 +14,7 @@ const scoreTxt = s => s ? fnum(s.score, 1) : '—';
 const exSorted = () => [...S.exams].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.addedAt || 0) - (a.addedAt || 0));
 
 /* ---------- acesso ao Claude (capacidade "sample") ---------- */
-async function getSample() { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } }
+async function getSample() { try { return iaWrap(window.claude && window.claude.use ? await window.claude.use('sample') : null); } catch (e) { return null; } }
 /* ---- Dependência da IA: estado e cartão de orientação (exames e bolus) ---- */
 /* 'ok' = IA pronta · 'notcfg' = falta configurar (app Android) · 'none' = indisponível neste ambiente */
 let AI_CFG, AI_T = 0;

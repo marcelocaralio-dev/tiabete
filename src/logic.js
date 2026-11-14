@@ -598,16 +598,17 @@ const dayNum = d => Math.round(Date.parse(d + 'T00:00:00Z') / 86400000);
    - dia sem medição relevante não cumpre a meta (ausência nunca vira cumprimento) e interrompe a sequência;
    - uma medição fora do limite hoje já é falha definitiva (nenhuma medição nova desfaz) e zera a sequência;
    - a sequência é sempre recalculada do histórico completo, então editar/excluir registros antigos corrige tudo. */
-function rewardEval(records, todayIso) {
+function rewardEval(records, todayIso, skip) {
   const real = (records || []).filter(r => r && r.source !== 'exemplo' && r.date && typeof r.glucose === 'number'), t = dayNum(todayIso), out = {};
   for (const [k, c] of Object.entries(RW_CATS)) {
-    const byDay = new Map();
-    for (const r of real) { const d = dayNum(r.date); if (d > t || !c.rel(r)) continue; const e = byDay.get(d) || { n: 0, bad: 0 }; e.n++; if (c.bad(r)) e.bad++; byDay.set(d, e); }
+    const byDay = new Map(), sk = skip && skip[k];
+    for (const r of real) { const d = dayNum(r.date); if (d > t || !c.rel(r) || (sk && sk.has(d))) continue; const e = byDay.get(d) || { n: 0, bad: 0 }; e.n++; if (c.bad(r)) e.bad++; byDay.set(d, e); }
     if (!byDay.size) { out[k] = { streak: 0, ach: {}, n: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0 }; continue; }
     const first = Math.min(...byDay.keys());
     let run = 0, prev = 0, brokeOn = null, cycles = 0, n = 0;
     for (const e of byDay.values()) n += e.n;
     for (let d = first; d < t; d++) {
+      if (sk && sk.has(d)) continue; /* dia com a conquista desativada: não conta nem quebra */
       const e = byDay.get(d);
       if (e && !e.bad) run++;
       else { if (run > 0) { prev = run; brokeOn = d; cycles++; } run = 0; }

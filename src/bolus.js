@@ -37,7 +37,8 @@ S.bl = blDefault();
 S.blUi = { tab: 'cafe', date: null, pend: null, busy: false, msg: {} };
 let blTimer = null;
 function blSave() { clearTimeout(blTimer); blTimer = setTimeout(blFlush, 120); }
-function blFlush() { clearTimeout(blTimer); try { Store.put('meta', { id: 'bolus', value: S.bl }); } catch (e) { } }
+let blReady = false; /* só grava depois de ler o que já estava salvo: evita sobrescrever os dados com o padrão se o app for ao segundo plano durante a abertura */
+function blFlush() { clearTimeout(blTimer); if (!blReady) return; try { Store.put('meta', { id: 'bolus', value: S.bl }); } catch (e) { } }
 document.addEventListener('visibilitychange', () => { if (document.hidden) blFlush(); });
 window.addEventListener('pagehide', blFlush);
 function blHasData() { return Object.keys(S.bl.days || {}).length > 0 || (S.bl.meals || []).length > 0 || (S.bl.rlog || []).length > 0; }
@@ -406,6 +407,8 @@ function blRazaoView() {
 
 
 /* ---- Backup: o que conta como dado do bolus e como unir um backup sem perder nem duplicar ---- */
+/* No app completo os alimentos e modelos de fábrica são dados do usuário; precisam ir no backup mesmo sem edição (a versão do APK começa vazia). */
+const blExport = () => !BL_PUBLIC || blDirty();
 const blDirty = () => { try { return JSON.stringify(S.bl) !== JSON.stringify(blDefault()); } catch (e) { return true; } };
 /* Une o bolus de um backup ao que já existe. Nas definições (valores dos alimentos, modelos de refeição, razão I:C e chaves) o backup
    prevalece, porque quem restaura quer os dados do backup de volta; o que só existe aqui (alimentos, dias, refeições e registros) é mantido.

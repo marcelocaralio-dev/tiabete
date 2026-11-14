@@ -97,8 +97,8 @@ document.addEventListener('keydown', e => {
   const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || !!el.closest('#acb, #acp, #acz') || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
   document.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return; const t = e.touches[0];
-    if (!DR.open && S.swipeMenu !== false && !blocked(e.target)) g = { m: 'open', edge: t.clientX <= EDGE, x: t.clientX, y: t.clientY, dx: 0, on: false };
-    else if (DR.open && e.target.closest('#dr, #dr-bg')) g = { m: 'close', x: t.clientX, y: t.clientY, dx: 0, on: false };
+    /* o gesto de abrir o menu foi removido: o menu abre só pelo botão; o deslize para a esquerda sobre o menu aberto continua fechando */
+    if (DR.open && e.target.closest('#dr, #dr-bg')) g = { m: 'close', x: t.clientX, y: t.clientY, dx: 0, on: false };
     else g = null;
   }, { passive: true });
   document.addEventListener('touchmove', e => {
@@ -118,11 +118,67 @@ document.addEventListener('keydown', e => {
 
 /* Configuração: ligar/desligar o gesto de abrir o menu */
 S.swipeMenu = true;
-function swipeCard() {
+function swipeCard() { return swipeNavCard(); }
+function swipeMenuCard() {
   const on = S.swipeMenu !== false;
-  return `<h2 class="sec">Gesto do menu lateral</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Deslizar para abrir o menu</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize o dedo para a direita em qualquer parte da tela (menos em campos, controles deslizantes e áreas que rolam para o lado) para abrir o menu. Para fechar, deslize para a esquerda sobre o menu. Desligado, o menu abre só pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Deslizar para abrir o menu" data-act="swipe-menu"><i>${on ? '✓' : ''}</i></button></div></div>`;
+  return `<h2 class="sec">Gesto do menu lateral</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Deslizar para abrir o menu</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize o dedo para a direita para abrir o menu: a partir da borda esquerda da tela nas 4 páginas principais (com a navegação por gestos ligada) e em qualquer parte da tela nas demais páginas (menos em campos, controles deslizantes e áreas que rolam para o lado). Para fechar, deslize para a esquerda sobre o menu. Desligado, o menu abre só pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Deslizar para abrir o menu" data-act="swipe-menu"><i>${on ? '✓' : ''}</i></button></div></div>`;
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act="swipe-menu"]'); if (!el) return;
   S.swipeMenu = !(S.swipeMenu !== false); try { await Store.put('meta', { id: 'swipe-menu', value: S.swipeMenu }); } catch (x) { } render();
 });
+
+/* ================= Navegação entre páginas por gestos =================
+   O gesto de abrir o menu foi removido; a tela toda navega: esquerda→direita volta; direita→esquerda avança, na ordem Painel, Histórico, Análise, Mais, sem circular.
+   A zona é decidida pela posição inicial do toque. Desligar isto não afeta o gesto do menu. */
+const NAV_EDGE = 0, NAV_PAGES = ['painel', 'historico', 'analise', 'mais'];
+S.swipeNav = true;
+const navZone = () => S.swipeNav !== false && NAV_PAGES.includes(S.route);
+function swipeNavCard() {
+  const on = S.swipeNav !== false;
+  return `<h2 class="sec">Navegação entre páginas por gestos</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Navegação entre páginas por gestos</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize horizontalmente pela tela para avançar ou retornar entre as páginas principais (Painel, Histórico, Análise e Mais). O menu lateral abre pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Navegação entre páginas por gestos" data-act="swipe-nav"><i>${on ? '✓' : ''}</i></button></div></div>`;
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="swipe-nav"]'); if (!el) return;
+  S.swipeNav = !(S.swipeNav !== false); try { await Store.put('meta', { id: 'swipe-nav', value: S.swipeNav }); } catch (x) { } render();
+});
+(function navSwipe() {
+  let g = null;
+  const SKIP = 'input, textarea, select, button[role=slider], [contenteditable], [role=slider], svg, canvas, .tbl-wrap, [data-noswipe], #acb, #acp, #acz';
+  const hScroll = el => { for (let n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return true; } return false; };
+  const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || DR.open || !!S.pm || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
+  const target = dx => { const i = NAV_PAGES.indexOf(S.route), j = dx > 0 ? i - 1 : i + 1; return j >= 0 && j < NAV_PAGES.length ? NAV_PAGES[j] : null; };
+  const calm = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  const reset = (v, anim) => { v.style.transition = anim ? 'transform .18s ease, opacity .18s ease' : ''; v.style.transform = ''; v.style.opacity = ''; if (anim) setTimeout(() => { v.style.transition = ''; }, 200); };
+  document.addEventListener('touchstart', e => {
+    g = null; if (e.touches.length !== 1 || !navZone()) return; const t = e.touches[0];
+    if (t.clientX <= NAV_EDGE || blocked(e.target)) return;
+    g = { x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, lock: false };
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!g) return; if (e.touches.length !== 1 || DR.open || !navZone()) { const v = document.getElementById('view'); if (v && g.lock) reset(v, false); g = null; return; }
+    const t = e.touches[0], dx = t.clientX - g.x, dy = t.clientY - g.y;
+    if (!g.lock) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) >= Math.abs(dx) * .55) { g = null; return; } /* rolagem vertical */
+      if (Math.abs(dx) < 14) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.8) return;
+      g.lock = true;
+    }
+    g.dx = dx; const v = document.getElementById('view'); if (!v || calm()) return;
+    const k = target(dx) ? .35 : .08; v.style.transition = 'none'; v.style.transform = `translateX(${Math.round(dx * k)}px)`; v.style.opacity = String(1 - Math.min(.4, Math.abs(dx) / 700));
+  }, { passive: true });
+  const end = () => {
+    if (!g) return; const { dx, lock, t } = g; g = null; const v = document.getElementById('view'); if (!lock || !v) return;
+    const dt = Math.max(1, Date.now() - t), to = target(dx), ok = to && DR.open === false && Math.abs(dx) >= 80 && (Math.abs(dx) >= 130 || Math.abs(dx) / dt >= .3);
+    if (!ok) { reset(v, !calm()); return; }
+    const sg = dx > 0 ? 1 : -1;
+    if (calm()) { reset(v, false); go(to); return; }
+    v.style.transition = 'transform .12s ease-in, opacity .12s ease-in'; v.style.transform = `translateX(${sg * 48}px)`; v.style.opacity = '0';
+    setTimeout(() => {
+      if (S.route === to) return; go(to); const nv = document.getElementById('view'); if (!nv) return;
+      nv.style.transition = 'none'; nv.style.transform = `translateX(${-sg * 48}px)`; nv.style.opacity = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => { nv.style.transition = 'transform .2s ease-out, opacity .2s ease-out'; nv.style.transform = ''; nv.style.opacity = ''; setTimeout(() => { nv.style.transition = ''; }, 230); }));
+    }, 120);
+  };
+  document.addEventListener('touchend', end, { passive: true }); document.addEventListener('touchcancel', () => { const v = document.getElementById('view'); if (g && g.lock && v) reset(v, true); g = null; }, { passive: true });
+})();

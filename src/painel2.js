@@ -71,7 +71,7 @@ function pnTrat() {
 function viewPainelCards() {
   const d = pnData(), { all, last, sc, cmp, rc, sd, rs } = d;
   if (!all.length) return viewPainelClassic(); // boas-vindas
-  let h = banners() + labelBanner() + pfInvite();
+  let h = banners() + labelBanner() + pfInvite() + prNotice('painel');
   const bnd = bandOf(last.glucose, last.context), gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
   const gl = (v, a, lbl) => `<div class="pn-gauge">${gaugeSvg(v, a, lbl)}</div>`;
   const cards = [];
