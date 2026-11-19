@@ -105,7 +105,7 @@ async function makePDFInner() {
     doc.setFillColor(...(b.k === 'ok' ? [150, 142, 147] : b.k === 'low' || b.k === 'vlow' ? [214, 90, 105] : [255, 46, 62])); if (bw > 0) doc.rect(M + 150, y, Math.max(bw, 1.5), 10, 'F');
     doc.text(`${n}  (${D.st.n ? (n / D.st.n * 100).toFixed(0) : 0}%)`, M + 150 + Math.max(bw, 1.5) + 6, y + 8); y += 18;
   });
-  note('Contagem de medições pontuais por faixa. Medições em jejum usam 70 a 130 mg/dL como faixa normal. Não representa tempo no alvo (TIR), que exige monitorização contínua.');
+  note('Contagem de medições pontuais por faixa. Medições em jejum usam 70 a 130 mg/dL como faixa normal. Não representa o tempo no alvo, que exige monitorização contínua.');
   /* comparação */
   h2('Comparação com o período anterior');
   const c = D.cmp, p = D.sp;
@@ -130,7 +130,7 @@ async function makePDFInner() {
   else note('Nenhum resultado laboratorial cadastrado.');
   note('Somente resultados de exame. Estimativas calculadas a partir de glicemias capilares não fazem parte deste relatório.');
   /* esquemas */
-  h2('Esquemas de tratamento');
+  h2('Tratamento');
   if (D.sch.length) {
     tbl(['Esquema', 'Início', 'Fim', 'Basal', 'Rápida', 'Doses / horários'], D.sch.map(x => [pdfSafe(x.s.name), fmtDate(x.s.start), x.s.end ? fmtDate(x.s.end) : 'em uso', pdfSafe([x.s.basalInsulin, x.s.basalDose].filter(Boolean).join(' ')), pdfSafe(x.s.rapidInsulin), pdfSafe(trunc([x.s.mealDoses, x.s.times, x.s.extraMeds].filter(Boolean).join(' | '), 90))]), { fs: 8 });
     tbl(['Esquema', 'Medições', 'Média (mg/dL)', '< 70', 'Acima'], D.sch.map(x => [pdfSafe(x.s.name), String(x.n), fm(x.mean), `${x.hypo}${x.n ? ' (' + (x.hypo / x.n * 100).toFixed(0) + '%)' : ''}`, `${x.hyper}${x.n ? ' (' + (x.hyper / x.n * 100).toFixed(0) + '%)' : ''}`]));
@@ -138,7 +138,7 @@ async function makePDFInner() {
   } else note('Nenhum esquema de tratamento no período.');
   /* histórico */
   h2(`Histórico de medições · ${D.recs.length}`);
-  tbl(['Data', 'Hora', 'mg/dL', 'Faixa', 'Contexto / refeição', 'Carb. (g)', 'Insulina (Ui)', 'Obs.'], [...D.recs].reverse().map(r => [fmtDate(r.date), r.noTime ? '-' : r.time, fn(r.glucose, 1), bandOf(r.glucose, r.context).txt, pdfSafe([CONTEXTS[r.context], MEALS[r.meal]].filter(Boolean).join(' / ')), r.carbs != null ? fn(r.carbs) : '', pdfSafe(insTxt(r)), pdfSafe(trunc(r.notes, 40))]), { fs: 7.5, cols: { 2: { fontStyle: 'bold' } }, cell: d => { if (d.section === 'body' && d.column.index === 2) { const f = String(d.row.raw && d.row.raw[3] || ''); if (/elevada/i.test(f)) d.cell.styles.textColor = [214, 20, 40]; else if (/baixa/i.test(f)) d.cell.styles.textColor = [150, 20, 40]; } } });
+  tbl(['Data', 'Hora', 'mg/dL', 'Faixa', 'Contexto / refeição', 'Carboidratos (g)', 'Insulina (Ui)', 'Obs.'], [...D.recs].reverse().map(r => [fmtDate(r.date), r.noTime ? '-' : r.time, fn(r.glucose, 1), bandOf(r.glucose, r.context).txt, pdfSafe([CONTEXTS[r.context], MEALS[r.meal]].filter(Boolean).join(' / ')), r.carbs != null ? fn(r.carbs) : '', pdfSafe(insTxt(r)), pdfSafe(trunc(r.notes, 40))]), { fs: 7.5, cols: { 2: { fontStyle: 'bold' } }, cell: d => { if (d.section === 'body' && d.column.index === 2) { const f = String(d.row.raw && d.row.raw[3] || ''); if (/elevada/i.test(f)) d.cell.styles.textColor = [214, 20, 40]; else if (/baixa/i.test(f)) d.cell.styles.textColor = [150, 20, 40]; } } });
   /* rodapé */
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
@@ -163,7 +163,7 @@ async function makeXLSXInner() {
   const hw = [12, 8, 16, 14, 18, 14, 14, 16, 12, 10, 10, 10, 14, 18, 20, 30, 10];
   const sheets = [
     { name: 'Resumo', title: 0, hdr: [4, 13], widths: [36, 26, 18], rows: [
-      ['TiaBete ' + APP_VERSION + ' - Relatório glicêmico'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], pfLine() ? ['Paciente', pfLine()] : [], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
+      ['TiaBete ' + APP_VERSION + ' - Relatório de glicemia'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], pfLine() ? ['Paciente', pfLine()] : [], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
       ['Indicador', 'Valor'], ['Medições', s.n], ['Média (mg/dL)', r1(s.mean)], ['Desvio-padrão (mg/dL)', r1(s.sd)], ['Menor (mg/dL)', s.min ?? ''], ['Maior (mg/dL)', s.max ?? ''], ['Medições < 70', s.hypo], ['Medições acima da faixa', s.hyper], [],
       ['Faixa (mg/dL)', 'Medições', '% das medições'], ...BAND_LIST.map(b => [b.label + ' ' + b.name, D.bands[b.k], s.n ? r1(D.bands[b.k] / s.n * 100) : 0]), [],
       ['Observação', 'Contagem de medições pontuais; não representa tempo no alvo (TIR). Este relatório não recomenda doses.']] },

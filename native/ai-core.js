@@ -159,6 +159,7 @@
 
   async function run(input, opts, extra) {
     opts = opts || {};
+    if (typeof window.TB_GATE === 'function' && !window.TB_GATE('ia')) throw { code: 'premium_required', aiMsg: 'Os recursos de IA fazem parte do plano premium. Seus registros, histórico e exportação continuam gratuitos (Mais → Perfil e configurações → Licença).' };
     const cfg = await config(); if (!cfg) throw ERR.notcfg;
     const tools = opts.tools || [], st = { msgs: await initialMessages(cfg.kind, extra && extra.json ? (typeof input === 'string' ? input + '\n\nResponda SOMENTE com JSON válido, sem comentários nem texto fora do JSON.' : input) : input, opts.images) };
     let acc = '';

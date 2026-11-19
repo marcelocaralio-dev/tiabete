@@ -70,9 +70,9 @@ if (window.TB_PUBLIC && window.TB_AI) {
   /* ---- 1. Introdução ---- */
   const secIntro = () => sec('Como a IA funciona no TiaBete', 'info') + `<div class="card"><div class="stack" style="gap:10px">
     <p style="margin:0">A IA do TiaBete lê exames, responde perguntas sobre os seus registros e estima os carboidratos dos alimentos. Ela <b>não calcula doses</b> e não substitui a sua equipe de saúde.</p>
-    <details class="more"><summary>O que é uma API?</summary><p class="hint" style="margin:0 0 12px">É uma “porta” que permite a um aplicativo conversar com um serviço de inteligência artificial pela internet. O TiaBete usa essa porta para enviar a sua pergunta e receber a resposta.</p></details>
-    <details class="more"><summary>O que é a chave de API?</summary><p class="hint" style="margin:0 0 12px">É uma senha longa e pessoal, gerada no site do provedor. Ela mostra ao serviço que o pedido é seu e é por ela que ele cobra (ou aplica o limite gratuito). <b>Não compartilhe a sua chave com ninguém.</b></p></details>
-    <p class="hint" style="margin:0"><b>Em 4 passos:</b> 1) escolha um provedor, 2) crie a conta e gere a chave no site dele, 3) cole a chave aqui e escolha um modelo, 4) teste a conexão. O assistente abaixo guia cada um e guarda o seu progresso.</p>
+    <details class="more"><summary>O que é uma API?</summary><p class="hint" style="margin:0 0 12px">É uma “porta” que deixa um aplicativo conversar com um serviço de inteligência artificial pela internet. O TiaBete a usa para enviar sua pergunta e receber a resposta.</p></details>
+    <details class="more"><summary>O que é a chave de API?</summary><p class="hint" style="margin:0 0 12px">É uma senha longa e pessoal, gerada no site do provedor. Ela mostra que o pedido é seu e define a cobrança (ou o limite gratuito). <b>Não compartilhe a sua chave com ninguém.</b></p></details>
+    <p class="hint" style="margin:0"><b>Em 4 passos:</b> 1) escolha um provedor, 2) crie a conta e gere a chave no site dele, 3) cole a chave aqui e escolha um modelo, 4) teste a conexão. O assistente abaixo guia cada etapa e guarda seu progresso.</p>
     <p class="hint" style="margin:0">O uso é cobrado (ou limitado) pelo provedor, na sua conta. Condições conferidas nos sites dos provedores em ${CHECKED}; elas mudam, então confirme no site antes de usar.</p></div></div>`;
 
   /* ---- 2. Assistente ---- */
@@ -138,11 +138,11 @@ if (window.TB_PUBLIC && window.TB_AI) {
 
   /* ---- 6. Navegador ---- */
   const secBrowser = () => sec('Navegador interno', 'globe') + `<div class="card"><div class="stack" style="gap:10px">
-    <p class="hint" style="margin:0">Abre os sites dos provedores numa <b>aba do navegador Chromium do Android</b> (Chrome Custom Tabs) por cima do TiaBete. Ela tem barra de endereço, botões de voltar e avançar, atualizar e copiar o link (no menu da aba). Ao fechar a aba (✕ ou botão voltar do celular), você volta ao TiaBete <b>exatamente onde estava</b>; o seu progresso fica salvo.</p>
+    <p class="hint" style="margin:0">Abre os sites dos provedores numa <b>aba do navegador do Android</b>, por cima do TiaBete. A aba tem barra de endereço, voltar, avançar, atualizar e copiar o endereço (no menu dela). Ao fechar (✕ ou botão voltar do celular), você volta ao TiaBete <b>exatamente onde estava</b>, com o progresso salvo.</p>
     <div class="field"><label class="fl" for="ai-url">Abrir um endereço</label><input class="in" id="ai-url" type="url" inputmode="url" autocomplete="off" placeholder="https://aistudio.google.com" value="${esc(A().lastUrl)}"></div>
     <div class="ia-row">${btn('ai-browse', ic(IC.ext) + 'Abrir', '', 'pri')}${btn('ai-copy', ic(IC.copy) + 'Copiar endereço', 'data-from="ai-url"')}</div>
     <div class="ia-row">${Object.keys(PV).filter(k => PV[k].site).slice(0, 6).map(k => `<button type="button" class="ia-chip" data-act="ai-open" data-url="${PV[k].site}">${logo(k)}<span>${esc(PV[k].name.split(' ')[0])}</span></button>`).join('')}</div>
-    <div class="ia-limit"><b>Limitação, explicada:</b> o Android não deixa embutir um Chromium completo dentro do app sem trazer um navegador inteiro junto, e os sites de login bloqueiam janelas embutidas por segurança. Por isso a aba abre por cima do TiaBete, e não dentro dele. O TiaBete <b>não vê</b> as páginas, senhas, cookies nem a chave exibida: é você quem copia e cola (botão “Colar” na Configuração).</div></div></div>`;
+    <div class="ia-limit"><b>Limitação, explicada:</b> o Android não deixa embutir um navegador completo dentro do app, e os sites de login bloqueiam janelas embutidas por segurança. Por isso a aba abre por cima do TiaBete, e não dentro dele. O TiaBete <b>não vê</b> as páginas, senhas, cookies nem a chave exibida: é você quem copia e cola (botão “Colar” na Configuração).</div></div></div>`;
 
   /* ---- 7. Teste ---- */
   function connState() {
@@ -164,10 +164,10 @@ if (window.TB_PUBLIC && window.TB_AI) {
   }
   const secSecurity = () => sec('Segurança das suas chaves', 'lock') + `<div class="card"><ul class="ia-ul">
     <li>A chave fica <b>cifrada</b> neste aparelho (AES-GCM, com chave que o app não consegue exportar).</li>
-    <li>Ela <b>não entra em backups</b>, relatórios, Google Drive nem mensagens de erro. Mesmo o rascunho da chave é guardado cifrado.</li>
+    <li>Ela <b>não entra nas cópias</b>, relatórios, Google Drive nem mensagens de erro. Mesmo o rascunho da chave é guardado cifrado.</li>
     <li>O TiaBete não tem servidor: os pedidos vão <b>direto do seu celular ao provedor</b>, só por https.</li>
     <li>O navegador interno <b>não lê</b> páginas, senhas, cookies nem chaves. Você copia e cola.</li>
-    <li>Quando você usa a IA, o conteúdo necessário (resumos de registros, texto de exames sem CPF e e-mail, nomes de alimentos) é enviado ao provedor. Cada provedor tem as próprias regras.</li>
+    <li>Ao usar a IA, o conteúdo necessário (resumos de registros, texto de exames sem CPF e e-mail, nomes de alimentos) é enviado ao provedor, que tem as próprias regras.</li>
     <li>Se achar que a chave vazou, apague-a no site do provedor e use “Remover chave” aqui.</li></ul></div>`;
 
   VIEWS.ia = function () {

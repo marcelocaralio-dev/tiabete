@@ -1,0 +1,91 @@
+/* ================= Padrão dos botões =================
+   Dois estados obrigatórios, em todo o app:
+   · NORMAL    → disponível: contorno/fundo vermelho (identidade TiaBete) sobre o preto.
+   · APÓS CLIQUE → a cor muda NA HORA: escurece enquanto o dedo/mouse está pressionado (.is-press / :active)
+                   e dá um brilho curto de confirmação depois do clique (.is-hit, ~0,6 s), voltando ao normal.
+   Animação: reduz até 96 % ao pressionar e as cores trocam em 120–250 ms. Nada atrasa a ação (só CSS).
+   buttons.js só liga/desliga as classes .is-press e .is-hit; não altera o que cada botão faz.
+   Tudo usa as variáveis de cor do tema (inclusive as paletas da tela de medição e o tema claro).      */
+:root { --bt-on: #fff; --bt-s: .96; }
+:root[data-theme="light"] { --bt-on: var(--fg); }
+
+/* ---------- transições (todas curtas) ---------- */
+button, summary, .mk span, .tgl, input.swt {
+  transition: transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .3s ease, filter .2s ease, opacity .2s ease;
+}
+button:not(:disabled):not(.acb):not(.sc-thumb), summary { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+/* ---------- 1) NORMAL: botão com cara de botão ---------- */
+.btn:not(.pri):not(.dark):not(.danger):not(.ghost) { border-color: color-mix(in srgb, var(--red) 42%, var(--line)); }
+.btn.ghost { border-color: color-mix(in srgb, var(--red) 30%, var(--line)); }
+
+/* ---------- 2) PRESSIONADO (efeito imediato) ---------- */
+.btn:not(:disabled):is(:active, .is-press) { transform: scale(var(--bt-s)); background: var(--red-d); border-color: var(--red); color: var(--bt-on); }
+.btn.pri:not(:disabled):is(:active, .is-press) { background: color-mix(in srgb, var(--red) 68%, #000); border-color: color-mix(in srgb, var(--red) 68%, #000); color: #fff; }
+.btn.danger:not(:disabled):is(:active, .is-press) { background: var(--red-d); border-color: var(--red-l); color: var(--bt-on); }
+.btn.full:not(:disabled):is(:active, .is-press), .btn.grow:not(:disabled):is(:active, .is-press) { --bt-s: .975; }
+
+/* seletores (períodos, abas, filtros, chips) */
+.seg button:not(:disabled):is(:active, .is-press), .seg-b:not(:disabled):is(:active, .is-press), .ac-chip:is(:active, .is-press), .ia-chip:is(:active, .is-press), .ia-m:is(:active, .is-press), .ac-opt:is(:active, .is-press), .chip:is(button):is(:active, .is-press) {
+  transform: scale(var(--bt-s)); background: var(--red-d); border-color: var(--red); color: var(--bt-on);
+}
+.mk:is(:active, .is-press) span { transform: scale(var(--bt-s)); background: var(--red-d); border-color: var(--red); color: var(--bt-on); }
+.mk input:checked + span { transition: transform .12s ease, background-color .2s ease, border-color .2s ease; }
+
+/* linhas e cartões que são botões */
+.rec:not(:disabled):is(:active, .is-press), .menu-item:is(:active, .is-press), .dr-it:is(:active, .is-press), .mx-h:is(:active, .is-press), .pn-c:is(:active, .is-press) {
+  transform: scale(.985); background-color: color-mix(in srgb, var(--red) 14%, var(--s2)); border-color: color-mix(in srgb, var(--red) 55%, var(--line));
+}
+.dr-it:is(:active, .is-press) { border-radius: 12px; }
+.pf-big:is(:active, .is-press), .ia-re:is(:active, .is-press), .ic-strip:is(:active, .is-press), .ia-st:is(:active, .is-press), .dr-me:is(:active, .is-press), .sf-note > summary:is(:active, .is-press) {
+  transform: scale(.985); background-color: color-mix(in srgb, var(--red) 14%, var(--s2)); border-color: color-mix(in srgb, var(--red) 55%, var(--line));
+}
+/* títulos que abrem e fecham (Filtros, "O que cada indicador precisa"…) */
+summary:is(:active, .is-press) { background-color: color-mix(in srgb, var(--red) 12%, transparent); color: var(--fg); }
+/* ícones sozinhos */
+.nav button:is(:active, .is-press), .thm:is(:active, .is-press), .dr-x:is(:active, .is-press), .mais-x:is(:active, .is-press), .pr-x:is(:active, .is-press), .pf-x:is(:active, .is-press), .bl-x:is(:active, .is-press), .acp-i:is(:active, .is-press) {
+  transform: scale(var(--bt-s)); background-color: color-mix(in srgb, var(--red) 20%, transparent); color: var(--red-l);
+}
+.nav .fab:is(:active, .is-press) { background: color-mix(in srgb, var(--red) 68%, #000); color: #fff; }
+.tgl:is(:active, .is-press) { filter: brightness(1.25); }
+input.swt:active { filter: brightness(1.25); }
+
+/* ---------- 3) CONFIRMAÇÃO depois do clique (brilho curto, volta sozinho) ---------- */
+.btn.is-hit:not(.pri):not(:disabled) { background: color-mix(in srgb, var(--red) 24%, var(--s2)); border-color: var(--red-l); box-shadow: 0 0 0 3px rgba(var(--red-rgb), .28); }
+.btn.pri.is-hit:not(:disabled) { background: color-mix(in srgb, var(--red) 82%, #fff); border-color: color-mix(in srgb, var(--red) 82%, #fff); box-shadow: 0 0 0 3px rgba(var(--red-rgb), .35), 0 6px 22px rgba(var(--red-rgb), .32); }
+.seg button.is-hit, .seg-b.is-hit, .ac-chip.is-hit, .ia-chip.is-hit, .ia-m.is-hit { box-shadow: 0 0 0 3px rgba(var(--red-rgb), .28); }
+.rec.is-hit, .menu-item.is-hit, .dr-it.is-hit, .mx-h.is-hit, .pf-big.is-hit, .ia-re.is-hit, .ic-strip.is-hit, .ia-st.is-hit, .dr-me.is-hit, summary.is-hit { background-color: color-mix(in srgb, var(--red) 10%, var(--s2)); }
+.nav button.is-hit, .thm.is-hit, .dr-x.is-hit, .mais-x.is-hit, .pr-x.is-hit, .pf-x.is-hit, .bl-x.is-hit, .acp-i.is-hit { background-color: color-mix(in srgb, var(--red) 14%, transparent); }
+.mk.is-hit span { box-shadow: 0 0 0 3px rgba(var(--red-rgb), .28); }
+
+/* ---------- 4) Cursor com mouse: realce leve (no celular o "hover" não fica grudado) ---------- */
+@media (hover: hover) {
+  .btn:not(:disabled):not(.pri):hover { border-color: var(--red); background-color: color-mix(in srgb, var(--red) 10%, var(--s2)); }
+  .seg button:not([aria-pressed="true"]):hover, .seg-b:not(.on):hover, .ac-chip:not(.on):hover, .ia-chip:not(.on):hover { border-color: color-mix(in srgb, var(--red) 55%, var(--line)); color: var(--fg); }
+  .nav button:hover { color: var(--red-l); }
+}
+
+/* ---------- 5) Desativado: claramente indisponível ---------- */
+button:disabled, .btn[disabled] { cursor: not-allowed; }
+
+/* ---------- 6) Movimento reduzido: as cores mudam igual, sem animar nem encolher ---------- */
+@media (prefers-reduced-motion: reduce) {
+  button, summary, .mk span, .tgl, input.swt { transition: none !important; }
+  .btn:is(:active, .is-press), .seg button:is(:active, .is-press), .seg-b:is(:active, .is-press), .rec:is(:active, .is-press), .menu-item:is(:active, .is-press), .dr-it:is(:active, .is-press), .mx-h:is(:active, .is-press), .pn-c:is(:active, .is-press), .nav button:is(:active, .is-press), .mk:is(:active, .is-press) span { transform: none; }
+}
+
+/* ---------- depois do toque: confirma na hora e ignora novos toques por 0,7 s ---------- */
+button.is-lock, [role="button"].is-lock { pointer-events: none; }
+.btn.is-lock:not(.pri):not(:disabled) { background: color-mix(in srgb, var(--red) 24%, var(--s2)); border-color: var(--red-l); }
+.btn.pri.is-lock:not(:disabled) { background: color-mix(in srgb, var(--red) 82%, #fff); border-color: color-mix(in srgb, var(--red) 82%, #fff); }
+.ins-card.ins-done .btn.is-lock:not(.pri):not(:disabled) { background: color-mix(in srgb, var(--good-fill) 24%, var(--s2)); border-color: var(--good-fill); }
+.ins-card.ins-done .btn.pri.is-lock:not(:disabled) { background: #15803d; border-color: #15803d; }
+/* ---------- texto sempre centrado dentro dos botões ---------- */
+.btn, .ins-act, .ins-sec .btn, .ins-stop { display: inline-flex; align-items: center; justify-content: center; text-align: center; line-height: 1.15; padding-top: 8px; padding-bottom: 8px; }
+.btn.sm, .ins-card .ins-sec .btn, .ins-card .ins-stop { padding-top: 4px; padding-bottom: 4px; }
+.btn:not(.sm):not(.ins-act) { padding-inline: 16px; }
+.btn.sm, .ins-card .ins-sec .btn, .ins-card .ins-stop { padding-inline: 10px; }
+.btn > svg, .btn > .ic { flex: none; }
+
+/* ---------- "Tomei agora" depois de registrado: verde apagado e bloqueado até a regra de cada insulina liberar ---------- */
+.ins-card .ins-side .ins-act.ins-lockd[disabled], .ins-card .ins-act.ins-lockd[disabled] { background: linear-gradient(145deg, #1d5c38, #15472b); border-color: #2b7a4b; color: rgba(255,255,255,.7); box-shadow: none; opacity: 1; cursor: not-allowed; }

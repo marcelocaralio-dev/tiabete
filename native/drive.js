@@ -13,19 +13,22 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   const rnd = n => b64u(crypto.getRandomValues(new Uint8Array(n)));
   const form = o => ({ headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: o });
 
+  /* Restaura a conta Google guardada (cofre tb-secure). Roda UMA vez, já na abertura do app (veja o fim do arquivo), e não só quando a tela de
+     backup é aberta; o licenciamento e a tela de entrada esperam por ela (TB_DRV.ready). */
   async function load() {
     G.loaded = true;
     try { if (!G.baked) G.cid = ((await SEC.getCfg('g-client')) || '').trim(); G.conn = await SEC.has('g-refresh'); G.profile = await SEC.getCfg('g-profile'); } catch (e) { }
-    if (S.route === 'backup') render();
+    try { if (S.route === 'backup') render(); } catch (e) { }
   }
-  const notify = () => { try { window.dispatchEvent(new Event('tb-auth')); } catch (e) { } };
+  /* evento "tb-auth": detail.type = 'restored' (conta lida do aparelho na abertura), 'connected' (login concluído), 'disconnected' ou 'changed' */
+  const notify = type => { try { window.dispatchEvent(new CustomEvent('tb-auth', { detail: { type: type || 'changed' } })); } catch (e) { try { window.dispatchEvent(new Event('tb-auth')); } catch (x) { } } };
   async function tokenCall(params) {
     const r = await http(TOK, Object.assign({ method: 'POST' }, form(Object.assign({ client_id: G.cid }, params))));
     return r;
   }
   async function accessToken(force) {
     if (!force && G.access && Date.now() < G.exp - 60000) return G.access;
-    const rt = await SEC.get('g-refresh'); if (!rt) { G.conn = false; throw E('drv_not_connected', 'Conecte sua conta Google em Mais → Backup e dados.'); }
+    const rt = await SEC.get('g-refresh'); if (!rt) { G.conn = false; throw E('drv_not_connected', 'Conecte sua conta Google em Mais → Cópia de segurança.'); }
     const r = await tokenCall({ grant_type: 'refresh_token', refresh_token: rt });
     if (r.status === 400 || r.status === 401) { await SEC.del('g-refresh'); G.conn = false; G.access = null; throw reauth(); }
     if (r.status >= 300 || !r.data || !r.data.access_token) throw E('upstream_error', 'O Google não respondeu. Tente de novo em instantes.');
@@ -73,7 +76,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     signIn: () => connect(), state: G,
     card(drv, body) {
       if (!G.loaded) load();
-      const intro = `Salva uma cópia do backup completo na pasta <b>TiaBete Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
+      const intro = `Salva uma cópia completa na pasta <b>TiaBete Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
       if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px"><button class="btn full" data-act="g-out" ${G.busy ? 'disabled' : ''}>Sair da conta Google</button></div></div>`;
       const idField = G.baked ? '' : `<div class="field" style="margin-top:12px"><label class="fl" for="g-cid">ID do cliente Google (OAuth)</label><input class="in" id="g-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid)}"></div>`;
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}
@@ -89,12 +92,12 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     const B = P('Browser'); if (!B) { G.msg = 'O navegador do sistema não está disponível neste aparelho.'; return render(); }
     const verifier = rnd(48), state = rnd(16);
     const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-    G.pending = { verifier, state }; G.msg = ''; G.busy = true; render(); notify();
+    G.pending = { verifier, state }; G.msg = ''; G.busy = true; render(); notify('changed');
     const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: G.cid, redirect_uri: REDIRECT, response_type: 'code', scope: SCOPE, code_challenge: ch, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent' });
     try { await B.open({ url }); } catch (e) { G.busy = false; G.msg = 'Não foi possível abrir o navegador.'; render(); notify(); }
   }
   async function onUrl(url) {
-    if (!url || !url.startsWith('app.tiabete.glicose:')) return;
+    if (!url || !url.startsWith('app.tiabete.glicose:') || url.startsWith('app.tiabete.glicose:/pagamento')) return; /* /pagamento é o retorno da compra (src/license.js) */
     const B = P('Browser'); try { B && await B.close(); } catch (e) { }
     const q = new URL(url.replace('app.tiabete.glicose:/', 'https://x/')).searchParams, pend = G.pending; G.pending = null;
     try {
@@ -102,18 +105,18 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       if (q.get('error')) throw E('x', q.get('error') === 'access_denied' ? 'Você não autorizou o acesso ao Drive.' : 'O Google recusou o login (' + q.get('error') + ').');
       const r = await tokenCall({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: pend.verifier, redirect_uri: REDIRECT });
       if (r.status >= 300 || !r.data || !r.data.refresh_token) throw E('x', 'Não foi possível concluir o login' + (r.data && r.data.error_description ? ': ' + r.data.error_description : '.'));
-      await SEC.set('g-refresh', r.data.refresh_token); G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; G.conn = true; G.msg = '';
+      G.idToken = r.data.id_token || null; G.idAt = Date.now(); G.idErr = null; await SEC.set('g-refresh', r.data.refresh_token); G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; G.conn = true; G.msg = '';
       try { const pl = JSON.parse(decodeURIComponent(escape(atob(String(r.data.id_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); G.profile = { email: pl.email || '', name: pl.name || '' }; await SEC.setCfg('g-profile', G.profile); } catch (e) { }
       toast('Conta Google conectada.');
     } catch (e) { G.msg = e.aiMsg || 'Falha ao conectar.'; }
-    G.busy = false; render(); notify();
+    G.busy = false; render(); notify(G.conn ? 'connected' : 'changed');
   }
   async function disconnect() {
     G.busy = true; render();
     try { const rt = await SEC.get('g-refresh'); if (rt) await http('https://oauth2.googleapis.com/revoke', Object.assign({ method: 'POST' }, form({ token: rt }))); } catch (e) { }
-    await SEC.del('g-refresh'); await SEC.setCfg('g-profile', null); await SEC.setCfg('login-skip', false); G.profile = null; G.conn = false; G.access = null; G.busy = false; G.msg = '';
+    await SEC.del('g-refresh'); await SEC.setCfg('g-profile', null); await SEC.setCfg('login-skip', false); G.profile = null; G.conn = false; G.access = null; G.idToken = null; G.idErr = null; G.busy = false; G.msg = '';
     S.drv.auto = false; S.drv.folderId = null; S.drv.list = null; try { await drvSavePref(); } catch (e) { }
-    toast('Você saiu da conta Google.'); render(); notify();
+    toast('Você saiu da conta Google.'); render(); notify('disconnected');
   }
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act="g-in"],[data-act="g-out"]'); if (!el) return;
@@ -122,5 +125,28 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   const A = P('App'); if (A && A.addListener) A.addListener('appUrlOpen', d => onUrl(d && d.url));
   /* se o usuário fechar o navegador sem concluir, o botão volta ao normal ao retornar ao app */
   if (A && A.addListener) A.addListener('resume', () => setTimeout(() => { if (G.busy && G.pending) { G.busy = false; G.pending = null; if (S.route === 'backup') render(); notify(); } }, 4000));
+  /* ID token do Google para o licenciamento (o servidor valida; o app nunca decide sozinho). Reaproveita o último se tiver menos de 45 min.
+     Devolve null quando não dá, MAS agora diz o motivo em G.idErr = { code, msg } (a tela de licença mostra a mensagem):
+       not_connected · needs_reauth (o Google recusou a renovação) · no_id_token · google_error · network. */
+  let idFlight = null;
+  async function idTokenNow() {
+    await G.ready;
+    if (G.idToken && Date.now() - (G.idAt || 0) < 45 * 60000) return G.idToken;
+    let rt = null; try { rt = await SEC.get('g-refresh'); } catch (e) { }
+    if (!rt) { G.conn = false; G.idErr = { code: 'not_connected', msg: 'Entre com a sua conta Google para iniciar o teste ou usar a licença.' }; return null; }
+    G.conn = true;
+    let r; try { r = await tokenCall({ grant_type: 'refresh_token', refresh_token: rt }); }
+    catch (e) { G.idErr = { code: 'network', msg: 'Sem conexão para confirmar a sua conta Google. Tente de novo com a internet ligada.' }; return null; }
+    if (r.status === 400 || r.status === 401) { G.idErr = { code: 'needs_reauth', msg: 'O Google não aceitou renovar o seu login' + (r.data && r.data.error ? ' (' + String(r.data.error).slice(0, 40) + ')' : '') + '. Toque em “Entrar com Google” para conectar de novo.' }; return null; }
+    if (r.status >= 300 || !r.data) { G.idErr = { code: 'google_error', msg: 'O Google não respondeu direito (erro ' + r.status + '). Tente de novo em instantes.' }; return null; }
+    if (!r.data.id_token) { G.idErr = { code: 'no_id_token', msg: 'O Google não enviou a identidade da conta. Saia e entre de novo com o Google.' }; return null; }
+    G.idToken = r.data.id_token; G.idAt = Date.now(); G.idErr = null;
+    if (r.data.access_token) { G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; }
+    return G.idToken;
+  }
+  window.TB_DRV.idToken = () => idFlight || (idFlight = idTokenNow().finally(() => { idFlight = null; }));
+  window.TB_DRV.ready = () => G.ready;
   window.TB_DRV_STATE = G;
+  /* restaura a conta já na abertura e avisa quem depende dela (licenciamento, tela de entrada) */
+  G.ready = load().then(() => notify('restored'), () => notify('restored'));
 }

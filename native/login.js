@@ -24,10 +24,10 @@ if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
     if (!gate) { gate = document.createElement('div'); gate.id = 'tb-gate'; gate.setAttribute('role', 'dialog'); gate.setAttribute('aria-label', 'Entrar no TiaBete'); document.body.appendChild(gate); }
     const idField = (window.TB_GOOGLE_CLIENT_ID || '').trim() ? '' : `<div><label class="fl" for="gate-cid">ID do cliente Google (OAuth)</label><input class="in" id="gate-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid || '')}"></div>`;
     gate.innerHTML = `<div>${drop}</div><h1 class="gt">Bem-vindo ao Tia<b>Bete</b></h1>
-      <p>Entre com a sua conta Google para ativar o backup no seu próprio Drive. Seus registros de glicemia ficam guardados <b>neste aparelho</b>; o TiaBete não tem servidor e não vê seus dados.</p>${idField}
+      <p>Entre com a sua conta Google para ativar a cópia no seu próprio Drive. Seus registros de glicemia ficam guardados <b>neste aparelho</b>; o TiaBete não tem servidor e não vê seus dados.</p>${idField}
       <div class="gb"><button class="btn pri full" id="gate-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Entrar com Google'}</button></div>
       ${G.msg ? `<p style="color:var(--red-t)" role="alert">${esc(G.msg)}</p>` : ''}
-      <button class="gl" id="gate-skip">Continuar sem conta (dados só neste aparelho)</button>
+      <button class="gl" id="gate-skip">Continuar sem conta</button>
       <p style="font-size:12.5px">O app não substitui acompanhamento médico. Em emergência, ligue 192 (SAMU).</p>`;
   }
   async function maybePrompt() {

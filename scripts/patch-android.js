@@ -3,7 +3,7 @@ const fs = require('fs'), path = require('path');
 const f = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 if (!fs.existsSync(f)) { console.error('AndroidManifest.xml não encontrado. Rode "npx cap add android" antes.'); process.exit(1); }
 let x = fs.readFileSync(f, 'utf8');
-const perms = ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.USE_BIOMETRIC'];
+const perms = ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.USE_BIOMETRIC', 'android.permission.VIBRATE'];
 for (const p of perms) if (!x.includes(p)) x = x.replace('</manifest>', `    <uses-permission android:name="${p}" />\n</manifest>`);
 /* Retorno do login Google (backup no Drive): o app recebe app.tiabete.glicose:/oauth2redirect */
 if (!x.includes('app.tiabete.glicose"')) {
@@ -38,8 +38,8 @@ if (fs.existsSync(g)) {
     if (j.includes('setTextZoom')) return;
     if (!/extends\s+BridgeActivity\s*\{\s*\}/.test(j)) { console.warn('MainActivity.java com formato inesperado; textZoom não aplicado.'); return; }
     const pk = (/package\s+([\w.]+)\s*;/.exec(j) || [])[1];
-    if (pk) { writeExpire(path.dirname(f), pk); writeBiometric(path.dirname(f), pk); } else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
-    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        registerPlugin(TbBiometricPlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
+    if (pk) { writeExpire(path.dirname(f), pk); writeBiometric(path.dirname(f), pk); writeSettings(path.dirname(f), pk); } else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
+    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        registerPlugin(TbBiometricPlugin.class);\n        registerPlugin(TbSettingsPlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
     fs.writeFileSync(f, j); console.log('textZoom 100% aplicado em', e.name);
   }
 })(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java'));
@@ -264,4 +264,94 @@ public class TbBiometricPlugin extends Plugin {
 }
 `);
   console.log('Plugin TbBiometric gravado em', dir);
+}
+
+/* Plugin nativo mínimo para os lembretes de insulina: abre as configurações do sistema (notificações, alarmes exatos, bateria)
+   e informa se as notificações estão liberadas. Não agenda nada: o agendamento é do LocalNotifications. */
+function writeSettings(dir, pk) {
+  fs.writeFileSync(path.join(dir, 'TbSettingsPlugin.java'), `package ${pk};
+
+import android.app.AlarmManager;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
+import androidx.core.app.NotificationManagerCompat;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+@CapacitorPlugin(name = "TbSettings")
+public class TbSettingsPlugin extends Plugin {
+    private boolean launch(Intent i) {
+        try {
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean openDetails() {
+        Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        i.setData(Uri.parse("package:" + getContext().getPackageName()));
+        return launch(i);
+    }
+
+    @PluginMethod
+    public void status(PluginCall call) {
+        try {
+            Context c = getContext();
+            JSObject o = new JSObject();
+            o.put("notifications", NotificationManagerCompat.from(c).areNotificationsEnabled());
+            boolean exact = true;
+            if (Build.VERSION.SDK_INT >= 31) {
+                AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+                exact = am != null && am.canScheduleExactAlarms();
+            }
+            o.put("exact", exact);
+            PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            o.put("battery", pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName()));
+            call.resolve(o);
+        } catch (Exception e) {
+            call.reject("status failed");
+        }
+    }
+
+    @PluginMethod
+    public void openNotifications(PluginCall call) {
+        Intent i;
+        if (Build.VERSION.SDK_INT >= 26) {
+            i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            i.putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+        } else {
+            i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            i.setData(Uri.parse("package:" + getContext().getPackageName()));
+        }
+        if (launch(i) || openDetails()) call.resolve(); else call.reject("Não foi possível abrir as configurações");
+    }
+
+    @PluginMethod
+    public void openExactAlarms(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            Intent i = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+            i.setData(Uri.parse("package:" + getContext().getPackageName()));
+            if (launch(i)) { call.resolve(); return; }
+        }
+        if (openDetails()) call.resolve(); else call.reject("Não foi possível abrir as configurações");
+    }
+
+    @PluginMethod
+    public void openBattery(PluginCall call) {
+        Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+        if (launch(i) || openDetails()) call.resolve(); else call.reject("Não foi possível abrir as configurações");
+    }
+}
+`);
+  console.log('Plugin TbSettings gravado em', dir);
 }

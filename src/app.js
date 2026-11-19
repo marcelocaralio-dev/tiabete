@@ -108,7 +108,7 @@ function makeExamples() {
 }
 
 /* ================= Utilidades de interface ================= */
-/* Recursos que dependem do Claude (perguntas, leitura de exames, backup no Drive) só existem quando o app roda dentro do Claude. */
+/* Recursos que dependem do Claude (perguntas, leitura de exames, cópia no Drive) só existem quando o app roda dentro do Claude. */
 const HAS_CLAUDE = !!(window.claude && window.claude.use);
 const IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const IC = {
@@ -122,6 +122,7 @@ const MIC = {
   cafe: '<path d="M4 9h12v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9zM16 10h2a2 2 0 0 1 0 4h-2M7 3v2.5M11 3v2.5"/>',
   almoco: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
   jantar: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/>',
+  ceia: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5zM16 4v3M14.5 5.5h3"/>',
   lanche: '<circle cx="12" cy="12" r="9"/><path d="M8.5 9h.01M14 8h.01M15.5 13h.01M10 14.5h.01M12.5 17h.01"/>',
   refeicao: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-3 4-3 7h3v11"/>',
   deitar: '<path d="M3 19v-9M3 15.5h18V19M21 15.5v-3a3 3 0 0 0-3-3h-7v6"/>',
@@ -139,7 +140,7 @@ function mealIcon(r) {
 }
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', config: 'Configurações', perfil: 'Meu Perfil', aparencia: 'Aparência', painel: 'Painel', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Esquemas de tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Backup e dados', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e notificações', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
+const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
@@ -154,6 +155,7 @@ function openSheet(html) {
   bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
   bg.addEventListener('pointerdown', e => { if (e.target === bg) closeSheet(); });
   document.body.appendChild(bg); document.body.style.overflow = 'hidden';
+  try { glInit(bg); } catch (e) { }
   const f = bg.querySelector('[autofocus]'); if (f) setTimeout(() => f.focus(), 60);
 }
 function closeSheet() { const b = $('#sheet-bg'); if (b) b.remove(); document.body.style.overflow = (typeof pmOpenNow === 'function' && pmOpenNow()) ? 'hidden' : ''; }
@@ -165,7 +167,7 @@ function relTime(ms) {
   const days = Math.round(h / 24); return days === 1 ? 'há 1 dia' : `há ${days} dias`;
 }
 const a1cBadge = v => { const b = a1cEval(v, S.a1cT); return b ? `<span class="badge ${b.k}">${b.sym} ${b.txt}</span>` : ''; };
-function badge(v, ctx) { const b = bandOf(v, ctx); return `<span class="badge ${b.k}">${b.sym} ${b.txt}</span>`; }
+function badge(v, ctx, hiFlag) { const b = bandOf(v, ctx); if (hiFlag && v > 600) return `<span class="badge vhigh">${b.sym} HI · acima de 600</span>`; return `<span class="badge ${b.k}">${b.sym} ${b.txt}</span>`; }
 function emptyBlock(t, d, extra = '') { return `<div class="empty"><b>${t}</b>${d}${extra}</div>`; }
 function recChips(r) {
   const c = [];
@@ -182,8 +184,8 @@ const curRange = () => periodRanges(S.period, Date.now());
 function banners() {
   if (typeof acBubbleOn === 'function' && acBubbleOn() && !S._acCollect) return '';
   let h = '';
-  if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte um backup antes de sair.</span></div>`;
-  h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner() + caBanner();
+  if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte uma cópia antes de sair.</span></div>`;
+  h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner() + irBanner() + caBanner();
   if (hasExamples()) h += `<div class="banner"><span><b>Dados de exemplo.</b> Eles somem sozinhos quando você importar ou registrar a primeira medição real.</span><button class="btn sm" data-act="rm-examples">Remover agora</button></div>`;
   return h;
 }
@@ -200,10 +202,10 @@ function todayBlock() {
   let h = `<div class="row sp" style="margin:22px 0 10px"><h2 class="sec" style="margin:0">${lab}</h2><div class="day-nav">${isToday ? '' : '<button class="btn sm" data-act="day-today">Hoje</button>'}<button class="btn sm" data-act="day-prev" aria-label="Dia anterior">‹</button><button class="btn sm" data-act="day-next" aria-label="Próximo dia" ${isToday ? 'disabled' : ''}>›</button></div></div>`;
   if (!rs.length) {
     const prevRec = [...S.records].reverse().find(r => r.ts < mkTs(iso, '00:00'));
-    return h + `<div class="card">${emptyBlock(isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia', prevRec ? `Última medição: ${fn(prevRec.glucose, 1)} mg/dL em ${fmtDate(prevRec.date)}.` : 'Registre uma medição para começar.', isToday ? '<br><br><button class="btn pri" data-act="new">Registrar medição</button>' : '')}</div>`;
+    return h + `<div class="card">${emptyBlock(isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia', prevRec ? `Última medição: ${fn(prevRec.glucose, 1)} mg/dL em ${fmtDate(prevRec.date)}.` : 'Registre uma medição para começar.', isToday ? '<br><br><button class="btn pri" data-act="new">Nova medição</button>' : '')}</div>`;
   }
   const spread = st.max - st.min;
-  h += `<div class="card"><div class="day-g"><div class="lb">Média do dia</div><div class="gauge-box gauge-md">${gaugeSvg(st.mean, false, 'Média do dia: ' + fn(st.mean, 1) + ' mg/dL. Mostrador de 70 a 250 mg/dL.')}</div></div>
+  h += `<div class="card"><div class="day-g"><div class="lb">Média do dia</div><div class="gauge-box gauge-md">${gaugeSvg(st.mean, false, 'Média do dia: ' + fn(st.mean, 1) + ' mg/dL.', 'dia')}</div></div>
     <div class="sum day-sum">
     <div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:32px">${st.n}</div><div class="sub">${st.hypo ? st.hypo + ' abaixo de 70 · ' : ''}${st.hyper ? st.hyper + ' acima da faixa' : (st.hypo ? '' : 'todas dentro da faixa')}</div></div>
     <div class="tile"><div class="lb">Variação</div>${st.n > 1 ? `<div class="v num" style="font-size:32px">${stepFmt(spread).replace('+', '')}<small>mg/dL</small></div><div class="sub">Maior ${fn(st.max, 1)} · menor ${fn(st.min, 1)}</div>` : `<div class="v num" style="font-size:32px">—</div><div class="sub">Precisa de 2 medições</div>`}</div>
@@ -227,8 +229,8 @@ function est90() {
 }
 function hbaCard() {
   const e = est90(), h = `<h2 class="sec">Hemoglobina glicada · estimativa</h2>`;
-  const note = '<div class="sub" style="margin-top:8px">Estimativa matemática aproximada. Não é exame de laboratório e não é o GMI.</div>';
-  if (!e.ok) return h + `<div class="card soft" style="border-style:dashed"><div class="eyebrow">Últimos 90 dias</div><div class="tile"><div class="v num" style="font-size:30px">—</div><div class="sub">Estimativa indisponível: são necessárias ao menos 30 medições em 20 dias diferentes. Há ${e.st.n} medições em ${e.days} dias.</div></div>${note}</div>`;
+  const note = '<div class="sub" style="margin-top:8px">Estimativa aproximada. Não é exame de laboratório e não é o GMI (estimativa de sensor contínuo).</div>';
+  if (!e.ok) return h + `<div class="card soft" style="border-style:dashed"><div class="eyebrow">Últimos 90 dias</div><div class="tile"><div class="v num" style="font-size:30px">—</div><div class="sub">Sem estimativa: precisa de 30 medições em 20 dias diferentes. Há ${e.st.n} medições em ${e.days} dias.</div></div>${note}</div>`;
   const ev = a1cEval(e.value, S.a1cT), key = 'e' + e.value.toFixed(2) + '|' + S.a1cT, an = S.a1mKey !== key; S.a1mKey = key;
   return h + `<div class="card hba2 hb-${ev.k}"><div class="hr-top"><div class="eyebrow">Estimada · últimos 90 dias</div></div>
     <div class="hba2-v"><span class="num">≈ ${fn(e.value, 1)}</span><small>%</small></div><div class="hr-state" style="margin-top:6px">${a1cBadge(e.value)}</div>
@@ -249,28 +251,28 @@ function viewPainelClassic() {
   let h = banners() + labelBanner() + pfInvite();
   const all = S.records;
   if (!all.length) {
-    return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Seu painel começa aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o CSV do mySugr ou registre uma medição. Os dados ficam só neste navegador.</p>
-    <div class="big-cta"><button class="btn pri full" data-act="go" data-r="importar">Importar CSV do mySugr</button><button class="btn full" data-act="new">Registrar medição</button></div></div>`;
+    return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Comece por aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o CSV do mySugr ou registre uma medição. Os dados ficam só neste aparelho.</p>
+    <div class="big-cta"><button class="btn pri full" data-act="go" data-r="importar">Importar CSV do mySugr</button><button class="btn full" data-act="new">Nova medição</button></div></div>`;
   }
   h += prNotice('painel');
   const last = all[all.length - 1];
   const gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
-  const bnd = bandOf(last.glucose, last.context), gLbl = `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}. Mostrador de 70 a 250 mg/dL.`;
+  const bnd = bandOf(last.glucose, last.context), gLbl = `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}.`;
   h += `<div class="card red hero hero2 b-${bnd.k}${(last.glucose < LIM.low || last.glucose > LIM.high) ? ' oor' : ''}"><div class="hr-top"><div class="eyebrow">Glicemia mais recente</div><span class="hr-when">${relTime(last.ts)}</span></div>
-    <div class="gauge-box">${gaugeSvg(last.glucose, gAnim, gLbl)}</div>
-    <div class="hr-state">${badge(last.glucose, last.context)}</div>
+    <div class="gauge-box">${gaugeSvg(last.glucose, gAnim, gLbl, 'ult')}</div>
+    <div class="hr-state">${badge(last.glucose, last.context, true)}</div>
     <div class="hr-info"><div class="hr-d num">${WD[new Date(last.ts).getDay()]} · ${fmtDate(last.date)}${last.noTime ? '' : ' · ' + last.time}</div><div class="chips" style="justify-content:center">${recChips(last)}</div></div>${lastExtremes(all)}</div>`;
   h += todayBlock() + treatmentCard() + hbaCard();
   const { cur, prev } = curRange();
   const rc = inRange(all, cur[0], cur[1]), rp = inRange(all, prev[0], prev[1]);
   const sc = stats(rc), sp = stats(rp), cmp = compareStats(sc, sp);
-  const selBar = `<div class="row sp" style="margin:0 0 12px;flex-wrap:wrap;gap:8px"><div class="seg" role="group" aria-label="Período da evolução e dos indicadores">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(cur[0])} – ${fmtDM(cur[1])}</span></div>`;
-  h += `<h2 class="sec">Evolução glicêmica</h2><div class="card">${selBar}`;
-  h += rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL para medições em jejum. Cada ponto é uma medição real. Toque ou passe o dedo para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.');
+  const selBar = `<div class="row sp" style="margin:0 0 12px;flex-wrap:wrap;gap:8px"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(cur[0])} – ${fmtDM(cur[1])}</span></div>`;
+  h += `<h2 class="sec">Evolução da glicemia</h2><div class="card">${selBar}`;
+  h += rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL em jejum. Cada ponto é uma medição real. Toque para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.');
   h += `</div>${eventLegend(cur[0], cur[1])}`;
   h += `<div class="stack" style="margin-top:14px">
     <div class="card tile big"><div class="lb">Média no período</div><div class="v num">${fm(sc.mean)}<small>mg/dL</small></div>
-      <div class="sub">${sc.n ? `${cmp.diff != null ? `${fsign(cmp.diff)} mg/dL vs. ${S.period} dias anteriores` : 'Sem média no período anterior para comparar'}` : 'Sem medições neste período'}</div></div>
+      <div class="sub">${sc.n ? `${cmp.diff != null ? `${fsign(cmp.diff)} mg/dL em relação aos ${S.period} dias anteriores` : 'Sem média no período anterior para comparar'}` : 'Sem medições neste período'}</div></div>
     <div class="grid3">
       <div class="card tile"><div class="lb">Menor</div><div class="v num">${f0(sc.min)}</div></div>
       <div class="card tile"><div class="lb">Maior</div><div class="v num">${f0(sc.max)}</div></div>
@@ -282,14 +284,14 @@ function viewPainelClassic() {
     </div></div>`;
   const row = (lb, a, b, d, cls = '') => `<tr><td>${lb}</td><td>${a}</td><td class="dim">${b}</td><td class="${cls}">${d}</td></tr>`;
   const few = (sc.n && sc.n < 5) || (sp.n && sp.n < 5);
-  h += `<h2 class="sec">Comparação com o período anterior</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Dif.<small>&nbsp;</small></th></tr></thead><tbody>
+  h += `<h2 class="sec">Comparação com o período anterior</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Diferença<small>&nbsp;</small></th></tr></thead><tbody>
     ${row('Média (mg/dL)', fm(sc.mean), fm(sp.mean), fsign(cmp.diff), cmp.diff > 0 ? 'delta-up' : '')}
     ${row('Variação %', '', '', cmp.pct == null ? '—' : fsign(cmp.pct) + '%', cmp.pct > 0 ? 'delta-up' : '')}
     ${row('Medições', sc.n, sp.n, fsign(sc.n - sp.n, 0))}
     ${row('Hipoglicemia (&lt; 70)', `${sc.hypo}<small>${sc.n ? (sc.hypo / sc.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sp.hypo}<small>${sp.n ? (sp.hypo / sp.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sc.hypo - sp.hypo, 0))}
     ${row('Hiperglicemia (acima da faixa)', `${sc.hyper}<small>${sc.n ? (sc.hyper / sc.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sp.hyper}<small>${sp.n ? (sp.hyper / sp.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sc.hyper - sp.hyper, 0))}
     </tbody></table></div>${few ? '<p class="hint"><b>Poucas medições</b> em um dos períodos. Compare com cautela.</p>' : ''}
-    <p class="hint">As contagens dependem de quantas medições foram feitas em cada período; os percentuais ajudam a comparar.</p></div>`;
+    <p class="hint">As contagens dependem de quantas medições há em cada período; compare pelos percentuais.</p></div>`;
   h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${distBars(rc)}</div>`;
   return h;
 }
@@ -346,7 +348,7 @@ function histListHTML() {
       if (i.t === 'e') h += epiHTML(i.e);
       else if (i.t === 'm') h += mealLogHTML(i.m, 'hist');
       else if (i.t === 'r') { const r = i.r; h += `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-key="r${r.id}" data-ts="${r.ts}" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`; }
-      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal tomada' : x.kind === 'extra' ? esc(x.name || 'Outra insulina') : 'Rápida tomada'}</span>${x.kind === 'basal' ? '' : `<span class="chips"><span class="tag">${x.kind === 'extra' ? 'Dose extra' : { fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span></span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
+      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal tomada' : x.kind === 'extra' ? esc(x.name || 'Outra insulina') : 'Rápida tomada'}</span>${x.kind === 'basal' && x.src !== 'lembrete' ? '' : `<span class="chips">${x.kind === 'basal' ? '' : `<span class="tag">${x.kind === 'extra' ? 'Dose extra' : { fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span>`}${x.src === 'lembrete' ? `<span class="tag on">Aplicação confirmada${x.insulin ? ' · ' + esc(x.insulin) : ''}</span>` : ''}</span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
     });
   }
   if (items.length > shown.length) h += `<button class="btn full" data-act="more">Mostrar mais (${items.length - shown.length})</button>`;
@@ -391,16 +393,17 @@ function recordForm(rec, pref) {
   ${mealChips()}<details class="more" style="margin-top:12px" ${hasMore ? 'open' : ''}><summary>Carboidratos, insulina e atividade</summary><div class="form-grid">
     <div class="field full"><label class="fl" for="f-mdesc">Descrição da refeição</label><input class="in" id="f-mdesc" maxlength="120" value="${esc(r.mealDesc || '')}" placeholder="opcional"></div>
     <div class="field"><label class="fl" for="f-carbs">Carboidratos (g)</label><input class="in" id="f-carbs" inputmode="decimal" value="${numAttr(r.carbs)}"></div>
-    <div class="field"><label class="fl" for="f-ins-meal">Insulina rápida (Ui)</label><input class="in" id="f-ins-meal" inputmode="decimal" value="${numAttr(r.insMeal)}"></div>
-    <div class="field"><label class="fl" for="f-ins-basal">Insulina basal (Ui)</label><input class="in" id="f-ins-basal" inputmode="decimal" value="${numAttr(r.insBasal)}"></div>
-    <div class="field"><label class="fl" for="f-ins-corr">Insulina de correção (Ui)</label><input class="in" id="f-ins-corr" inputmode="decimal" value="${numAttr(r.insCorr)}"></div>
+    <div class="field full"><label class="fl">Insulina (Ui) · gire para escolher</label><div class="uip-grid">
+      <div><span class="uip-lb">Rápida</span>${uipHTML({ id: 'f-ins-meal', value: r.insMeal, rows: 3, label: 'Insulina rápida' })}</div>
+      <div><span class="uip-lb">Basal</span>${uipHTML({ id: 'f-ins-basal', value: r.insBasal, rows: 3, label: 'Insulina basal' })}</div>
+      <div><span class="uip-lb">Correção</span>${uipHTML({ id: 'f-ins-corr', value: r.insCorr, rows: 3, label: 'Insulina de correção' })}</div></div></div>
     <div class="field"><label class="fl" for="f-act-desc">Atividade física</label><input class="in" id="f-act-desc" placeholder="Ex.: caminhada" value="${esc(r.actDesc || '')}"></div>
     <div class="field"><label class="fl" for="f-act-min">Duração (min)</label><input class="in" id="f-act-min" inputmode="numeric" value="${numAttr(r.actMin)}"></div>
   </div></details>
   <div class="form-grid" style="margin-top:12px">
     <div class="field full"><label class="fl">Marcações rápidas</label><div class="mks">${Object.entries({ ...MARKS, ...((r.marks || []).includes('treino') ? MARKS_OLD : {}) }).map(([k, t]) => `<label class="mk"><input type="checkbox" name="mk" value="${k}" ${(r.marks || []).includes(k) ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div></div>
     <div class="field full"><label class="fl" for="f-notes">Observações</label><textarea class="in" id="f-notes">${esc(r.notes || '')}</textarea></div>
-    ${S.schemes.length ? `<div class="field full"><label class="fl" for="f-scheme">Esquema de tratamento</label><select class="in" id="f-scheme"><option value="">Automático pela data</option>${sch}</select></div>` : ''}
+    ${S.schemes.length ? `<div class="field full"><label class="fl" for="f-scheme">Esquema</label><select class="in" id="f-scheme"><option value="">Automático pela data</option>${sch}</select></div>` : ''}
   </div>
   <p class="err" id="f-err" role="alert"></p>
   <div class="row" style="margin-top:6px"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div>
@@ -453,8 +456,16 @@ function meanBars(rows) {
   const ok = rows.filter(r => r.n >= MIN_BUCKET);
   if (!rows.some(r => r.n)) return '<div class="empty">Sem dados.</div>';
   return rows.map(r => r.n >= MIN_BUCKET
-    ? `<div class="hbar ${r.mean > (r.hi || LIM.high) ? 'high' : r.mean < LIM.low ? 'low' : 'ok'}"><span class="lab">${esc(r.label)}</span><span class="trk"><span class="fil" style="display:block;width:${Math.min(100, r.mean / 260 * 100).toFixed(1)}%"></span></span><span class="val num">${fm(r.mean)}<small>n=${r.n}</small></span></div>`
-    : `<div class="hbar"><span class="lab">${esc(r.label)}</span><span class="trk"></span><span class="val dim">${r.n ? 'n=' + r.n + ' · insuficiente' : '—'}</span></div>`).join('');
+    ? `<div class="hbar wide ${r.mean > (r.hi || LIM.high) ? 'high' : r.mean < LIM.low ? 'low' : 'ok'}"><span class="lab">${esc(r.label)}</span><span class="trk"><span class="fil" style="display:block;width:${Math.min(100, r.mean / 260 * 100).toFixed(1)}%"></span></span><span class="val num">${fm(r.mean)}<small>n=${r.n}</small></span></div>`
+    : `<div class="hbar wide"><span class="lab">${esc(r.label)}</span><span class="trk"></span><span class="val dim">${r.n ? 'n=' + r.n + ' · insuficiente' : '—'}</span></div>`).join('') + chartLegend([
+      { k: 'txt', c: '135,2', t: '<b>Número grande:</b> média das glicemias, em mg/dL (miligramas por decilitro).' },
+      { k: 'txt', c: 'n=18', t: '<b>n:</b> quantidade de medições usadas na média (n=18 significa 18 medições).' },
+      { k: 'box', c: 'var(--good-fill)', t: `<b>Barra verde:</b> média dentro da faixa de referência (até ${LIM.high} mg/dL; em jejum, até ${FAST.high}).` },
+      { k: 'box', c: 'var(--red)', t: '<b>Barra vermelha:</b> média acima da faixa de referência.' },
+      { k: 'box', c: 'var(--red-l)', t: `<b>Barra vermelha clara:</b> média abaixo de ${LIM.low} mg/dL.` },
+      { k: 'txt', c: '↔', t: '<b>Comprimento da barra:</b> proporcional à média, numa escala de 0 a 260 mg/dL.' },
+      { k: 'txt', c: '—', t: `<b>Sem barra:</b> menos de ${MIN_BUCKET} medições; a média não é mostrada porque seria pouco confiável.` }
+    ]);
 }
 function statsBlock(label, rs) {
   const s = stats(rs);
@@ -469,12 +480,13 @@ function compareCardHTML() {
   if (!ra || !rb) return h + '<p class="hint">Informe as duas datas de cada período.</p>';
   const sa = stats(inRange(S.records, ra[0], ra[1])), sb = stats(inRange(S.records, rb[0], rb[1])), c = compareStats(sa, sb);
   const row = (lb, a, b, d) => `<tr><td>${lb}</td><td>${a}</td><td>${b}</td><td>${d}</td></tr>`;
-  h += `<div class="tbl-wrap" style="margin-top:12px"><table class="t"><thead><tr><th></th><th>A</th><th>B</th><th>A − B</th></tr></thead><tbody>
-  ${row('Média', fm(sa.mean), fm(sb.mean), fsign(c.diff))}${row('Variação %', '', '', c.pct == null ? '—' : fsign(c.pct) + '%')}
+  h += `<div class="tbl-wrap" style="margin-top:12px"><table class="t"><thead><tr><th></th><th>Período A</th><th>Período B</th><th>A − B</th></tr></thead><tbody>
+  ${row('Média', fm(sa.mean), fm(sb.mean), fsign(c.diff))}${row('Variação (%)', '', '', c.pct == null ? '—' : fsign(c.pct) + '%')}
   ${row('Desvio-padrão', fm(sa.sd), fm(sb.sd), sa.sd != null && sb.sd != null ? fsign(sa.sd - sb.sd) : '—')}
-  ${row('Menor – maior', sa.n ? f0(sa.min) + '–' + f0(sa.max) : '—', sb.n ? f0(sb.min) + '–' + f0(sb.max) : '—', '')}
-  ${row('Medições', sa.n, sb.n, fsign(sa.n - sb.n, 0))}${row('&lt; 70', `${sa.hypo}<small>${sa.n ? (sa.hypo / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hypo}<small>${sb.n ? (sb.hypo / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hypo - sb.hypo, 0))}
+  ${row('Menor–maior', sa.n ? f0(sa.min) + '–' + f0(sa.max) : '—', sb.n ? f0(sb.min) + '–' + f0(sb.max) : '—', '')}
+  ${row('Nº de medições', sa.n, sb.n, fsign(sa.n - sb.n, 0))}${row('Abaixo de 70', `${sa.hypo}<small>${sa.n ? (sa.hypo / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hypo}<small>${sb.n ? (sb.hypo / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hypo - sb.hypo, 0))}
   ${row('Acima da faixa', `${sa.hyper}<small>${sa.n ? (sa.hyper / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hyper}<small>${sb.n ? (sb.hyper / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hyper - sb.hyper, 0))}</tbody></table></div>`;
+  h += `<p class="hint"><b>A − B:</b> diferença entre o período A e o período B; sinal + significa que A ficou maior. <b>Variação (%):</b> quanto a média de A mudou em relação à de B, em porcentagem. <b>Desvio-padrão:</b> o quanto as glicemias oscilam em torno da média. <b>Nº de medições:</b> quantidade de glicemias. <b>Abaixo de 70</b> e <b>Acima da faixa</b>: quantidade (e porcentagem) de glicemias fora da faixa de referência (${LIM.low} a ${LIM.high} mg/dL; em jejum, até ${FAST.high}). Valores em mg/dL.</p>`;
   if (sa.n < 10 || sb.n < 10) h += '<p class="hint"><b>Poucas medições</b> em um dos períodos (menos de 10). A comparação pode não representar a rotina.</p>';
   return h;
 }
@@ -497,10 +509,11 @@ function viewAnalise() {
     <div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:27px">${fm(st.mean)}</div></div>
     <div class="tile"><div class="lb">Desvio-padrão</div><div class="v num" style="font-size:27px">${fm(st.sd)}</div></div>
     <div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:27px">${st.n}</div></div>
-    <div class="tile"><div class="lb">Menor</div><div class="v num" style="font-size:27px">${f0(st.min)}</div></div>
-    <div class="tile"><div class="lb">Maior</div><div class="v num" style="font-size:27px">${f0(st.max)}</div></div>
+    <div class="tile"><div class="lb">Menor glicemia</div><div class="v num" style="font-size:27px">${f0(st.min)}</div></div>
+    <div class="tile"><div class="lb">Maior glicemia</div><div class="v num" style="font-size:27px">${f0(st.max)}</div></div>
     <div class="tile"><div class="lb">Dias com medição</div><div class="v num" style="font-size:27px">${days}</div></div></div>
-    <p class="hint">Valores em mg/dL.</p>
+    <p class="hint">Valores em <b>mg/dL</b> (miligramas por decilitro).</p>
+    <p class="hint"><b>Média:</b> soma de todas as glicemias dividida pela quantidade de medições. <b>Desvio-padrão:</b> mostra o quanto as glicemias variam em torno da média; quanto maior, mais elas oscilam. <b>Medições:</b> quantidade de glicemias registradas no intervalo. <b>Dias com medição:</b> dias em que houve ao menos um registro.</p>
     <p class="hint">${tr ? `<b>Tendência aproximada:</b> ${fsign(tr.perWeek)} mg/dL por semana, calculada sobre ${tr.days} dias com medição. Descreve o passado e não prevê o futuro.` : '<b>Tendência:</b> dados insuficientes (precisa de ao menos 10 dias e 20 medições).'}</p></div>`;
   /* evolução: intervalo + agrupamento */
   const wk = a.agg === 'week', g = groupBy(recs, r => wk ? weekStart(r.ts) : monthStart(r.ts));
@@ -508,20 +521,21 @@ function viewAnalise() {
   const total = all.length, buckets = all.slice(-12);
   const lbl = t => wk ? fmDMY(t) : new Date(t).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
   h += `<h2 class="sec">Evolução</h2><div class="card">${tag('agg')}<div class="row sp" style="margin:0 0 10px"><span class="fl" style="margin:0">Agrupar por</span><div class="seg" role="group" aria-label="Agrupamento temporal"><button data-act="ana-agg" data-v="week" aria-pressed="${wk}">Semana</button><button data-act="ana-agg" data-v="month" aria-pressed="${!wk}">Mês</button></div></div>`;
-  h += barChart(buckets.map(b => ({ label: wk ? fmtDM(b.t) : lbl(b.t), value: b.mean, n: b.n, sub: `Menor ${f0(b.min)} · maior ${f0(b.max)}` })), { label: 'Média por ' + (wk ? 'semana' : 'mês') });
+  h += barChart(buckets.map(b => ({ label: wk ? fmtDM(b.t) : lbl(b.t), value: b.mean, n: b.n, sub: `Menor ${f0(b.min)} · maior ${f0(b.max)}` })), { label: 'Média de glicemia por ' + (wk ? 'semana' : 'mês') });
+  h += barLegend(wk ? 'cada barra é uma <b>semana</b>; a data embaixo (dia/mês, como 03/11) é a <b>segunda-feira em que a semana começa</b>.' : 'cada barra é um <b>mês</b> (por exemplo, nov 26 = novembro de 2026).');
   h += `<p class="hint">Média por ${wk ? 'semana (início na segunda)' : 'mês'}, em mg/dL. ${total > 12 ? `Gráfico: últimos 12 de ${total}; a tabela abaixo traz todos. ` : ''}Barras com menos de ${MIN_BUCKET} medições não mostram média.</p>`;
-  h += `<details class="allper"><summary>Ver todos os ${wk ? 'semanas' : 'meses'} (${total})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>${wk ? 'Semana de' : 'Mês'}</th><th>Média</th><th>Min–máx</th><th>n</th></tr></thead><tbody>${all.slice().reverse().map(b => `<tr><td>${wk ? fmDMY(b.t) : lbl(b.t)}</td><td>${b.n >= MIN_BUCKET ? fm(b.mean) : '<span class="dim">insuf.</span>'}</td><td>${f0(b.min)}–${f0(b.max)}</td><td>${b.n}</td></tr>`).join('')}</tbody></table></div></details></div>`;
-  h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${tag('int')}<div class="chips"><span class="chip ${st.hypo ? 'alert' : ''}">&lt; 70: <b>${st.hypo}</b> (${(st.hypo / st.n * 100).toFixed(0)}%)</span><span class="chip ${st.hyper ? 'alert' : ''}">Acima da faixa: <b>${st.hyper}</b> (${(st.hyper / st.n * 100).toFixed(0)}%)</span></div>${distBars(recs)}</div>`;
+  h += `<details class="allper"><summary>Ver ${wk ? 'todas as semanas' : 'todos os meses'} (${total})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>${wk ? 'Semana começando em' : 'Mês'}</th><th>Média (mg/dL)</th><th>Menor–maior</th><th>Nº de medições</th></tr></thead><tbody>${all.slice().reverse().map(b => `<tr><td>${wk ? fmDMY(b.t) : lbl(b.t)}</td><td>${b.n >= MIN_BUCKET ? fm(b.mean) : '<span class="dim">insuficiente</span>'}</td><td>${f0(b.min)}–${f0(b.max)}</td><td>${b.n}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+  h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${tag('int')}<div class="chips"><span class="chip ${st.hypo ? 'alert' : ''}">Abaixo de 70 mg/dL: <b>${st.hypo}</b> (${(st.hypo / st.n * 100).toFixed(0)}%)</span><span class="chip ${st.hyper ? 'alert' : ''}">Acima da faixa: <b>${st.hyper}</b> (${(st.hyper / st.n * 100).toFixed(0)}%)</span></div>${distBars(recs, true, true)}</div>`;
   const td = typicalDay(recs);
-  h += `<h2 class="sec">Perfil do dia</h2><div class="card">${tag('int')}<h3 class="sub">Dia típico</h3>${typicalDayChart(recs)}${td.ok >= 6 ? '<p class="hint" style="margin:8px 0 0">Junta todos os dias do intervalo em um só dia de 24 horas. A linha é a mediana por horário (janela de 3 h) e as faixas mostram onde ficou a maioria das medições. Mostra o que aconteceu, sem prever nem orientar tratamento.</p>' : ''}<h3 class="sub">Média por faixa horária</h3>${barChart(byTimeBlock(recs).map(b => ({ label: b.label, value: b.mean, n: b.n })), { label: 'Média por faixa horária' })}<p class="hint">Medições sem horário (importadas sem hora) ficam de fora.</p></div>`;
+  h += `<h2 class="sec">Perfil do dia</h2><div class="card">${tag('int')}<h3 class="sub">Dia típico</h3>${typicalDayChart(recs)}${td.ok >= 6 ? '<p class="hint" style="margin:8px 0 0">Reúne todos os dias do período em um só dia de 24 horas. A linha é a mediana por horário e as faixas mostram onde ficou a maioria das medições. Só mostra o que aconteceu: não orienta tratamento.</p>' : ''}<h3 class="sub">Média por faixa horária (blocos de 4 horas)</h3>${barChart(byTimeBlock(recs).map(b => ({ label: b.label, value: b.mean, n: b.n })), { label: 'Média de glicemia por faixa horária' })}${barLegend('cada barra é um período de <b>4 horas</b> do dia (00–04h = da meia-noite às 4 da manhã; 12–16h = do meio-dia às 4 da tarde).')}<p class="hint">Medições sem horário (importadas sem hora) ficam de fora.</p></div>`;
   h += heatmapCard(recs).replace('<div class="card">', '<div class="card">' + tag('int'));
   const ctxRows = Object.entries(CONTEXTS).map(([k, l]) => ({ label: l, hi: k === 'jejum' ? FAST.high : LIM.high, ...stats(recs.filter(r => r.context === k)) })).filter(r => r.n);
   const none = stats(recs.filter(r => !r.context));
-  h += `<h2 class="sec">Antes e depois das refeições</h2><div class="card">${tag('int')}${ctxRows.length ? meanBars(ctxRows.map(r => ({ ...r, label: r.label.replace(' da refeição', '') }))) : '<div class="empty">Nenhuma medição com contexto informado.</div>'}${none.n ? `<p class="hint">${none.n} medições sem contexto não entram nesta lista.</p>` : ''}</div>`;
+  h += `<h2 class="sec">Antes e depois das refeições</h2><div class="card">${tag('int')}${ctxRows.length ? meanBars(ctxRows.map(r => ({ ...r, label: r.label }))) : '<div class="empty">Nenhuma medição com contexto informado.</div>'}${none.n ? `<p class="hint">${none.n} medições sem contexto não entram nesta lista.</p>` : ''}</div>`;
   const mealRows = Object.entries(MEALS).map(([k, l]) => { const ar = recs.filter(r => r.meal === k); return { l, all: stats(ar), antes: stats(ar.filter(r => r.context === 'antes')), depois: stats(ar.filter(r => r.context === 'depois')) }; });
   const cell = s => s.n >= MIN_BUCKET ? `${fm(s.mean)}<small>n=${s.n}</small>` : `<span class="dim">${s.n ? 'n=' + s.n : '—'}</span>`;
-  h += `<h2 class="sec">Por refeição</h2><div class="card">${tag('int')}<h3 class="sub">Média por tipo de refeição</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Todas</th></tr></thead><tbody>${mealRows.map(m => `<tr><td>${m.l}</td><td>${cell(m.antes)}</td><td>${cell(m.depois)}</td><td>${cell(m.all)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Médias em mg/dL. Mostradas só com ${MIN_BUCKET} ou mais medições.</p><h3 class="sub">Variação (depois − antes, no mesmo dia)</h3>${mealDeltaCard(recs, true)}</div>`;
-  h += `<h2 class="sec">Janelas fixas · 7, 30, 90 e 180 dias</h2><div class="card">${tag('ind')}<div class="tbl-wrap"><table class="t"><thead><tr><th>Período</th><th>Média</th><th>Min–máx</th><th>n</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>${[7, 30, 90, 180].map(d => statsBlock(d + ' dias', inRange(S.records, startOfDay(addDays(now, -(d - 1))), endOfDay(now))).html).join('')}</tbody></table></div><p class="hint">Sempre contam a partir de hoje, com todos os registros, qualquer que seja o intervalo escolhido acima.</p></div>`;
+  h += `<h2 class="sec">Por refeição</h2><div class="card">${tag('int')}<h3 class="sub">Média por tipo de refeição</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Todas</th></tr></thead><tbody>${mealRows.map(m => `<tr><td>${m.l}</td><td>${cell(m.antes)}</td><td>${cell(m.depois)}</td><td>${cell(m.all)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Médias em mg/dL. Mostradas só com ${MIN_BUCKET} ou mais medições. <b>Antes</b>: glicemia medida antes de comer. <b>Depois</b>: glicemia medida depois de comer. <b>Todas</b>: todas as medições daquela refeição. <b>n=18</b> (número pequeno abaixo da média) é a quantidade de medições usadas; n=18 significa 18 medições. <b>—</b> indica que não há medições.</p><h3 class="sub">Variação (depois − antes, no mesmo dia)</h3>${mealDeltaCard(recs, true)}<p class="hint"><b>Como ler a variação:</b> sinal <b>+</b> significa que a glicemia depois da refeição ficou mais alta que antes; sinal <b>−</b>, mais baixa. O valor está em mg/dL.</p></div>`;
+  h += `<h2 class="sec">Janelas fixas · 7, 30, 90 e 180 dias</h2><div class="card">${tag('ind')}<div class="tbl-wrap tw-hint" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal"><table class="t wide-t"><thead><tr><th>Período</th><th>Média (mg/dL)</th><th>Menor–maior</th><th>Nº de medições</th><th>Abaixo de 70</th><th>Acima da faixa</th></tr></thead><tbody>${[7, 30, 90, 180].map(d => statsBlock(d + ' dias', inRange(S.records, startOfDay(addDays(now, -(d - 1))), endOfDay(now))).html).join('')}</tbody></table></div><p class="hint">Sempre contam a partir de hoje, com todos os registros, qualquer que seja o intervalo escolhido acima. <b>Nº de medições</b>: quantidade de glicemias no período. <b>Abaixo de 70</b>: glicemias menores que ${LIM.low} mg/dL (hipoglicemia). <b>Acima da faixa</b>: glicemias acima de ${LIM.high} mg/dL (acima de ${FAST.high} quando medidas em jejum). O número menor embaixo é a porcentagem sobre as medições do período.</p></div>`;
   h += `<h2 class="sec">Comparar dois períodos</h2><div class="card">${tag('ind')}<div id="cmp">${compareCardHTML()}</div></div>`;
   return h;
 }
@@ -550,12 +564,12 @@ function viewHba() {
     if (S.hba.length > 1) { const a = S.hba[S.hba.length - 2], b = S.hba[S.hba.length - 1]; h += `<p class="hint">Entre os dois últimos exames (${fmtDate(a.date)} e ${fmtDate(b.date)}): <b>${fsign(b.value - a.value)} ponto percentual</b>.</p>`; }
     h += `</div><div class="stack" style="margin-top:12px">` + [...S.hba].reverse().map(x => `<button class="rec" style="grid-template-columns:1fr auto" data-act="hba-edit" data-id="${x.id}"><span class="info"><span class="num">${fmtDate(x.date)}</span><span class="chips">${a1cBadge(x.value)}${x.lab ? `<span class="tag">${esc(x.lab)}</span>` : ''}${x.source === 'mysugr' ? '<span class="tag">Importado do mySugr</span>' : ''}${x.source === 'exame' ? '<span class="tag">Do exame enviado</span>' : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span>${x.notes ? `<span class="dim" style="font-size:14px">${esc(x.notes)}</span>` : ''}</span><span class="gl num">${fn(x.value, 1)}%<small>laboratório</small></span></button>`).join('') + `</div>`;
   }
-  h += `<h2 class="sec">Estimativa matemática (opcional)</h2><div class="card soft" style="border-style:dashed">`;
-  if (!S.est) h += `<p class="hint" style="margin:0 0 12px">Calcula um valor aproximado a partir da média das suas glicemias capilares. <b>Não é um exame</b> e não é o GMI.</p><button class="btn" data-act="est-on">Mostrar estimativa</button>`;
+  h += `<h2 class="sec">Estimativa (opcional)</h2><div class="card soft" style="border-style:dashed">`;
+  if (!S.est) h += `<p class="hint" style="margin:0 0 12px">Calcula um valor aproximado a partir da média das suas glicemias capilares. <b>Não é um exame</b> e não é o GMI (estimativa de sensor contínuo).</p><button class="btn" data-act="est-on">Mostrar estimativa</button>`;
   else {
     const E = est90(), st = E.st, days = E.days;
-    if (st.n < 30 || days < 20) h += `<div class="eyebrow">Estimativa indisponível</div><p class="hint">Faltam dados: são necessárias ao menos 30 medições em 20 dias distintos nos últimos 90 dias. Há ${st.n} medições em ${days} dias.</p>`;
-    else h += `<div class="eyebrow">Estimativa matemática aproximada</div><div class="hero-n num" style="font-size:40px;margin:8px 0">≈ ${fn(estimatedA1c(st.mean), 1)}%<small>estimada</small></div><div style="margin-bottom:8px">${a1cBadge(estimatedA1c(st.mean))}</div><p class="hint" style="margin:0">Fórmula aplicada à média de ${fm(st.mean)} mg/dL em ${st.n} medições capilares (${days} dias, últimos 90 dias).</p>`;
+    if (st.n < 30 || days < 20) h += `<div class="eyebrow">Estimativa indisponível</div><p class="hint">Faltam dados: precisa de 30 medições em 20 dias diferentes nos últimos 90 dias. Há ${st.n} medições em ${days} dias.</p>`;
+    else h += `<div class="eyebrow">Estimativa aproximada</div><div class="hero-n num" style="font-size:40px;margin:8px 0">≈ ${fn(estimatedA1c(st.mean), 1)}%<small>estimada</small></div><div style="margin-bottom:8px">${a1cBadge(estimatedA1c(st.mean))}</div><p class="hint" style="margin:0">Fórmula aplicada à média de ${fm(st.mean)} mg/dL em ${st.n} medições capilares (${days} dias, últimos 90 dias).</p>`;
     h += `<ul class="plain"><li>Não é HbA1c de laboratório e não deve ser comparada a ele como equivalente.</li><li>Não é GMI, que depende de monitorização contínua de glicose.</li><li>Medições pontuais costumam se concentrar em certos horários e podem enviesar a média.</li><li>Anemias, hemoglobinas variantes e outras condições alteram a HbA1c real.</li></ul><button class="btn sm" style="margin-top:12px" data-act="est-off">Ocultar estimativa</button>`;
   }
   return h + `</div>`;
@@ -573,7 +587,7 @@ function schemeForm(x) {
     <div class="field"><label class="fl" for="s-st">Início</label><input class="in" type="date" id="s-st" value="${x.start}"></div>
     <div class="field"><label class="fl" for="s-en">Encerramento</label><input class="in" type="date" id="s-en" value="${x.end || ''}"></div>
     <div class="field full"><label class="fl" for="s-no">Observações</label><textarea class="in" id="s-no">${esc(x.notes || '')}</textarea></div></div>
-    <p class="hint" style="margin:0 0 8px">Registro para organizar informações. O app não sugere nem calcula doses.</p>
+    <p class="hint" style="margin:0 0 8px">Só para organizar. O app não sugere nem calcula doses.</p>
     <p class="err" id="s-err" role="alert"></p><div class="row"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div>
     ${x.id ? `<button class="btn danger full" type="button" style="margin-top:10px" data-act="del-ask-sch" data-id="${x.id}">Excluir esquema</button>` : ''}</form>`;
 }
@@ -583,7 +597,7 @@ function schemeStats(sc) {
   return { ...st, days, perDay: st.n / days, recs };
 }
 function viewEsquemas() {
-  let h = banners() + planCards() + `<h2 class="sec">Esquemas anteriores e comparação</h2><p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha feita no registro). O app só compara resultados e não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
+  let h = banners() + planCards() + `<h2 class="sec">Esquemas anteriores e comparação</h2><p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha no registro). O app só compara resultados: não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
   if (!S.schemes.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Nenhum esquema', 'Cadastre o esquema atual e os anteriores para poder compará-los.')}</div>`;
   h += `<h2 class="sec">Esquemas cadastrados</h2><div class="stack">` + [...S.schemes].reverse().map(x => {
     const act = !x.end || x.end >= isoDate(new Date());
@@ -592,7 +606,7 @@ function viewEsquemas() {
   const rows = S.schemes.map(sc => ({ sc, ...schemeStats(sc) }));
   h += `<h2 class="sec">Comparação de resultados</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Esquema</th><th>Dias</th><th>n</th><th>Média</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>` +
     rows.map(r => `<tr><td>${esc(r.sc.name)}<small>${fmtDM(mkTs(r.sc.start, '00:00'))}${r.sc.end ? '–' + fmtDM(mkTs(r.sc.end, '00:00')) : ' → hoje'}</small></td><td>${r.days}</td><td>${r.n}${r.n < 20 ? '<small>poucas</small>' : `<small>${fn(r.perDay, 1)}/dia</small>`}</td><td>${fm(r.mean)}</td><td>${r.hypo}<small>${r.n ? (r.hypo / r.n * 100).toFixed(0) + '%' : '—'}</small></td><td>${r.hyper}<small>${r.n ? (r.hyper / r.n * 100).toFixed(0) + '%' : '—'}</small></td></tr>`).join('') +
-    `</tbody></table></div><p class="hint">Comparação descritiva. Diferenças podem refletir alimentação, rotina, quantidade de medições e outros fatores, e não apenas o esquema. Esquemas com menos de 20 medições são marcados como "poucas". Leve estes dados à sua equipe de saúde.</p></div>`;
+    `</tbody></table></div><p class="hint">Comparação descritiva. As diferenças podem vir de alimentação, rotina e quantidade de medições, não só do esquema. Esquemas com menos de 20 medições aparecem como "poucas". Leve estes dados à sua equipe de saúde.</p></div>`;
   return h;
 }
 
@@ -604,7 +618,7 @@ function viewImportar() {
     const r = imp.result;
     return h + `<div class="card red"><div class="eyebrow">Importação concluída</div><div class="grid3" style="margin:14px 0 4px"><div class="tile"><div class="lb">Importados</div><div class="v num">${r.added}</div></div><div class="tile"><div class="lb">Duplicados</div><div class="v num">${r.dup}</div></div><div class="tile"><div class="lb">Ignorados</div><div class="v num">${r.ignored}</div></div></div>
       ${r.hba ? `<p class="hint">${r.hba} resultado(s) de HbA1c também importado(s).</p>` : ''}${r.removedExamples ? '<p class="hint">Dados de exemplo foram removidos.</p>' : ''}</div>
-      <div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="go" data-r="painel">Ver painel</button><button class="btn" data-act="imp-reset">Importar outro</button></div>
+      <div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="go" data-r="painel">Ir ao início</button><button class="btn" data-act="imp-reset">Importar outro</button></div>
       <p class="hint">Importar o mesmo arquivo de novo não duplica os registros.</p>`;
   }
   if (imp && imp.parsed) {
@@ -617,15 +631,15 @@ function viewImportar() {
       ${p.warning ? `<p class="err">${esc(p.warning)}</p>` : ''}
       ${reasons.length ? `<h2 class="sec" style="margin-top:18px">Linhas ignoradas</h2><ul class="plain">${reasons.map(([k, n]) => `<li>${n} · ${esc(k)}</li>`).join('')}</ul>${p.withOtherData ? `<p class="hint">${p.withOtherData} linha(s) sem glicemia tinham dose de insulina ou carboidrato. Elas não são importadas, porque o TiaBete guarda cada registro a partir de uma medição.</p>` : ''}${p.ignored.length ? `<details class="more" style="margin-top:10px"><summary>Ver linhas (${Math.min(p.ignored.length, 200)})</summary><ul class="plain" style="margin-bottom:12px">${p.ignored.slice(0, 60).map(i => `<li>Linha ${i.line}: ${esc(i.reason)}${i.extra ? ' (“' + esc(i.extra.slice(0, 30)) + '”)' : ''}</li>`).join('')}${p.ignored.length > 60 ? `<li>…e mais ${p.ignored.length - 60}</li>` : ''}</ul></details>` : ''}` : ''}
       ${p.hba.length ? `<label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-hba" ${imp.includeHba ? 'checked' : ''}><span>Importar também ${p.hba.length} valor(es) de HbA1c encontrados no arquivo, como resultado sem laboratório informado.</span></label>` : ''}
-      <label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-rule" ${imp.timeRule ? 'checked' : ''}><span>Definir jejum, pré e pós-prandial pelo <b>horário</b> da medição (${p.items.filter(i => applyRule(i)).length} de ${p.items.length} serão definidas ou alteradas). As etiquetas originais do mySugr são mantidas.</span></label>
+      <label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-rule" ${imp.timeRule ? 'checked' : ''}><span>Definir jejum, antes e depois da refeição pelo <b>horário</b> da medição (${p.items.filter(i => applyRule(i)).length} de ${p.items.length} serão definidas ou alteradas). As etiquetas originais do mySugr são mantidas.</span></label>
       <details class="more" style="margin-top:14px"><summary>Colunas reconhecidas (${p.columns.length})</summary><p class="hint" style="margin:0 0 12px">${p.columns.join(', ')}.${p.ignoredCols.length ? ' Localização, fuso horário, latitude e longitude são descartados por privacidade.' : ''}</p></details>
-      <p class="hint">Etiquetas como “Almoço” ou “Antes da refeição” preenchem refeição e contexto quando reconhecidas. O texto original das etiquetas é mantido. Doses de caneta, bomba, refeição, correção e basal ficam em campos separados e nunca são somadas.</p>
+      <p class="hint">Etiquetas como “Almoço” ou “Antes da refeição” preenchem refeição e contexto. O texto original é mantido. Doses de caneta, bomba, refeição, correção e basal ficam separadas e nunca são somadas.</p>
       <div class="row" style="margin-top:16px"><button class="btn pri grow" data-act="imp-commit" ${imp.newCount || (imp.includeHba && p.hba.length) ? '' : 'disabled'}>Importar ${imp.newCount} registro${imp.newCount === 1 ? '' : 's'}</button><button class="btn" data-act="imp-reset">Cancelar</button></div></div>`;
   }
-  return h + `<div class="card red"><div class="eyebrow">CSV do mySugr, FreeStyle Libre (LibreView) ou Dexcom Clarity</div><p style="margin:10px 0 16px;color:var(--fg)">Escolha o arquivo no seu aparelho. Ele é lido aqui mesmo, sem enviar nada para a internet.</p>
+  return h + `<div class="card red"><div class="eyebrow">CSV do mySugr, FreeStyle Libre (LibreView) ou Dexcom Clarity</div><p style="margin:10px 0 16px;color:var(--fg)">Escolha o arquivo no aparelho. Ele é lido aqui mesmo, sem enviar nada pela internet.</p>
     <input type="file" id="imp-file" accept=".csv,.txt,text/csv,text/plain" hidden><button class="btn pri full" data-act="pick-csv">Escolher arquivo CSV</button></div>
     <h2 class="sec">Como funciona</h2><div class="card"><ul class="plain" style="margin:0">
-    <li>Datas em DD/MM/AAAA e números com vírgula ou ponto são reconhecidos.</li><li>Você vê uma prévia antes de gravar qualquer coisa.</li><li>Registros que já existem (mesma data, hora e valor) são tratados como duplicados.</li><li>Linhas sem glicemia válida ou sem data são ignoradas e contadas.</li><li>Localização e coordenadas não são guardadas.</li></ul></div>`;
+    <li>Datas como 31/12/2026; números com vírgula ou ponto.</li><li>Você vê uma prévia antes de gravar qualquer coisa.</li><li>Registros com mesma data, hora e valor são duplicados.</li><li>Linhas sem glicemia válida ou sem data são ignoradas.</li><li>Localização e coordenadas não são guardadas.</li></ul></div>`;
 }
 async function handleCsvFile(file) {
   if (!file) return;
@@ -659,7 +673,7 @@ function labelBanner() {
   const recs = S.records.filter(r => !isEx(r)), scope = recs.slice(-Math.max(1, S.ruleN || 180));
   const pend = scope.filter(r => !r.context && targetFor(r, 'horario')).length;
   if (!pend) return '';
-  return `<div class="banner" style="display:block"><b>${pend} das ${scope.length} últimas medições</b> estão sem jejum, antes ou depois da refeição.<div class="row" style="margin-top:10px"><button class="btn sm pri" data-act="label-now">Etiquetar agora pelo horário</button><button class="btn sm" data-act="go" data-r="classificar">Escolher critério</button></div></div>`;
+  return `<div class="banner" style="display:block"><b>${pend} das ${scope.length} últimas medições</b> estão sem jejum, antes ou depois da refeição.<div class="row" style="margin-top:10px"><button class="btn sm pri" data-act="label-now">Etiquetar pelo horário</button><button class="btn sm" data-act="go" data-r="classificar">Escolher critério</button></div></div>`;
 }
 
 /* ---------- Classificação (horário ou etiquetas) ---------- */
@@ -687,10 +701,10 @@ function ruleSummary() {
 function viewClassificar() {
   const R = ruleSummary();
   if (!R.recs.length) return banners() + `<div class="card">${emptyBlock('Sem medições', 'Importe o CSV do mySugr ou registre medições para classificar.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar CSV</button>')}</div>`;
-  let h = banners() + `<p class="hint" style="margin:0 0 12px">Define o contexto (jejum, antes ou depois da refeição) e a refeição de cada medição. As etiquetas originais do mySugr não são apagadas, e o valor anterior fica guardado para você desfazer.</p>`;
+  let h = banners() + `<p class="hint" style="margin:0 0 12px">Define o contexto (jejum, antes ou depois da refeição) e a refeição de cada medição. As etiquetas do mySugr são mantidas e dá para desfazer.</p>`;
   h += `<div class="card"><div class="row sp"><div class="field" style="width:130px"><label class="fl" for="rule-n">Últimas medições</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN}"></div><p class="hint grow" style="margin:0">Só as <b class="num">${R.scope.length}</b> mais recentes, de <span class="num">${fmtDate(R.scope[0].date)}</span> a <span class="num">${fmtDate(R.scope[R.scope.length - 1].date)}</span>. As mais antigas não são alteradas.</p></div>
     <div style="margin-top:14px"><div class="fl">Critério</div><div class="seg" role="group" aria-label="Critério" style="display:flex">${Object.entries(RULE_MODES).map(([k, l]) => `<button style="flex:1" data-act="rule-mode" data-v="${k}" aria-pressed="${R.mode === k}">${l}</button>`).join('')}</div>
-    <p class="hint">${R.mode === 'horario' ? '04h–08h jejum · 08h–10h pós do café · 10h–12h pré do almoço · 12h–16h pós do almoço · 16h–19h pré do jantar · 19h–00h pós do jantar. Entre 00h e 04h não há regra.' : 'Usa Pré-prandial, Pós-prandial, Jejum e a refeição marcados no mySugr. Quando a etiqueta não traz a refeição ou o pré/pós, o horário completa.'}</p></div></div><div style="height:12px"></div>`;
+    <p class="hint">${R.mode === 'horario' ? '04h–08h jejum · 08h–10h depois do café · 10h–12h antes do almoço · 12h–16h depois do almoço · 16h–19h antes do jantar · 19h–00h depois do jantar. Entre 00h e 04h não há regra.' : 'Usa Antes da refeição, Depois da refeição, Jejum e a refeição marcados no mySugr. Quando a etiqueta não traz a refeição ou o pré/pós, o horário completa.'}</p></div></div><div style="height:12px"></div>`;
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Classificação</th><th>Medições</th><th>Mudam</th></tr></thead><tbody>${R.rows.map(x => `<tr><td style="text-align:left;white-space:normal">${tgtLabel(x.t)}</td><td>${x.n}</td><td>${x.ch}</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">${R.none ? R.none + ' medições não entram em nenhuma classificação e ficam como estão.' : 'Todas as medições deste grupo entram em alguma classificação.'}</p></div>`;
   if (R.conflicts.length) {
@@ -699,7 +713,7 @@ function viewClassificar() {
   }
   h += `<h2 class="sec">Efeito nas contagens</h2><div class="card"><div class="grid2"><div class="tile"><div class="lb">Acima da faixa hoje</div><div class="v num" style="font-size:28px">${R.before.hyper}</div></div><div class="tile ${R.after.hyper > R.before.hyper ? 'alert' : ''}"><div class="lb">Depois de aplicar</div><div class="v num" style="font-size:28px">${R.after.hyper}</div></div></div>
     <p class="hint">Medições de jejum usam 70 a 130 mg/dL como faixa normal. Valores entre 131 e 180 classificados como jejum passam a contar como acima da faixa.</p></div>`;
-  h += `<div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rule-ask" ${R.changed.size ? '' : 'disabled'}>${R.changed.size ? 'Aplicar ao histórico (' + R.changed.size + ' mudam)' : 'Nada a alterar'}</button>${R.undoable ? `<button class="btn full" data-act="rule-undo">Desfazer (${R.undoable} medições)</button>` : ''}<button class="btn full" data-act="go" data-r="backup">Fazer backup antes</button></div>`;
+  h += `<div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rule-ask" ${R.changed.size ? '' : 'disabled'}>${R.changed.size ? 'Aplicar ao histórico (' + R.changed.size + ' mudam)' : 'Nada a alterar'}</button>${R.undoable ? `<button class="btn full" data-act="rule-undo">Desfazer (${R.undoable} medições)</button>` : ''}<button class="btn full" data-act="go" data-r="backup">Fazer cópia antes</button></div>`;
   return h;
 }
 
@@ -711,8 +725,8 @@ function viewRelatorios() {
   return banners() + prNotice('relatorios') + `<div class="card"><div class="form-grid"><div class="field"><label class="fl" for="r-from">De</label><input class="in" type="date" id="r-from" value="${r.from}"></div><div class="field"><label class="fl" for="r-to">Até</label><input class="in" type="date" id="r-to" value="${r.to}"></div></div>
     <div class="row" style="margin-top:12px">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias']].map(([d, l]) => `<button class="btn sm" data-act="rep-quick" data-d="${d}">${l}</button>`).join('')}</div></div>
     <h2 class="sec">O que entra</h2><div class="card"><div class="grid3"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${st.n}</div></div><div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:22px">${fm(st.mean)}</div></div><div class="tile"><div class="lb">&lt;70 / acima</div><div class="v num" style="font-size:22px">${st.hypo}/${st.hyper}</div></div></div>
-    <ul class="plain"><li>Resumo, estatísticas, gráfico de medições e distribuição por faixa</li><li>Comparação com o período anterior de mesma duração</li><li>Episódios de hipoglicemia e hiperglicemia</li><li>Resultados laboratoriais de HbA1c (sem estimativas)</li><li>Esquemas de tratamento e comparação</li><li>Histórico completo de medições</li></ul></div>
-    <div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rep-pdf" ${st.n ? '' : 'disabled'}>Gerar PDF</button><button class="btn full" data-act="rep-xlsx" ${st.n ? '' : 'disabled'}>Gerar Excel</button><button class="btn full" data-act="rep-summary">Resumo para a consulta (PDF, últimos 90 dias)</button><button class="btn full" data-act="sh-open">Enviar ao meu médico…</button></div>
+    <ul class="plain"><li>Resumo, estatísticas, gráfico de medições e distribuição por faixa</li><li>Comparação com o período anterior de mesma duração</li><li>Episódios de hipoglicemia e hiperglicemia</li><li>Resultados laboratoriais de HbA1c (sem estimativas)</li><li>Esquemas e comparação</li><li>Histórico completo de medições</li></ul></div>
+    <div class="stack" style="margin-top:14px"><button class="btn pri full" data-act="rep-pdf" ${st.n ? '' : 'disabled'}>Gerar PDF</button><button class="btn full" data-act="rep-xlsx" ${st.n ? '' : 'disabled'}>Gerar Excel</button><button class="btn full" data-act="rep-summary">Resumo para a consulta (PDF, 90 dias)</button><button class="btn full" data-act="sh-open">Enviar ao meu médico…</button></div>
     ${st.n ? '' : '<p class="hint">Não há medições neste intervalo.</p>'}<p class="hint" id="rep-status" role="status"></p>`;
 }
 
@@ -720,27 +734,27 @@ function viewRelatorios() {
 function viewBackup() {
   const nReal = S.records.filter(r => !isEx(r)).length;
   let h = banners() + `<div class="card"><div class="eyebrow">Seus dados</div><div class="grid3" style="margin-top:12px"><div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:26px">${S.records.length}</div></div><div class="tile"><div class="lb">HbA1c</div><div class="v num" style="font-size:22px">${S.hba.length}</div></div><div class="tile"><div class="lb">Esquemas</div><div class="v num" style="font-size:22px">${S.schemes.length}</div></div></div>
-    <p class="hint" id="persist-note">Armazenamento: ${Store.persistent ? 'banco IndexedDB neste navegador' : 'indisponível (somente sessão)'}.</p>
-    <p class="hint"><b>Atenção:</b> limpar os dados do site ou do navegador apaga tudo daqui. Faça backups regulares.</p></div>
-    <h2 class="sec">Exportar</h2>${(() => { const d = blExport(), nf = (S.bl.foods || []).length, nm = (S.bl.meals || []).length, nd = Object.keys(S.bl.days || {}).length; return `<p class="hint" style="margin:0 0 10px">${d ? `<b>Cálculo de bolus entra no backup:</b> ${nf} alimento${nf === 1 ? '' : 's'}, ${nd} dia(s), ${nm} refeição(ões) registrada(s).` : '<b>Cálculo de bolus:</b> ainda sem dados neste aparelho (nada a incluir).'}</p>`; })()}<div class="stack"><button class="btn pri full" data-act="bk-json">Backup completo (.json)</button><button class="btn full" data-act="bk-csv">Medições em CSV (.csv)</button></div>
+    <p class="hint" id="persist-note">Armazenamento: ${Store.persistent ? 'banco de dados neste navegador' : 'indisponível (somente sessão)'}.</p>
+    <p class="hint"><b>Atenção:</b> limpar os dados do site ou do navegador apaga tudo daqui. Faça cópias regulares.</p></div>
+    <h2 class="sec">Exportar</h2>${(() => { const d = blExport(), nf = (S.bl.foods || []).length, nm = (S.bl.meals || []).length, nd = Object.keys(S.bl.days || {}).length; return `<p class="hint" style="margin:0 0 10px">${d ? `<b>Cálculo de bolus entra na cópia:</b> ${nf} alimento${nf === 1 ? '' : 's'}, ${nd} dia(s), ${nm} refeição(ões) registrada(s).` : '<b>Cálculo de bolus:</b> ainda sem dados neste aparelho (nada a incluir).'}</p>`; })()}<div class="stack"><button class="btn pri full" data-act="bk-json">Cópia completa (.json)</button><button class="btn full" data-act="bk-csv">Medições (.csv)</button></div>
     ${driveCard()}
-    <h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0 0 10px">Backup protegido por senha, Drive com criptografia e bloqueio por PIN ou biometria ficam agora em Segurança e privacidade.</p><button class="btn full" data-act="go" data-r="seguranca">Abrir Bloqueio e proteção</button></div>
-    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher backup</button>${secPrompt()}`;
+    <h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0 0 10px">Cópia protegida por senha, Drive com criptografia e bloqueio por PIN ou biometria ficam agora em Segurança e privacidade.</p><button class="btn full" data-act="go" data-r="seguranca">Abrir Bloqueio e proteção</button></div>
+    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher cópia</button>${secPrompt()}`;
   if (S.rest) {
     const x = S.rest;
     h += `<div style="margin-top:14px"><div class="eyebrow">Arquivo lido</div><p style="margin:6px 0 4px" class="num">${x.records.length} medições · ${x.hba.length} HbA1c · ${x.schemes.length} esquemas</p><p class="hint" style="margin:0 0 12px">Exportado em ${esc(x.exportedAt ? new Date(x.exportedAt).toLocaleString('pt-BR') : 'data desconhecida')}.</p>
-      ${(() => { const b = x.state && x.state.bolus; return `<p class="hint" style="margin:0 0 12px">${b && Array.isArray(b.foods) ? `<b>Cálculo de bolus incluído:</b> ${b.foods.length} alimento${b.foods.length === 1 ? '' : 's'}${b.meals && b.meals.length ? ' · ' + b.meals.length + ' refeição(ões) registrada(s)' : ''}${b.days && Object.keys(b.days).length ? ' · ' + Object.keys(b.days).length + ' dia(s)' : ''}${b.ratio ? ' · razão 1:' + b.ratio : ''}.` : '<b>Este arquivo não traz dados do Cálculo de bolus.</b> Ele foi gerado por uma versão antiga do app ou antes de haver dados nessa página. Em Exportar (acima) veja se os dados do bolus estão no aparelho de origem e gere um backup novo.'}</p>`; })()}
-      <div class="stack"><button class="btn pri full" data-act="rest-merge">Mesclar com meus dados (sem duplicar)</button>
-      <button class="btn danger full" data-act="rest-replace-ask">Substituir tudo por este backup</button></div></div>`;
+      ${(() => { const b = x.state && x.state.bolus; return `<p class="hint" style="margin:0 0 12px">${b && Array.isArray(b.foods) ? `<b>Cálculo de bolus incluído:</b> ${b.foods.length} alimento${b.foods.length === 1 ? '' : 's'}${b.meals && b.meals.length ? ' · ' + b.meals.length + ' refeição(ões) registrada(s)' : ''}${b.days && Object.keys(b.days).length ? ' · ' + Object.keys(b.days).length + ' dia(s)' : ''}${b.ratio ? ' · razão 1:' + b.ratio : ''}.` : '<b>Este arquivo não traz dados do Cálculo de bolus.</b> Ele foi gerado por uma versão antiga do app ou antes de haver dados nessa página. Em Exportar (acima) veja se os dados do bolus estão no aparelho de origem e gere uma cópia nova.'}</p>`; })()}
+      <div class="stack"><button class="btn pri full" data-act="rest-merge">Juntar aos meus dados</button>
+      <button class="btn danger full" data-act="rest-replace-ask">Substituir tudo por esta cópia</button></div></div>`;
   }
   h += lastBackupLine();
-  h += `</div><h2 class="sec">Apagar dados</h2><div class="card" style="border-color:var(--low-bd)"><p class="hint" style="margin:0 0 12px">Remove os dados <b>deste aparelho</b> de forma definitiva. Não dá para desfazer: faça um backup antes.</p><div class="stack"><button class="btn danger full" data-act="wipe-ask" data-w="records">Apagar todas as medições (${S.records.filter(r => !isEx(r)).length})</button><button class="btn danger full" data-act="wipe-ask" data-w="all">Apagar tudo (medições, HbA1c, esquemas e exames)</button></div></div>`;
+  h += `</div><h2 class="sec">Apagar dados</h2><div class="card" style="border-color:var(--low-bd)"><p class="hint" style="margin:0 0 12px">Remove os dados <b>deste aparelho</b> de forma definitiva. Não dá para desfazer: faça uma cópia antes.</p><div class="stack"><button class="btn danger full" data-act="wipe-ask" data-w="records">Apagar todas as medições (${S.records.filter(r => !isEx(r)).length})</button><button class="btn danger full" data-act="wipe-ask" data-w="all">Apagar tudo</button></div></div>`;
   return h;
 }
 function wipeSheet(w) {
   const nR = S.records.length, all = w === 'all';
   const what = all ? `${nR} medições, ${S.hba.length} resultados de HbA1c, ${S.schemes.length} esquemas e ${S.exams.length} exames` : `${nR} medições (HbA1c, esquemas e exames ficam)`;
-  openSheet(`<h2>${all ? 'Apagar tudo?' : 'Apagar todas as medições?'}</h2><p style="margin:0 0 10px">Serão apagados: <b>${what}</b>. Isso não pode ser desfeito.</p><button class="btn full" data-act="bk-json" style="margin-bottom:12px">Fazer backup antes (.json)</button><label class="fl" for="wipe-t">Digite APAGAR para confirmar</label><input class="in" id="wipe-t" autocomplete="off" autocapitalize="characters" placeholder="APAGAR"><div class="row" style="margin-top:12px"><button class="btn danger grow" id="wipe-go" data-act="wipe-do" data-w="${w}" disabled>Apagar definitivamente</button><button class="btn" data-act="close">Cancelar</button></div>`);
+  openSheet(`<h2>${all ? 'Apagar tudo?' : 'Apagar todas as medições?'}</h2><p style="margin:0 0 10px">Serão apagados: <b>${what}</b>. Isso não pode ser desfeito.</p><button class="btn full" data-act="bk-json" style="margin-bottom:12px">Fazer cópia antes</button><label class="fl" for="wipe-t">Digite APAGAR para confirmar</label><input class="in" id="wipe-t" autocomplete="off" autocapitalize="characters" placeholder="APAGAR"><div class="row" style="margin-top:12px"><button class="btn danger grow" id="wipe-go" data-act="wipe-do" data-w="${w}" disabled>Apagar definitivamente</button><button class="btn" data-act="close">Cancelar</button></div>`);
 }
 async function wipeData(w) {
   await Store.delMany('records', S.records.map(r => r.id));
@@ -780,44 +794,49 @@ const menuItem = (r, t, d, act) => `<button class="menu-item" data-act="${act ||
 MI.seguranca = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 15v2"/>';
 MI.privacidade = '<path d="M12 3l8 3v6c0 4.500-3.400 8-8 9-4.600-1-8-4.500-8-9V6z"/><path d="M9 12l2 2 4-4"/>';
 MI.alertashist = MI.lembretes;
-Object.assign(MI, { 'g-trat': MI.esquemas, 'g-analises': MI.padroes, 'g-exames': MI.exames, 'g-ia': MI.ia, 'g-notif': MI.lembretes, 'g-dados': MI.backup, 'g-seg': MI.seguranca, 'g-perfil': MI.perfil, 'g-sobre': MI.sobre });
+Object.assign(MI, { 'g-trat': MI.esquemas, 'g-saude': MI.hba1c, 'g-bolus': MI.bolus, 'g-hist': MI.classificar, 'g-relat': MI.relatorios, 'g-analises': MI.padroes, 'g-exames': MI.exames, 'g-ia': MI.ia, 'g-notif': MI.lembretes, 'g-dados': MI.backup, 'g-seg': MI.seguranca, 'g-aj': MI.aparencia, 'g-perfil': MI.perfil, 'g-sobre': MI.sobre });
 /* Categorias da aba Mais (cada uma é um submenu expansível). Item: [rota, título, legenda, ação opcional] */
 function menuGroups() {
+  /* Ordem = importância para o dia a dia. Perfil sempre primeiro; ajustes e informações do app por último.
+     Categoria com um só item vira atalho direto (sem expandir). Cada item continua com a mesma rota e a mesma tela. */
   const G = {
-    'g-trat': { t: 'Tratamento e insulina', d: 'Esquemas, doses registradas, bolus e protocolo de hipoglicemia', items: [['esquemas', 'Esquemas de tratamento', 'Medicamentos, horários e comparação'], ['insulinas', 'Histórico de insulinas', 'Horários da basal e da insulina rápida, média e variação'], ['bolus', 'Cálculo de bolus', 'Razão insulina/carboidratos, alimentos e refeições'], ['hypo', 'Protocolo de hipoglicemia', 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', 'hypo-open']] },
-    'g-analises': { t: 'Análises e conquistas', d: 'Padrões, marcos, classificação das medições e eventos', items: [['padroes', 'Padrões', 'Observações automáticas sobre horários, jejum e etiquetas'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses'], ['classificar', 'Classificar medições', 'Jejum, pré e pós-prandial e refeição das últimas medições'], ['eventos', 'Eventos', 'Marcar doença, viagem ou mudança de rotina nos gráficos']] },
-    'g-exames': { t: 'Exames e relatórios', d: 'HbA1c, exames de laboratório e relatórios para o médico', items: [['hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico'], HAS_CLAUDE ? ['exames', 'Exames laboratoriais', 'Enviar PDFs, notas, contexto e comparação'] : null, ['relatorios', 'Relatórios', 'PDF e Excel por período']] },
-    'g-ia': { t: 'Inteligência artificial', d: 'Pergunte sobre o seu histórico e configure o provedor e a chave', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Faça perguntas sobre o seu histórico de registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor de IA, o modelo e informe a sua chave'] : null] },
-    'g-notif': { t: 'Alertas e lembretes', d: 'Avisos, horários, alertas personalizados e modo de exibição', items: [['lembretes', 'Alertas e notificações', 'Avisos, lembretes de horário, silêncio noturno e modo de exibição'], ['alertasp', 'Alertas personalizados', 'Avisos ligados às suas marcações, como Dia de perna, e à glicemia'], ['alertashist', 'Histórico de alertas', 'Todos os avisos recebidos, lidos e dispensados']] },
-    'g-dados': { t: 'Dados e backup', d: 'Backup, restauração, Google Drive e importação do mySugr', items: [['backup', 'Backup e dados', 'Exportar, restaurar, Google Drive e CSV'], ['importar', 'Importar do mySugr', 'Enviar CSV exportado, com prévia']] },
-    'g-seg': { t: 'Segurança e privacidade', d: 'Bloqueio por PIN, biometria, backup protegido e privacidade', items: [['seguranca', 'Bloqueio e proteção', 'PIN, biometria, backup protegido por senha e Drive cifrado'], ['privacidade', 'Privacidade e armazenamento', 'Onde ficam seus dados, armazenamento persistente e apagar perfil']] },
-    'g-perfil': { t: 'Perfil e configurações', d: 'Seu perfil, aparência, metas e demais ajustes', items: [['perfil', 'Meu Perfil', pfMenuDesc()], ['aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela'], ['config', 'Configurações', 'Metas de HbA1c, limite da insulina do jantar e demais ajustes']] },
-    'g-sobre': { t: 'Sobre e ajuda', d: 'Versão, privacidade, métodos de cálculo e avisos de segurança', items: [['sobre', 'Sobre e limites', 'Versão, como os números são calculados e avisos']] }
+    'g-perfil': { t: 'Perfil e licença', d: 'Foto, dados pessoais, diabetes e licença', items: [['perfil', 'Meu perfil', pfMenuDesc()], ['licenca', 'Licença TiaBete', typeof licMenuDesc === 'function' ? licMenuDesc() : 'Gratuito, teste e licença vitalícia']] },
+    'g-saude': { t: 'Saúde e diabetes', d: 'Hemoglobina glicada, exames e hipoglicemia', items: [['hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico'], HAS_CLAUDE ? ['exames', 'Exames laboratoriais', 'Enviar exames, ver notas e comparar'] : null, ['hypo', 'Protocolo de hipoglicemia', 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', 'hypo-open']] },
+    'g-trat': { t: 'Tratamento e insulina', d: 'Medicamentos, horários e doses de insulina', items: [['esquemas', 'Meu tratamento', 'Diabetes, insulinas, medicamentos e histórico'], ['insrem', 'Lembretes de insulina', 'Avisos de basal e rápida, com confirmação da aplicação'], ['insulinas', 'Histórico de insulinas', 'Horários, média e variação das insulinas']] },
+    'g-bolus': { t: 'Cálculo de bolus', d: 'Razão insulina/carboidratos, alimentos e refeições', items: [['bolus', 'Cálculo de bolus', 'Razão insulina/carboidratos, alimentos e refeições']] },
+    'g-hist': { t: 'Histórico e registros', d: 'Classificar medições, eventos e importação do mySugr', items: [['classificar', 'Classificar medições', 'Jejum, antes e depois da refeição'], ['eventos', 'Eventos', 'Marcar doença, viagem ou rotina nos gráficos'], ['importar', 'Importar do mySugr', 'Enviar o CSV, com prévia']] },
+    'g-relat': { t: 'Relatórios e estatísticas', d: 'Relatórios para o médico, padrões e conquistas', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['padroes', 'Padrões', 'Observações automáticas dos seus registros'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses']] },
+    'g-ia': { t: 'Inteligência artificial', d: 'Pergunte sobre seus registros e configure a IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Pergunte sobre seus registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor, o modelo e a chave'] : null] },
+    'g-dados': { t: 'Cópia de segurança', d: 'Exportar, restaurar, Google Drive e CSV', items: [['backup', 'Cópia de segurança', 'Exportar, restaurar, Google Drive e CSV']] },
+    'g-seg': { t: 'Segurança e privacidade', d: 'Bloqueio por PIN, biometria, cópia protegida e privacidade', items: [['seguranca', 'Bloqueio e proteção', 'PIN, biometria, cópia protegida por senha e Drive cifrado'], ['privacidade', 'Privacidade e armazenamento', 'Onde ficam seus dados, armazenamento persistente e apagar perfil']] },
+    'g-notif': { t: 'Alertas e lembretes', d: 'Avisos, horários e modo de exibição', items: [['lembretes', 'Alertas e lembretes', 'Lembretes, silêncio noturno e modo de exibição'], ['alertasp', 'Alertas personalizados', 'Avisos pelas suas marcações e pela glicemia'], ['alertashist', 'Histórico de alertas', 'Avisos recebidos, lidos e dispensados']] },
+    'g-aj': { t: 'Aparência e ajustes', d: 'Tema, tamanho da tela, metas e limites', items: [['aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela'], ['config', 'Configurações', 'Meta de HbA1c, limite da insulina do jantar e outros ajustes']] },
+    'g-sobre': { t: 'Sobre o TiaBete', d: 'Versão, cálculos e avisos', items: [['sobre', 'Sobre o TiaBete', 'Versão, cálculos e avisos']] }
   };
   for (const g of Object.values(G)) g.items = g.items.filter(Boolean);
-  { const ia = G['g-ia'], q = ia.items.some(x => x[0] === 'perguntas'), p = ia.items.some(x => x[0] === 'ia'); ia.d = q && p ? 'Pergunte sobre o seu histórico e configure o provedor e a chave' : q ? 'Pergunte à IA sobre o seu histórico de registros' : p ? 'Configure o provedor de IA, o modelo e a chave' : ia.d; }
+  { const ia = G['g-ia'], q = ia.items.some(x => x[0] === 'perguntas'), p = ia.items.some(x => x[0] === 'ia'); ia.d = q && p ? 'Pergunte sobre seus registros e configure a IA' : q ? 'Pergunte à IA sobre seus registros' : p ? 'Configure o provedor, o modelo e a chave' : ia.d; }
   return G;
 }
 const hubOf = r => { if (r === 'perguntas' || r === 'ia') return 'g-ia'; const G = menuGroups(); for (const [k, g] of Object.entries(G)) if (g.items.some(x => x[0] === r)) return k; return null; };
 const hubView = k => () => { const g = menuGroups()[k]; return banners() + `<div class="stack">${g.items.map(x => menuItem(x[0], x[1], x[2])).join('')}</div>`; };
-const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'perfil foto nome idade nascimento tipo diabetes equipe medico privacidade seguranca conta dados avatar', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
-Object.assign(MAIS_KW, { seguranca: 'pin senha bloqueio bloquear biometria digital rosto cifrar criptografia backup protegido drive', privacidade: 'dados armazenamento persistente apagar perfil lgpd rastreamento', alertashist: 'historico avisos bolha lidos dispensados', hypo: 'hipoglicemia glicose baixa 15 minutos protocolo reavaliar', sobre: (MAIS_KW.sobre || '') + ' versao ajuda atualizacao tutorial' });
-const pfMenuDesc = () => S.profile && (S.profile.name || S.profile.photo) ? 'Foto, dados pessoais, diabetes, privacidade e backups' : 'Crie seu perfil para uma experiência personalizada';
+const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar backup copia seguranca', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'perfil foto nome idade nascimento tipo diabetes equipe medico privacidade seguranca conta dados avatar', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+Object.assign(MAIS_KW, { insrem: 'lembrete lembretes insulina basal rapida notificacao aviso alarme confirmar aplicacao adiar', seguranca: 'pin senha bloqueio bloquear biometria digital rosto cifrar criptografia backup copia protegido drive', privacidade: 'dados armazenamento persistente apagar perfil lgpd rastreamento', alertashist: 'historico avisos bolha lidos dispensados', hypo: 'hipoglicemia glicose baixa 15 minutos protocolo reavaliar', sobre: (MAIS_KW.sobre || '') + ' versao ajuda atualizacao tutorial' });
+const pfMenuDesc = () => S.profile && (S.profile.name || S.profile.photo) ? 'Foto, dados pessoais, diabetes e privacidade' : 'Crie seu perfil';
 function maisIndex() {
   const out = [];
-  for (const g of Object.values(menuGroups())) for (const x of g.items) out.push({ r: x[0], t: x[1], d: x[2], g: g.t, act: x[3] });
+  for (const g of Object.values(menuGroups())) for (const x of g.items) out.push({ r: x[0], t: x[1], d: x[2], g: g.t, act: x[3], solo: g.items.length === 1 });
   return out;
 }
 function maisResults(q) {
   const words = norm(q).split(/\s+/).filter(Boolean);
   const list = maisIndex().filter(x => { const hay = norm([x.t, x.d, x.g, MAIS_KW[x.r] || ''].join(' ')); return words.every(w => hay.includes(w)); });
-  return list.length ? list.map(x => menuItem(x.r, x.t, (x.g ? x.g + ' › ' : '') + x.d, x.act)).join('') : `<div class="card"><p class="hint" style="margin:0">Nada encontrado para “${esc(q)}”. Tente outra palavra, como “backup”, “tema”, “insulina” ou “perfil”.</p></div>`;
+  return list.length ? list.map(x => menuItem(x.r, x.t, (x.g && !x.solo ? x.g + ' › ' : '') + x.d, x.act)).join('') : `<div class="card"><p class="hint" style="margin:0">Nada encontrado para “${esc(q)}”. Tente outra palavra, como “cópia”, “tema”, “insulina” ou “perfil”.</p></div>`;
 }
 document.addEventListener('input', e => { if (e.target.id !== 'mais-q') return; S.maisQ = e.target.value; const l = document.getElementById('mais-list'); if (l) l.innerHTML = S.maisQ.trim() ? maisResults(S.maisQ) : maisMenu(); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-act="mais-clear"]'); if (!c) return; S.maisQ = ''; const i = document.getElementById('mais-q'); if (i) { i.value = ''; i.focus(); } const l = document.getElementById('mais-list'); if (l) l.innerHTML = maisMenu(); });
 function maisMenu() {
   const G = menuGroups(), op = S.maisOpen || '';
-  return Object.entries(G).filter(([, g]) => g.items.length).map(([k, g]) => `<div class="mx${op === k ? ' open' : ''}" data-k="${k}"><button class="mx-h" type="button" data-act="mais-cat" data-k="${k}" aria-expanded="${op === k}" aria-controls="mx-${k}">${mi(k)}<div>${g.t}<span>${g.d}</span></div><svg class="chv" viewBox="0 0 24 24" aria-hidden="true">${IC.chev}</svg></button><div class="mx-b" id="mx-${k}" role="region" aria-label="${g.t}"><div class="mx-in">${g.items.map(x => menuItem(x[0], x[1], x[2], x[3])).join('')}</div></div></div>`).join('');
+  return Object.entries(G).filter(([, g]) => g.items.length).map(([k, g]) => g.items.length === 1 ? (x => `<div class="mx mx-solo" data-k="${k}"><button class="mx-h" type="button" data-act="${x[3] || 'go'}" ${x[3] ? '' : `data-r="${x[0]}"`}>${mi(x[0])}<div>${x[1]}<span>${x[2]}</span></div><svg class="chv" viewBox="0 0 24 24" aria-hidden="true">${IC.chev}</svg></button></div>`)(g.items[0]) : `<div class="mx${op === k ? ' open' : ''}" data-k="${k}"><button class="mx-h" type="button" data-act="mais-cat" data-k="${k}" aria-expanded="${op === k}" aria-controls="mx-${k}">${mi(k)}<div>${g.t}<span>${g.d}</span></div><svg class="chv" viewBox="0 0 24 24" aria-hidden="true">${IC.chev}</svg></button><div class="mx-b" id="mx-${k}" role="region" aria-label="${g.t}"><div class="mx-in">${g.items.map(x => menuItem(x[0], x[1], x[2], x[3])).join('')}</div></div></div>`).join('');
 }
 document.addEventListener('click', e => {
   const h = e.target.closest('[data-act="mais-cat"]'); if (!h) return;
@@ -830,24 +849,24 @@ function viewMais() {
   const q = S.maisQ || '';
   return banners() + `<div class="mais-s"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="in" id="mais-q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Buscar em Mais…" aria-label="Buscar em Mais" value="${esc(q)}">${q ? '<button class="mais-x" data-act="mais-clear" aria-label="Limpar busca">×</button>' : ''}</div><div class="stack" id="mais-list">${q.trim() ? maisResults(q) : maisMenu()}</div>`;
 }
-function viewAparencia() { return banners() + themeCard() + scaleCard() + swipeCard(); }
+function viewAparencia() { return banners() + themeCard() + pnlCard() + scaleCard() + swipeCard(); }
 
 function viewSobre() {
   const kv = (k, v) => `<div class="row sp" style="gap:12px;padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start"><span class="dim" style="flex:none">${k}</span><b style="text-align:right;overflow-wrap:anywhere">${v}</b></div>`;
   const n = { med: S.records.filter(r => !isEx(r)).length, hba: S.hba.filter(x => !isEx(x)).length, ex: S.exams.length, ins: S.inslog.length };
-  return `<div class="card"><div class="about-logo" role="img" aria-label="TiaBete Glicose Control"><svg viewBox="0 0 100 100" width="56" height="56" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg><span class="lw"><span class="ln">Tia<b>Bete</b></span><span class="ls">GLICOSE CONTROL</span></span></div><p style="margin:10px 0 0">Registro, importação e análise de glicemia capilar para acompanhar o controle da glicemia.</p></div>
-  <h2 class="sec">Informações do aplicativo</h2><div class="card">
+  return `<div class="card"><div class="about-logo" role="img" aria-label="TiaBete"><svg viewBox="0 0 100 100" width="56" height="56" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg><span class="lw"><span class="ln">Tia<b>Bete</b></span><span class="ls">CONTROLE DA GLICOSE</span></span></div><p style="margin:10px 0 0">Registro, importação e análise da glicemia capilar.</p></div>
+  <h2 class="sec">Sobre o aplicativo</h2><div class="card">
     ${kv('Versão', APP_VERSION)}${kv('Compilação', BUILD_DATE || '—')}${kv('Plataforma', IS_NATIVE ? 'Aplicativo Android' : 'Versão web (navegador)')}${kv('Banco de dados', 'Local no aparelho · esquema ' + SCHEMA_VERSION)}${kv('Desenvolvimento', esc(APP_INFO.dev))}${kv('Com assistência de', esc(APP_INFO.assist))}${kv('Código-fonte', esc(APP_INFO.repo))}
-    <p class="hint" style="margin:10px 0 0">Para dúvidas e sugestões, abra uma “Issue” no repositório do código-fonte. Gráficos, importação de CSV e geração de Excel são do próprio app; PDF e leitura de exames usam as bibliotecas jsPDF e pdf.js, carregadas só quando você pede.</p></div>
-  <h2 class="sec">Seus dados neste aparelho</h2><div class="card">${kv('Medições de glicemia', n.med)}${kv('Resultados de HbA1c', n.hba)}${kv('Exames laboratoriais', n.ex)}${kv('Registros de insulina', n.ins)}<p class="hint" style="margin:10px 0 0">Tudo fica só neste aparelho. Faça backup em Mais → Backup e dados.</p></div>
-  <h2 class="sec">Privacidade</h2><div class="card"><p class="hint" style="margin:0">Os dados ficam no banco local deste aparelho. Não há contas nem rastreamento. Arquivos CSV e backups são lidos no aparelho. Única exceção: na tela de Exames, quando você pede a análise, o texto do exame (sem CPF e e-mail) é enviado ao Claude da sua conta, com sua autorização.</p></div>
-  <h2 class="sec">Como os números são calculados</h2><div class="card"><ul class="plain" style="margin:0"><li>Faixas: &lt; 54 muito baixa · 54–69 baixa · 70–180 dentro da faixa · 181–250 elevada · &gt; 250 muito elevada (mg/dL). Em medições de <b>jejum</b> a faixa normal é 70–130, e acima de 130 é elevada.</li><li>“Episódio” de hipo ou hiperglicemia é uma medição fora do limite (&lt; 70 ou acima da faixa: &gt; 180, ou &gt; 130 em jejum). O app não agrupa medições em eventos.</li><li>As medições são pontuais. A distribuição por faixa é contagem de medições e não equivale a tempo no alvo (TIR).</li><li>Período anterior: mesma duração, imediatamente antes (30 dias contra os 30 anteriores).</li><li>Médias com menos de ${MIN_BUCKET} medições não são exibidas.</li><li>Classificação por horário (opcional): 04h–08h jejum; 08h–10h pós-prandial do café; 10h–12h pré-prandial do almoço; 12h–16h pós-prandial do almoço; 16h–19h pré-prandial do jantar; 19h–00h pós-prandial do jantar. Medições entre 00h e 04h e sem horário não são alteradas.</li><li>Estimativa de HbA1c: (média + 46,7) ÷ 28,7, opcional e separada dos exames. Não é GMI.</li></ul></div>
+    <p class="hint" style="margin:10px 0 0">Para dúvidas e sugestões, abra uma solicitação no repositório do código-fonte. Gráficos, importação de CSV e geração de Excel são do próprio app; PDF e leitura de exames usam as bibliotecas jsPDF e pdf.js, carregadas só quando você pede.</p></div>
+  <h2 class="sec">Seus dados neste aparelho</h2><div class="card">${kv('Medições de glicemia', n.med)}${kv('Resultados de HbA1c', n.hba)}${kv('Exames laboratoriais', n.ex)}${kv('Registros de insulina', n.ins)}<p class="hint" style="margin:10px 0 0">Tudo fica só neste aparelho. Faça cópias em Mais → Cópia de segurança.</p></div>
+  <h2 class="sec">Privacidade</h2><div class="card"><p class="hint" style="margin:0">Os dados ficam no banco local deste aparelho. Não há contas nem rastreamento. Arquivos CSV e cópias são lidos no aparelho. Única exceção: na tela de Exames, quando você pede a análise, o texto do exame (sem CPF e e-mail) é enviado ao Claude da sua conta, com sua autorização.</p></div>
+  <h2 class="sec">Como os números são calculados</h2><div class="card"><ul class="plain" style="margin:0"><li>Faixas: &lt; 54 muito baixa · 54–69 baixa · 70–180 dentro da faixa · 181–250 elevada · &gt; 250 muito elevada (mg/dL). Em medições de <b>jejum</b> a faixa normal é 70–130, e acima de 130 é elevada.</li><li>“Episódio” de hipo ou hiperglicemia é uma medição fora do limite (&lt; 70 ou acima da faixa: &gt; 180, ou &gt; 130 em jejum). O app não agrupa medições em eventos.</li><li>As medições são pontuais. A distribuição por faixa é contagem de medições e não equivale ao tempo no alvo.</li><li>Período anterior: mesma duração, imediatamente antes (30 dias contra os 30 anteriores).</li><li>Médias com menos de ${MIN_BUCKET} medições não são exibidas.</li><li>Classificação por horário (opcional): 04h–08h jejum; 08h–10h depois do café; 10h–12h antes do almoço; 12h–16h depois do almoço; 16h–19h antes do jantar; 19h–00h depois do jantar. Medições entre 00h e 04h e sem horário não são alteradas.</li><li>Estimativa de HbA1c: (média + 46,7) ÷ 28,7, opcional e separada dos exames. Não é o GMI (estimativa de sensor contínuo).</li></ul></div>
   <h2 class="sec">Avisos</h2><div class="card"><p class="hint" style="margin:0">O TiaBete não substitui avaliação médica nem muda o tratamento por conta própria. O cálculo de bolus apenas faz a conta com a razão que você definiu com a sua equipe de saúde, sem considerar a glicemia atual. Use os relatórios para conversar com sua equipe de saúde.</p></div>`;
 }
 
 /* ================= Roteamento e renderização ================= */
 
-const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, alertasp: viewAlertasP, alertashist: () => viewAlertasHist(), padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, seguranca: viewSeguranca, privacidade: viewPrivacidade };
+const VIEWS = { config: () => viewConfig(), perfil: () => viewPerfil(), aparencia: viewAparencia, painel: viewPainel, historico: viewHistorico, analise: viewAnalise, mais: viewMais, hba1c: viewHba, esquemas: viewEsquemas, importar: viewImportar, classificar: viewClassificar, relatorios: viewRelatorios, backup: viewBackup, sobre: viewSobre, exames: viewExames, eventos: viewEventos, insulinas: viewInsulinas, conquistas: viewConquistas,  lembretes: viewLembretes, insrem: viewInsRem, alertasp: viewAlertasP, alertashist: () => viewAlertasHist(), padroes: viewPadroes, perguntas: viewPerguntas, exame: viewExame, comparar: viewComparar, seguranca: viewSeguranca, privacidade: viewPrivacidade };
 /* ---- Aviso de segurança e responsabilidade médica (páginas com exames, bolus, estimativas, IA e tratamento) ---- */
 const SF_SHORT = { exames: 'A IA pode errar. Os resultados não substituem o seu médico.', exame: 'A IA pode errar. Os resultados não substituem o seu médico.', comparar: 'A IA pode errar. Os resultados não substituem o seu médico.', perguntas: 'As respostas da IA podem ter imprecisões e não substituem o seu médico.', hba1c: 'Estimativas não são exame e não decidem tratamento.', bolus: 'Cálculos não substituem o seu médico. Não mude doses por conta própria.', esquemas: 'Doses e remédios só mudam com orientação médica.', painel: 'Ferramenta de apoio ao acompanhamento. Não substitui o seu médico.' };
 function safetyNote(view, route) {
@@ -872,18 +891,20 @@ function render() {
   safetyNote(view, route);
   pfSync();
   try { acSync(); } catch (e) { }
+  try { ambSync(); } catch (e) { }
   attachCharts(view);
   try { if (S.pm) pmDraw(); } catch (e) { }
   try { iaMount(view, route); } catch (e) { }
   rewardSoon();
   setTimeout(drvAuto, 2500);
   setTimeout(insLink, 50); setTimeout(scrSetup, 30);
+  try { if (typeof rmScan === 'function') requestAnimationFrame(() => rmScan()); } catch (e) { }
 }
 function navHTML() {
   const cur = navGroup(S.route), b = (r, i, l) => `<button data-act="go" data-r="${r}" ${cur === r ? 'aria-current="page"' : ''}>${ic(i)}${l}</button>`;
-  return `<div class="nav-in">${b('painel', 'home', 'Painel')}${b('historico', 'list', 'Histórico')}<button class="fab" data-act="new" aria-label="Nova medição">${ic('plus')}</button>${b('analise', 'chart', 'Análise')}${b('mais', 'menu', 'Mais')}</div>`;
+  return `<div class="nav-in">${b('painel', 'home', 'Início')}${b('historico', 'list', 'Histórico')}<button class="fab" data-act="new" aria-label="Nova medição">${ic('plus')}</button>${b('analise', 'chart', 'Análise')}${b('mais', 'menu', 'Mais')}</div>`;
 }
-function backOf(r) { return r === 'alertashist' ? 'lembretes' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
+function backOf(r) { return r === 'alertashist' ? 'lembretes' : r === 'insrem' ? 'lembretes' : r === 'esquemas' ? 'perfil' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
 function go(r) { if (r === 'mais' && S.route !== 'mais' && hubOf(S.route)) S.maisOpen = hubOf(S.route); if (r !== S.route) S.prevRoute = S.route; S.route = r; if (location.hash !== '#' + r) { try { location.hash = r; } catch (e) { } } render(); window.scrollTo(0, 0); }
 function routeFromHash() { const h = location.hash.replace('#', ''); return h === 'exame' ? (S.exams.some(x => x.id === S.ex.id) ? 'exame' : 'exames') : VIEWS[h] ? h : 'painel'; }
 
@@ -905,7 +926,7 @@ document.addEventListener('click', async e => {
       case 'open': openRecord(id); break;
       case 'edit': openSheet(recordForm(S.records.find(r => r.id === id))); break;
       case 'more': S.hist.limit += 60; $('#h-list').innerHTML = histListHTML(); break;
-      case 'clear-filters': Object.assign(S.hist, { from: '', to: '', band: '', ctx: '', meal: '', mark: '' }); render(); break;
+      case 'clear-filters': { const had = ['from', 'to', 'band', 'ctx', 'meal', 'mark'].some(k => S.hist[k]); Object.assign(S.hist, { from: '', to: '', band: '', ctx: '', meal: '', mark: '' }); render(); toast(had ? 'Filtros limpos.' : 'Nenhum filtro ativo.'); break; }
       case 'rm-examples': await removeExamples(); render(); toast('Dados de exemplo removidos.'); break;
       case 'del-ask': el.dataset.act = 'del-do'; el.textContent = 'Toque de novo para excluir'; el.classList.add('pri'); setTimeout(() => { if (el.isConnected && el.dataset.act === 'del-do') { el.dataset.act = 'del-ask'; el.textContent = 'Excluir registro'; el.classList.remove('pri'); } }, 4000); break;
       case 'del-do': await Store.del('records', id); await loadAll(); closeSheet(); render(); toast('Registro excluído.'); break;
@@ -930,7 +951,7 @@ document.addEventListener('click', async e => {
       case 'imp-reset': S.imp = null; render(); break;
       case 'imp-commit': el.disabled = true; await commitImport(); break;
       case 'rep-quick': { const to = isoDate(new Date()); S.rep = { to, from: isoDate(new Date(addDays(Date.now(), -(+el.dataset.d - 1)))) }; render(); break; }
-      case 'rep-pdf': el.disabled = true; await makePDF(); el.disabled = false; break;
+      case 'rep-pdf': if (typeof licAllowed === 'function' && !licAllowed('rel-pdf')) { toast('O relatório em PDF é um recurso premium. O Excel e o CSV continuam gratuitos.'); go('licenca'); break; } el.disabled = true; await makePDF(); el.disabled = false; break;
       case 'rep-xlsx': el.disabled = true; await makeXLSX(); el.disabled = false; break;
       case 'bk-json': await exportBackup(); break;
       case 'bk-csv': await exportCSV(); break;
@@ -979,7 +1000,7 @@ document.addEventListener('change', async e => {
   else if (id === 'rule-n') { const n = parseInt(t.value, 10); S.ruleN = n > 0 ? Math.min(n, 100000) : 180; render(); }
   else if (id === 'rest-file') { await readBackupFile(t.files[0]); t.value = ''; }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hypoClose(); });
 document.addEventListener('pointerdown', e => { if (!e.target.closest('.chart')) $$('.tip').forEach(t => t.hidden = true); });
 window.addEventListener('hashchange', () => { const r = routeFromHash(); if (r !== S.route) { S.route = r; render(); window.scrollTo(0, 0); } });
 
@@ -988,14 +1009,14 @@ async function saveFile(name, data, textFallback) {
   let dl = null; try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { }
   if (!dl) {
     if (textFallback) { openSheet(`<h2>Copie o conteúdo</h2><p class="hint" style="margin:0 0 10px">Este visualizador não permite baixar arquivos. Copie o texto abaixo e salve como <b>${esc(name)}</b>.</p><textarea class="in" id="fb-text" style="min-height:200px;font-family:var(--f-mono);font-size:13.5px" readonly>${esc(textFallback)}</textarea><div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="close">Fechar</button></div>`); setTimeout(() => { const t = $('#fb-text'); if (t) t.select(); }, 80); return false; }
-    toast('Download indisponível neste visualizador.'); return false;
+    toast('Não é possível baixar neste visualizador.'); return false;
   }
   try { await dl.save({ filename: name, data }); toast('Arquivo salvo: ' + name); return true; }
-  catch (e) { toast(e && e.code === 'declined' ? 'Download cancelado.' : 'Não foi possível salvar o arquivo.'); return false; }
+  catch (e) { toast(e && e.code === 'declined' ? 'Cancelado.' : 'Não foi possível salvar o arquivo.'); return false; }
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, insRem: S.ir && S.ir.items.length ? { ...S.ir, state: {}, tz: '' } : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
   if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.rw && S.rw.cust && S.rw.cust.length) && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }
@@ -1015,20 +1036,20 @@ async function exportCSV() {
 async function readBackupFile(file) {
   if (!file) return;
   try { const j = JSON.parse((await file.text()).replace(/^\ufeff/, '')); await ingestBackup(j); }
-  catch (e) { S.rest = null; render(); toast(e.message && e.message.length < 90 ? e.message : 'Não consegui ler este backup.'); }
+  catch (e) { S.rest = null; render(); toast(e.message && e.message.length < 90 ? e.message : 'Não consegui ler esta cópia.'); }
 }
 async function ingestBackup(j) {
   try {
     if (j && j.enc === 1) { SEC.pend = j; SEC.msg = ''; S.rest = null; render(); return; }
-    if (!j || !['GlicoTrack', 'TiaBete'].includes(j.app) || !Array.isArray(j.records)) throw new Error('Este arquivo não é um backup do TiaBete.');
-    if (j.schema && j.schema > SCHEMA_VERSION) throw new Error('Este backup foi criado por uma versão mais nova do TiaBete.');
+    if (!j || !['GlicoTrack', 'TiaBete'].includes(j.app) || !Array.isArray(j.records)) throw new Error('Este arquivo não é uma cópia do TiaBete.');
+    if (j.schema && j.schema > SCHEMA_VERSION) throw new Error('Esta cópia foi criada por uma versão mais nova do TiaBete.');
     const okRec = r => r && typeof r.date === 'string' && parseDate(r.date) && typeof r.glucose === 'number' && r.glucose >= GLU_MIN && r.glucose <= GLU_MAX;
     const recs = j.records.filter(okRec).map(r => ({ ...r, id: r.id || uid(), time: r.time || '00:00', ts: mkTs(r.date, r.time || '00:00') }));
     const bad = j.records.length - recs.length;
     S.rest = { state: j.state && typeof j.state === 'object' ? j.state : null, records: recs, hba: (j.hba1c || []).filter(x => x && parseDate(x.date) && typeof x.value === 'number').map(x => ({ ...x, id: x.id || uid() })), schemes: (j.schemes || []).filter(x => x && x.name && parseDate(x.start)).map(x => ({ ...x, id: x.id || uid() })), settings: j.settings && typeof j.settings.a1cTarget === 'number' ? j.settings : null, events: (Array.isArray(j.events) ? j.events : []).filter(x => x && parseDate(x.date) && typeof x.text === 'string').map(x => ({ id: x.id || uid(), date: x.date, text: x.text.slice(0, 60) })), exams: (Array.isArray(j.exams) ? j.exams : []).filter(x => x && Array.isArray(x.items)).map(x => ({ ...x, id: x.id || uid() })), inslog: (Array.isArray(j.inslog) ? j.inslog : []).filter(x => x && ['basal', 'fast', 'lunch', 'dinner', 'extra'].includes(x.kind) && typeof x.ts === 'number' && x.ts > 0).map(x => { const r = { id: x.id || uid(), kind: x.kind, ts: x.ts, date: isoDate(new Date(x.ts)), at: x.at || x.ts }; const u = typeof x.units === 'string' ? parseFloat(x.units.replace(',', '.')) : x.units; if (typeof u === 'number' && isFinite(u) && u > 0) r.units = u; if (typeof x.name === 'string' && x.name.trim()) r.name = x.name.trim().slice(0, 80); return r; }), exportedAt: j.exportedAt, bad };
     if (bad) toast(`${bad} registro(s) inválido(s) do arquivo serão ignorados.`);
     render();
-  } catch (e) { S.rest = null; render(); toast(e.message && e.message.length < 90 ? e.message : 'Não consegui ler este backup.'); }
+  } catch (e) { S.rest = null; render(); toast(e.message && e.message.length < 90 ? e.message : 'Não consegui ler esta cópia.'); }
 }
 async function restoreBackup(replace) {
   const x = S.rest; if (!x) return;

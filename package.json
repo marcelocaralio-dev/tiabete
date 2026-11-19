@@ -1,15 +1,16 @@
 {
   "name": "tiabete",
-  "version": "0.13.1",
+  "version": "0.21.1",
   "private": true,
   "description": "TiaBete – controle de glicemia para diabetes MODY (app local, sem conta, sem nuvem)",
   "license": "MIT",
   "scripts": {
     "build:web": "node scripts/build-web.js",
-    "test": "node tests/test.js && node tests/test2.js && node tests/test3.js && node tests/test4.js && node tests/test5.js && node tests/test6.js",
+    "test": "node tests/test.js && node tests/test2.js && node tests/test3.js && node tests/test4.js && node tests/test5.js && node tests/test6.js && node tests/test7.js && node tests/test8.js && node tests/test9.js && node tests/test10.js && node tests/test11.js && node tests/test12.js && node tests/test13.js && node tests/test14.js && node tests/test15.js",
     "android:prepare": "npm run build:web && (test -d android || npx cap add android) && node scripts/patch-android.js && npx capacitor-assets generate --android --assetPath assets && npx cap sync android",
     "android:debug": "npm run android:prepare && cd android && ./gradlew assembleDebug",
-    "android:release": "npm run android:prepare && cd android && ./gradlew assembleRelease"
+    "android:release": "npm run android:prepare && cd android && ./gradlew assembleRelease",
+    "build:web:dev": "node scripts/build-web.js --dev"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
@@ -27,5 +28,7 @@
     "@fontsource/manrope": "^5.0.0",
     "@fontsource/unbounded": "^5.0.0"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=22.13"
+  }
 }

@@ -1,0 +1,27 @@
+# Cloudflare Worker do licenciamento do TiaBete.
+# Este arquivo é VERSIONADO: nunca coloque aqui senhas, tokens ou chaves (veja "Segredos" no fim).
+# Recursos já criados na conta Cloudflare: Worker "tiabete-license-api", banco D1 "tiabete-licenses", binding "DB".
+name = "tiabete-license-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"                                  # o código usa env.DB: não mude
+database_name = "tiabete-licenses"
+database_id = "b9905f3d-e3a3-4673-a601-477e6ecf2a88"    # painel Cloudflare → Storage & Databases → D1 → tiabete-licenses (ou: wrangler d1 list)
+migrations_dir = "migrations"
+
+[vars]
+# Valores PÚBLICOS (não são segredo). Preencha antes de publicar.
+GOOGLE_CLIENT_ID = "506090586074-90pi61t816ktl2c3rqlppjningpeof8c.apps.googleusercontent.com"   # o mesmo ID de config/google-client-id.txt (…apps.googleusercontent.com)
+PUBLIC_URL = "https://tiabete-license-api.marcelocaralio.workers.dev"         # endereço do Worker: https://tiabete-license-api.<seu-subdominio>.workers.dev (sem barra no fim)
+APP_RETURN = "app.tiabete.glicose:/pagamento"   # retorno ao app após o pagamento: não mude
+MP_SELLER_ID = ""       # ID numérico do VENDEDOR no Mercado Pago (público). Usado no X-Caller-Id da consulta de contestações; vazio = sem essa consulta (decide só pelo status oficial da Order)
+
+# Segredos (NÃO ficam aqui; cadastre com "wrangler secret put NOME"):
+#   LICENSE_PRIVATE_JWK · MP_ACCESS_TOKEN · MP_WEBHOOK_SECRET
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true

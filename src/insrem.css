@@ -1,0 +1,23 @@
+/* Lembretes de insulina: indicador de situação e lista (só tokens do tema) */
+.ir-st{display:flex;gap:12px;align-items:flex-start}
+.ir-st>div{min-width:0}
+.ir-st b{display:block;overflow-wrap:anywhere}
+.ir-st small{display:block;color:var(--mut);font-size:14px;line-height:1.45;margin-top:2px}
+.ir-dot{flex:none;width:14px;height:14px;border-radius:50%;margin-top:5px;background:var(--mut2);box-shadow:0 0 0 3px var(--s2)}
+.ir-st.ok .ir-dot{background:var(--good-st)}
+.ir-st.warn .ir-dot{background:#E0A100}
+.ir-st.bad .ir-dot{background:var(--red)}
+.ir-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.ir-r{border:1px solid var(--line);border-radius:14px;background:var(--s1);padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.ir-r.off .ir-h{opacity:.62}
+.ir-h{display:flex;gap:12px;align-items:flex-start}
+.ir-i{min-width:0;flex:1}
+.ir-t{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ir-t b{overflow-wrap:anywhere}
+.ir-tm{font-family:var(--f-display);font-size:22px;font-weight:500;letter-spacing:-.02em}
+.ir-s{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ir-n{font-size:14px;color:var(--mut);margin-top:6px}
+.ir-w{font-size:14px;margin-top:6px;color:var(--red-l)}
+.ir-b{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.ir-m{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;background:var(--s2);padding:8px 10px}
+.ir-m span{min-width:0}.ir-m b{display:block;overflow-wrap:anywhere}.ir-m small{display:block;color:var(--mut);font-size:13.5px}

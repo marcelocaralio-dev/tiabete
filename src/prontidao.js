@@ -12,7 +12,7 @@ const PR_INDS = {
   grafico: { name: 'Gráficos de evolução', why: 'Um gráfico precisa de pontos suficientes para mostrar a direção dos valores.', calc: re => { const w = prWin(re, 30); return [{ have: w.length, need: 5, u: 'medições nos últimos 30 dias' }, { have: prDays(w), need: 2, u: 'dias com medição' }]; } },
   dia_tipico: { name: 'Dia típico', why: 'Compara os horários do dia; cada horário precisa de ao menos 4 medições.', calc: re => { let ok = 0; try { ok = typicalDay(re.filter(r => !r.noTime)).ok || 0; } catch (e) { } return [{ have: ok, need: 6, u: 'horários com 4 medições ou mais' }]; } },
   tendencia: { name: 'Tendência', why: 'A inclinação só é confiável com médias de vários dias.', calc: re => [{ have: Math.min(prDays(re), 99), need: 10, u: 'dias com medição' }, { have: re.length, need: 20, u: 'medições' }] },
-  padroes: { name: 'Padrões glicêmicos', why: 'Padrões por horário e por refeição precisam de uma base de registros.', calc: re => [{ have: re.length, need: 20, u: 'medições' }, { have: prDays(re), need: 7, u: 'dias com medição' }] },
+  padroes: { name: 'Padrões da glicemia', why: 'Padrões por horário e por refeição precisam de uma base de registros.', calc: re => [{ have: re.length, need: 20, u: 'medições' }, { have: prDays(re), need: 7, u: 'dias com medição' }] },
   hba1c: { name: 'Estimativa de HbA1c', why: 'A estimativa usa a média dos últimos 90 dias; poucos dados deixariam o número enganoso.', calc: re => { const w = prWin(re, 90); return [{ have: w.length, need: 30, u: 'medições nos últimos 90 dias' }, { have: prDays(w), need: 20, u: 'dias com medição' }]; } },
   comparacao: { name: 'Comparação entre períodos', why: 'Comparar exige medições nos dois períodos.', calc: re => [{ have: prWin(re, 30).length, need: 10, u: 'medições nos últimos 30 dias' }, { have: prWin(re, 30, 30).length, need: 10, u: 'medições nos 30 dias anteriores' }] }
 };
@@ -50,7 +50,7 @@ function prNotice(ctx) {
   return `<section class="pr-card" aria-label="Aviso de registros" data-pr-ctx="${ctx}"><div class="pr-hd"><div class="pr-ey">Primeiros registros</div><button class="pr-x" data-pr="off" data-ctx="${ctx}" data-sig="${sig}" aria-label="Dispensar este aviso por enquanto" title="Dispensar por enquanto">×</button></div>
     <p class="pr-tt">${C.ttl}</p><p class="pr-tx">${intro} ${need}${recentGap} <span class="dim">Nada fica bloqueado: os números continuam aparecendo, mas só são confiáveis com dados suficientes.</span></p>
     <div class="pr-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pc}" aria-label="Progresso para liberar ${next.name}"><i style="width:${pc}%"></i></div><div class="pr-pl num">${pc}% · ${next.name}</div>
-    <div class="pr-act"><button class="btn pri sm" data-act="new">Registrar glicemia</button></div>
+    <div class="pr-act"><button class="btn pri sm" data-act="new">Nova medição</button></div>
     <details class="pr-det"><summary>O que cada indicador precisa</summary><ul class="pr-ls">${ev.map(row).join('')}</ul><p class="hint" style="margin:8px 0 0">Registros de exemplo não contam. Histórico importado conta normalmente.</p></details></section>`;
 }
 document.addEventListener('click', e => {

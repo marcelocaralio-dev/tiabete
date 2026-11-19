@@ -25,7 +25,7 @@ if (NATIVE) {
     }
   };
 
-  const diagCard = () => `<h2 class="sec">Diagnóstico das notificações</h2><div class="card"><p class="hint" id="nt-status" style="margin:0 0 10px">Verificando…</p><div class="stack" style="gap:8px"><button class="btn full" data-act="nt-perm">Permitir notificações</button><button class="btn full" data-act="nt-exact">Permitir horários exatos</button><button class="btn pri full" data-act="nt-test">Enviar notificação de teste (em 10 segundos)</button></div><p class="hint" style="margin:10px 0 0">Se o teste não chegar: Configurações do Android → Apps → TiaBete → Notificações (ligadas) e Bateria → “Sem restrições”. Alguns celulares (Xiaomi, Samsung, Motorola) fecham apps em segundo plano e impedem avisos.</p></div>`;
+  const diagCard = () => `<h2 class="sec">Diagnóstico das notificações</h2><div class="card"><p class="hint" id="nt-status" style="margin:0 0 10px">Verificando…</p><div class="stack" style="gap:8px"><button class="btn full" data-act="nt-perm">Permitir notificações</button><button class="btn full" data-act="nt-exact">Permitir horários exatos</button><button class="btn pri full" data-act="nt-test">Testar aviso em 10 segundos</button></div><p class="hint" style="margin:10px 0 0">Se o teste não chegar: no Android, vá em Apps → TiaBete → Notificações (ligadas) e Bateria → “Sem restrições”. Alguns celulares (Xiaomi, Samsung, Motorola) fecham apps em segundo plano e bloqueiam avisos.</p></div>`;
   async function diagFill() {
     const el = document.getElementById('nt-status'), ln = LN(); if (!el) return;
     if (!ln) { el.textContent = 'Notificações não estão disponíveis neste aparelho.'; return; }
@@ -168,7 +168,7 @@ if (NATIVE) {
         }
         if (on('bomba') && p.pump.alarm && p.pump.lastChange) {
           const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))), at = mkTs(due, p.pump.siteTime || '08:00');
-          if (at > Date.now() && !(alCfg().plQuiet && inQuiet(new Date(at).getHours(), new Date(at).getMinutes()))) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter/set de infusão.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
+          if (at > Date.now() && !(alCfg().plQuiet && inQuiet(new Date(at).getHours(), new Date(at).getMinutes()))) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
         }
       }
       let granted = true;
@@ -182,6 +182,7 @@ if (NATIVE) {
     } catch (e) { console.error(e); } finally { planBusy = false; }
   }
   { const _put = Store.put; Store.put = function (st, v) { const r = _put.apply(this, arguments); if (st === 'meta' && v && (v.id === 'plan' || v.id === 'alerts')) setTimeout(planSync, 150); return r; }; }
+  window.tbPlanSync = () => setTimeout(planSync, 150); /* chamado quando muda quais insulinas passam a ter lembrete próprio (insrem.js): refaz os alarmes do tratamento sem duplicar */
   async function notifInit() {
     const ln = LN(); if (!ln) return;
     try {
@@ -215,8 +216,8 @@ if (NATIVE) {
   window.addEventListener('tb-drv-fail', async ev => {
     try {
       const ln = LN(); if (!ln || !(await ensurePerm())) return;
-      try { await ln.createChannel({ id: 'backup', name: 'Backup no Drive', description: 'Avisos de falha do backup programado', importance: 3 }); } catch (e) { }
-      await ln.schedule({ notifications: [{ id: 998, title: 'TiaBete · backup não concluído', body: ((ev && ev.detail) || 'O backup no Google Drive falhou.') + ' Abra o app para tentar de novo.', channelId: 'backup', schedule: { at: new Date(Date.now() + 1500) } }] });
+      try { await ln.createChannel({ id: 'backup', name: 'Cópia no Drive', description: 'Avisos de falha da cópia programada', importance: 3 }); } catch (e) { }
+      await ln.schedule({ notifications: [{ id: 998, title: 'TiaBete · cópia não concluída', body: ((ev && ev.detail) || 'A cópia no Google Drive falhou.') + ' Abra o app para tentar de novo.', channelId: 'backup', schedule: { at: new Date(Date.now() + 1500) } }] });
     } catch (e) { console.error(e); }
   });
   const _loadAll = loadAll;
@@ -238,6 +239,7 @@ if (NATIVE) {
   });
   document.addEventListener('click', async e => {
     const el = e.target.closest('[data-act="rem-on"],[data-act="rem-off"]'); if (!el) return;
+    if (el.dataset.k) return; /* "Dispensar" do aviso na tela inicial (data-k) só esconde o aviso; não desliga os lembretes */
     e.stopImmediatePropagation();
     if (!LN()) { toast('Notificações não estão disponíveis neste aparelho.'); return; }
     try {

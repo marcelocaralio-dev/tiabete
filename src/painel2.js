@@ -1,15 +1,17 @@
 /* ================= Painel em cards (visual novo) =================
    Reversível: o visual antigo continua inteiro em viewPainelClassic() (app.js).
-   A chave "Visual do painel" (Cards | Clássico) fica no topo do Painel e guarda a escolha neste aparelho.
+   A chave "Visual do Início" (Cards | Clássico) fica no topo do Painel e guarda a escolha neste aparelho.
    Para voltar de vez ao antigo: troque o valor padrão de pnlGet() para 'classic'. */
 const PNL_KEY = 'tb-pnl';
 function pnlGet() { try { return localStorage.getItem(PNL_KEY) === 'classic' ? 'classic' : 'cards'; } catch (e) { return 'cards'; } }
 let pnlMode = pnlGet();
 function pnlSet(v) { pnlMode = v === 'classic' ? 'classic' : 'cards'; try { localStorage.setItem(PNL_KEY, pnlMode); } catch (e) { } }
-function pnlSwitch() {
-  return `<div class="pn-sw" role="group" aria-label="Visual do painel"><span>Visual do painel</span><div class="seg">${[['cards', 'Cards'], ['classic', 'Clássico']].map(([k, t]) => `<button data-act="pnl-mode" data-v="${k}" aria-pressed="${pnlMode === k}">${t}</button>`).join('')}</div></div>`;
+/* A escolha do visual do Início agora fica em Aparência → Visual do Painel (mesma chave, mesmo armazenamento, mesmo efeito). */
+function pnlCard() {
+  const o = [['cards', 'Cartões', 'Visual novo, em cartões. Toque em um cartão para ver os detalhes.'], ['classic', 'Clássico', 'Visual antigo do Início, completo.']];
+  return `<h2 class="sec">Visual do Painel</h2><div class="card" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">Escolha como a tela Início é mostrada. A escolha é aplicada na hora e fica guardada neste aparelho.</p><div class="seg" role="group" aria-label="Visual do Início" style="display:flex">${o.map(([k, t]) => `<button class="grow" data-act="pnl-mode" data-v="${k}" aria-pressed="${pnlMode === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">${esc(o.find(x => x[0] === pnlMode)[2])}</p></div>`;
 }
-function viewPainel() { return pnlSwitch() + (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()); }
+function viewPainel() { return (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()); }
 
 const PNI = {
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
@@ -62,7 +64,7 @@ function pnTrat() {
     else { big = '—'; unit = 'basal sem contagem'; }
     lines.push(`Rápida hoje: ${done} de 3`);
   }
-  if (on('remedios')) { const n = p.meds.filter(x => x.name || x.times.length).length; lines.push(`Remédios: ${n || 'nenhum'} cadastrado${n === 1 ? '' : 's'}`); if (big === '—' && !on('insulina')) { big = String(n); unit = n === 1 ? 'remédio' : 'remédios'; } }
+  if (on('remedios')) { const n = p.meds.filter(x => x.name || x.times.length).length; lines.push(`Medicamentos: ${n || 'nenhum'} cadastrado${n === 1 ? '' : 's'}`); if (big === '—' && !on('insulina')) { big = String(n); unit = n === 1 ? 'medicamento' : 'medicamentos'; } }
   if (on('bomba')) lines.push('Bomba de insulina');
   return { big, unit, sub: lines.join(' · '), st };
 }
@@ -73,13 +75,14 @@ function viewPainelCards() {
   if (!all.length) return viewPainelClassic(); // boas-vindas
   let h = banners() + labelBanner() + pfInvite() + prNotice('painel');
   const bnd = bandOf(last.glucose, last.context), gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
-  const gl = (v, a, lbl) => `<div class="pn-gauge">${gaugeSvg(v, a, lbl)}</div>`;
+  const gl = (v, a, lbl, k) => `<div class="pn-gauge">${gaugeSvg(v, a, lbl, k)}</div>`;
+  const dKey = d.iso + '|' + (rs.length ? sd.mean : ''), dAnim = S.gaugeKeyD !== dKey; S.gaugeKeyD = dKey;
   const cards = [];
   cards.push(pnCard('ult', `b-${bnd.k}${(last.glucose < LIM.low || last.glucose > LIM.high) ? ' oor' : ''}`, 'drop', 'Glicemia mais recente',
-    `${gl(last.glucose, gAnim, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}. Mostrador de 70 a 250 mg/dL.`)}<span class="pn-mid">${badge(last.glucose, last.context)}</span><span class="pn-sub num">${last.noTime ? '' : 'Última medição: ' + last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}</span>`,
+    `${gl(last.glucose, gAnim, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}.`, 'ult')}<span class="pn-mid">${badge(last.glucose, last.context, true)}</span><span class="pn-sub num">${last.noTime ? '' : 'Última medição: ' + last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}</span>`,
     `Glicemia mais recente: ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}`, bnd.k === 'ok'));
   cards.push(pnCard('dia', '', 'bars', 'Média do dia',
-    rs.length ? `${gl(sd.mean, false, 'Média do dia: ' + fn(sd.mean, 1) + ' mg/dL. Mostrador de 70 a 250 mg/dL.')}<span class="pn-mid">${badge(sd.mean)}</span><span class="pn-sub num">Medições: ${sd.n} · ${pnDayLab(d.iso, d.isToday)}</span>`
+    rs.length ? `${gl(sd.mean, dAnim, 'Média do dia: ' + fn(sd.mean, 1) + ' mg/dL.', 'dia')}<span class="pn-mid">${badge(sd.mean)}</span><span class="pn-sub num">Medições: ${sd.n} · ${pnDayLab(d.iso, d.isToday)}</span>`
       : `<span class="pn-big num">—</span><span class="pn-sub">${d.isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia'}</span>`,
     rs.length ? `Média do dia: ${fn(sd.mean, 1)} mg/dL, ${sd.n} medições` : 'Média do dia: sem medições', rs.length ? bandOf(sd.mean).k === 'ok' : null));
   const e = est90();
@@ -87,14 +90,14 @@ function viewPainelCards() {
     e.ok ? `<span class="pn-row"><span class="pn-big num">≈ ${fn(e.value, 1)}<small>%</small></span>${a1cBadge(e.value)}<span class="pn-sub pn-r">Estimativa: 90 dias</span></span>`
       : `<span class="pn-row"><span class="pn-big num">—</span><span class="pn-sub pn-r">Estimativa indisponível: ${e.st.n} medições em ${e.days} dias</span></span>`,
     e.ok ? `HbA1c estimada: aproximadamente ${fn(e.value, 1)} por cento` : 'HbA1c estimada indisponível', e.ok ? a1cEval(e.value, S.a1cT).k === 'ok' : null));
-  cards.push(pnCard('evo', '', 'trend', 'Evolução glicêmica',
+  cards.push(pnCard('evo', '', 'trend', 'Evolução da glicemia',
     `<span class="pn-spark">${rc.length > 1 ? sparkline(rc) : ''}</span><span class="pn-sub">${rc.length ? `${rc.length} medi${rc.length > 1 ? 'ções' : 'ção'} · ${S.period} dias` : 'Sem medições em ' + S.period + ' dias'}</span>`,
-    'Evolução glicêmica', sc.n ? bandOf(sc.mean).k === 'ok' : null));
+    'Evolução da glicemia', sc.n ? bandOf(sc.mean).k === 'ok' : null));
   const tr = pnTrat();
   cards.push(pnCard('trat', '', 'syringe', 'Meu tratamento', `<span class="pn-big num">${tr.big}</span>${tr.unit ? `<span class="pn-unit">${tr.unit}</span>` : ''}<span class="pn-sub">${esc(tr.sub)}</span>`, 'Meu tratamento', tr.st));
-  cards.push(`<div class="pn-per"><div class="seg" role="group" aria-label="Período dos indicadores">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(d.cur[0])} – ${fmtDM(d.cur[1])}</span></div>`);
-  cards.push(pnCard('med', '', 'bars', 'Média no período', `<span class="pn-big num">${fm(sc.mean)}<small>mg/dL</small></span><span class="pn-sub">${sc.n ? (cmp.diff != null ? `${fsign(cmp.diff)} mg/dL vs. ${S.period} dias anteriores` : 'Sem média anterior para comparar') : 'Sem medições neste período'}</span>`, 'Média no período', sc.n ? bandOf(sc.mean).k === 'ok' : null));
-  cards.push(pnCard('cmp', '', 'cmp', 'Comparação', `<span class="pn-big num">${cmp.pct == null ? '—' : fsign(cmp.pct, 0)}<small>%</small></span><span class="pn-sub">vs. período anterior</span>`, 'Comparação com o período anterior'));
+  cards.push(`<div class="pn-per"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(d.cur[0])} – ${fmtDM(d.cur[1])}</span></div>`);
+  cards.push(pnCard('med', '', 'bars', 'Média no período', `<span class="pn-big num">${fm(sc.mean)}<small>mg/dL</small></span><span class="pn-sub">${sc.n ? (cmp.diff != null ? `${fsign(cmp.diff)} mg/dL em relação aos ${S.period} dias anteriores` : 'Sem média anterior para comparar') : 'Sem medições neste período'}</span>`, 'Média no período', sc.n ? bandOf(sc.mean).k === 'ok' : null));
+  cards.push(pnCard('cmp', '', 'cmp', 'Comparação', `<span class="pn-big num">${cmp.pct == null ? '—' : fsign(cmp.pct, 0)}<small>%</small></span><span class="pn-sub">em relação ao período anterior</span>`, 'Comparação com o período anterior'));
   cards.push(pnCard('min', 'mini', 'down', 'Menor', `<span class="pn-big num">${f0(sc.min)}</span><span class="pn-unit">mg/dL</span>`, 'Menor glicemia do período', sc.n ? bandOf(sc.min).k === 'ok' : null));
   cards.push(pnCard('max', 'mini', 'up', 'Maior', `<span class="pn-big num">${f0(sc.max)}</span><span class="pn-unit">mg/dL</span>`, 'Maior glicemia do período', sc.n ? bandOf(sc.max).k === 'ok' : null));
   cards.push(pnCard('n', 'mini', 'bars', 'Medições', `<span class="pn-big num">${sc.n}</span><span class="pn-unit">no período</span>`, 'Quantidade de medições no período'));
@@ -108,7 +111,7 @@ function viewPainelCards() {
 }
 
 /* ---------- Janela flutuante (detalhes) ---------- */
-const PM_TITLES = { ult: 'Glicemia mais recente', dia: 'Média do dia', hba: 'Hemoglobina glicada (HbA1c)', evo: 'Evolução glicêmica', trat: 'Meu tratamento', med: 'Média no período', cmp: 'Comparação com o período anterior', min: 'Menor glicemia', max: 'Maior glicemia', n: 'Medições', hipo: 'Episódios abaixo de 70', hiper: 'Acima da faixa', dist: 'Distribuição por faixa' };
+const PM_TITLES = { ult: 'Glicemia mais recente', dia: 'Média do dia', hba: 'Hemoglobina glicada (HbA1c)', evo: 'Evolução da glicemia', trat: 'Meu tratamento', med: 'Média no período', cmp: 'Comparação com o período anterior', min: 'Menor glicemia', max: 'Maior glicemia', n: 'Medições', hipo: 'Episódios abaixo de 70', hiper: 'Acima da faixa', dist: 'Distribuição por faixa' };
 const pmBig = (v, u, sub) => `<div class="pm-big"><span class="num">${v}</span>${u ? `<small>${u}</small>` : ''}</div>${sub ? `<p class="pm-sub">${sub}</p>` : ''}`;
 const pmRow = (a, b) => `<div class="row sp pm-r"><span class="dim">${a}</span><b class="num">${b}</b></div>`;
 const pmRecLine = r => r ? `${fn(r.glucose, 0)} mg/dL em ${fmtDate(r.date).slice(0, 5)}${r.noTime ? '' : ' às ' + r.time}` : 'nenhuma registrada';
@@ -123,8 +126,8 @@ function pmDetail(key) {
     case 'ult': {
       const bnd = bandOf(last.glucose, last.context);
       return `<div class="card red hero hero2 b-${bnd.k}${(last.glucose < LIM.low || last.glucose > LIM.high) ? ' oor' : ''}"><div class="hr-top"><div class="eyebrow">Glicemia mais recente</div><span class="hr-when">${relTime(last.ts)}</span></div>
-        <div class="gauge-box">${gaugeSvg(last.glucose, false, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}. Mostrador de 70 a 250 mg/dL.`)}</div>
-        <div class="hr-state">${badge(last.glucose, last.context)}</div>
+        <div class="gauge-box">${gaugeSvg(last.glucose, false, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}.`, 'ult')}</div>
+        <div class="hr-state">${badge(last.glucose, last.context, true)}</div>
         <div class="hr-info"><div class="hr-d num">${WD[new Date(last.ts).getDay()]} · ${fmtDate(last.date)}${last.noTime ? '' : ' · ' + last.time}</div><div class="chips" style="justify-content:center">${recChips(last)}</div></div>${lastExtremes(all)}</div>
         <button class="btn full" style="margin-top:12px" data-act="open" data-id="${last.id}">Abrir esta medição</button>`;
     }
@@ -132,19 +135,19 @@ function pmDetail(key) {
     case 'hba': return hbaCard();
     case 'trat': return treatmentCard();
     case 'evo': {
-      const selBar = `<div class="row sp" style="margin:0 0 12px;flex-wrap:wrap;gap:8px"><div class="seg" role="group" aria-label="Período da evolução e dos indicadores">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${per}</span></div>`;
-      return `<div class="card">${selBar}${rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL para medições em jejum. Cada ponto é uma medição real. Toque ou passe o dedo para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.')}</div>${eventLegend(cur[0], cur[1])}`;
+      const selBar = `<div class="row sp" style="margin:0 0 12px;flex-wrap:wrap;gap:8px"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${per}</span></div>`;
+      return `<div class="card">${selBar}${rc.length ? glucoseChart(rc, cur[0], cur[1]) + `<div class="legend"><span><i class="lg-dot"></i>medição</span><span><i class="lg-line"></i>média diária</span><span><i class="lg-dash"></i>70 e 180 mg/dL</span></div><p class="hint">Pontilhado: limite de 130 mg/dL em jejum. Cada ponto é uma medição real. Toque para ver o valor.</p>` : emptyBlock('Sem medições', 'Nenhuma medição nos últimos ' + S.period + ' dias.')}</div>${eventLegend(cur[0], cur[1])}`;
     }
     case 'med': return pmBig(fm(sc.mean), 'mg/dL', per) + pmRow('Média no período anterior', sp.n ? fm(sp.mean) + ' mg/dL' : '—') + pmRow('Diferença', cmp.diff != null ? fsign(cmp.diff) + ' mg/dL' : '—') + pmRow('Medições no período', sc.n);
     case 'cmp': {
       const row = (lb, a, b, dd, cls = '') => `<tr><td>${lb}</td><td>${a}</td><td class="dim">${b}</td><td class="${cls}">${dd}</td></tr>`, few = (sc.n && sc.n < 5) || (sp.n && sp.n < 5);
-      return pmBig(cmp.pct == null ? '—' : fsign(cmp.pct, 0), '%', 'vs. período anterior') + `<div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Dif.<small>&nbsp;</small></th></tr></thead><tbody>
+      return pmBig(cmp.pct == null ? '—' : fsign(cmp.pct, 0), '%', 'em relação ao período anterior') + `<div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Diferença<small>&nbsp;</small></th></tr></thead><tbody>
         ${row('Média (mg/dL)', fm(sc.mean), fm(sp.mean), fsign(cmp.diff), cmp.diff > 0 ? 'delta-up' : '')}
         ${row('Variação %', '', '', cmp.pct == null ? '—' : fsign(cmp.pct) + '%', cmp.pct > 0 ? 'delta-up' : '')}
         ${row('Medições', sc.n, sp.n, fsign(sc.n - sp.n, 0))}
         ${row('Hipoglicemia (&lt; 70)', `${sc.hypo}<small>${sc.n ? (sc.hypo / sc.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sp.hypo}<small>${sp.n ? (sp.hypo / sp.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sc.hypo - sp.hypo, 0))}
         ${row('Hiperglicemia (acima da faixa)', `${sc.hyper}<small>${sc.n ? (sc.hyper / sc.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sp.hyper}<small>${sp.n ? (sp.hyper / sp.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sc.hyper - sp.hyper, 0))}
-        </tbody></table></div>${few ? '<p class="hint"><b>Poucas medições</b> em um dos períodos. Compare com cautela.</p>' : ''}<p class="hint">As contagens dependem de quantas medições foram feitas em cada período; os percentuais ajudam a comparar.</p>`;
+        </tbody></table></div>${few ? '<p class="hint"><b>Poucas medições</b> em um dos períodos. Compare com cautela.</p>' : ''}<p class="hint">As contagens dependem de quantas medições há em cada período; compare pelos percentuais.</p>`;
     }
     case 'min': case 'max': {
       const r = rc.find(x => x.glucose === (key === 'min' ? sc.min : sc.max));
@@ -189,7 +192,7 @@ document.addEventListener('click', e => {
   if (c) { S.pm = c.dataset.pm; pmDraw(); return; }
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'pm-close') pmClose();
-  else if (a.dataset.act === 'pnl-mode') { pmClose(true); pnlSet(a.dataset.v); render(); window.scrollTo(0, 0); }
+  else if (a.dataset.act === 'pnl-mode') { pmClose(true); pnlSet(a.dataset.v); render(); if (S.route === 'painel') window.scrollTo(0, 0); }
   else if (a.dataset.act === 'go' && S.pm) pmClose(true);
 });
 let pmEscSheet = false; // Esc fecha só a folha por cima (se houver); o modal fecha no Esc seguinte

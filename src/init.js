@@ -14,6 +14,7 @@
   try { const am2 = (await Store.all('meta')).find(x => x.id === 'alert-center'); if (am2) acLoad(am2.value); acRefresh(); } catch (e) { }
   try { const sw = (await Store.all('meta')).find(x => x.id === 'swipe-menu'); if (sw && typeof sw.value === 'boolean') S.swipeMenu = sw.value; } catch (e) { }
   try { const sn = (await Store.all('meta')).find(x => x.id === 'swipe-nav'); if (sn && typeof sn.value === 'boolean') S.swipeNav = sn.value; } catch (e) { }
+  try { const uc = (await Store.all('meta')).find(x => x.id === 'ui-cfg'); if (uc) S.uip = uipClean(uc.value); } catch (e) { }
   try { const us = (await Store.all('meta')).find(x => x.id === 'ui-scale'); if (us && SCALES.some(x => x[0] === us.value)) { S.scale = us.value; applyScale(); } } catch (e) { }
   try { const th = (await Store.all('meta')).find(x => x.id === 'theme'); if (th && ['light', 'dark', 'auto'].includes(th.value)) { S.theme = th.value; try { localStorage.setItem('tb-theme', th.value); } catch (e) { } } applyTheme(); } catch (e) { }
   try { const ac = (await Store.all('meta')).find(x => x.id === 'acc'); if (ac && ac.value && typeof ac.value === 'object') { S.acc = ac.value; try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } } } catch (e) { }
@@ -23,6 +24,8 @@
   try { const pi = (await Store.all('meta')).find(x => x.id === 'profile-invite'); if (pi && pi.value > 0) S.pfSnooze = pi.value; } catch (e) { }
   try { const bm = (await Store.all('meta')).find(x => x.id === 'bolus'); if (bm) blLoad(bm.value); blReady = true; } catch (e) { blReady = false; }
   try { const pm = (await Store.all('meta')).find(x => x.id === 'plan'); if (pm) plLoad(pm.value); else if (S.inslog.length || S.ins.basalTs) { S.plan.types = ['insulina']; await plSave(); } } catch (e) { }
+  try { const im = (await Store.all('meta')).find(x => x.id === 'ins-rem'); if (im) irLoad(im.value); const rr = irReconcile(S.ir, S.plan), pr = irPrune(S.ir, Date.now()); if (rr.changed || pr) await irSave(); irTzCheck(); } catch (e) { console.error(e); }
+  S.irReady = true;
   try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }
   try { const sv = (await Store.all('meta')).find(x => x.id === 'saved-meals'); if (sv && Array.isArray(sv.value)) S.saved = sv.value; } catch (e) { }
@@ -37,4 +40,5 @@
   }
   S.route = routeFromHash();
   render();
+  S.irLive = true; try { irFlushQueue(); irSync(1500); } catch (e) { }
 })();

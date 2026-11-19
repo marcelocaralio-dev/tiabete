@@ -8,8 +8,9 @@ const blRule = id => id ? blRatioOf(id) != null : (S.bl.ratio >= 1 || BL_MEALS.s
 const BL_MEALS = [
   { id: 'cafe', name: 'Café da manhã', short: 'Café', ic: 'cafe' },
   { id: 'almoco', name: 'Almoço', short: 'Almoço', ic: 'almoco' },
+  { id: 'lanche', name: 'Lanche da tarde', short: 'Lanche', ic: 'lanche' },
   { id: 'jantar', name: 'Jantar', short: 'Jantar', ic: 'jantar' },
-  { id: 'lanche', name: 'Lanches', short: 'Lanches', ic: 'lanche' }
+  { id: 'ceia', name: 'Ceia', short: 'Ceia', ic: 'ceia' }
 ];
 const BL_FOODS = [
   { id: 'leite', name: 'Leite em pó integral Itambé', basis: 'g', unit: 'g', kcal: 129 / 26 * 100, carb: 10 / 26 * 100, prot: 6.5 / 26 * 100, fat: 7 / 26 * 100, fiber: 0, est: false },
@@ -28,11 +29,12 @@ const BL_FOODS = [
 ];
 const BL_TPL = {
   cafe: [{ f: 'leite', q: 37 }, { f: 'whey', q: 1 }, { f: 'linhaca', q: 1 }, { f: 'chia', q: 1 }, { f: 'psyllium', q: 4 }, { f: 'pao', q: 2 }, { f: 'ovo', q: 1 }, { f: 'margarina', q: 0.5 }],
-  almoco: [{ f: 'arroz', q: 100 }, { f: 'feijao', q: 125 }, { f: 'macarrao', q: 275 }], jantar: [], lanche: []
+  almoco: [{ f: 'arroz', q: 100 }, { f: 'feijao', q: 125 }, { f: 'macarrao', q: 275 }], jantar: [], lanche: [], ceia: []
 };
 const blClone = o => JSON.parse(JSON.stringify(o));
-function blDefault() { if (BL_PUBLIC) return { v: 1, ratio: null, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: [], tpl: { sem: { cafe: [], almoco: [], jantar: [], lanche: [] }, fds: { cafe: [], almoco: [], jantar: [], lanche: [] } }, days: {}, meals: [], ratios: {}, rhist: [], rlog: [] };
-  return { v: 1, ratio: 15, bolusOn: { cafe: true, almoco: true, jantar: false, lanche: false }, foods: blClone(BL_FOODS), tpl: { sem: blClone(BL_TPL), fds: blClone(BL_TPL) }, days: {}, meals: [], ratios: {}, rhist: [], rlog: [] }; }
+function blDefault() { return blNorm(blSeed(blDefault0())); }
+function blDefault0() { if (BL_PUBLIC) return { v: 1, ratio: null, bolusOn: { cafe: true, almoco: true, lanche: false, jantar: false, ceia: false }, foods: [], tpl: { sem: blEmptyM(), fds: blEmptyM() }, days: {}, meals: [], ratios: {}, rhist: [], rlog: [] };
+  return { v: 1, ratio: 15, bolusOn: { cafe: true, almoco: true, lanche: false, jantar: false, ceia: false }, foods: blClone(BL_FOODS), tpl: { sem: blClone(BL_TPL), fds: blClone(BL_TPL) }, days: {}, meals: [], ratios: {}, rhist: [], rlog: [] }; }
 S.bl = blDefault();
 S.blUi = { tab: 'cafe', date: null, pend: null, busy: false, msg: {} };
 let blTimer = null;
@@ -46,14 +48,15 @@ function blCleanMeals(l) { return (Array.isArray(l) ? l : []).filter(m => m && t
 function blLoad(v) {
   if (!v || typeof v !== 'object' || !Array.isArray(v.foods) || !v.tpl || typeof v.tpl !== 'object') return;
   const d = blDefault(), ok = x => x && typeof x === 'object';
-  S.bl = { v: 1, ratio: v.ratio >= 1 && v.ratio <= 200 ? v.ratio : (BL_PUBLIC ? null : 15), bolusOn: { ...d.bolusOn, ...(ok(v.bolusOn) ? v.bolusOn : {}) }, foods: v.foods.filter(f => f && f.id && typeof f.name === 'string'), tpl: { sem: ok(v.tpl.sem) ? v.tpl.sem : d.tpl.sem, fds: ok(v.tpl.fds) ? v.tpl.fds : d.tpl.fds }, days: ok(v.days) ? v.days : {}, meals: blCleanMeals(v.meals), ratios: blCleanRatios(v.ratios), rhist: blCleanRhist(v.rhist), rlog: blCleanRlog(v.rlog) };
+  S.bl = { v: 1, ratio: v.ratio >= 1 && v.ratio <= 200 ? v.ratio : (BL_PUBLIC ? null : 15), bolusOn: { ...d.bolusOn, ...(ok(v.bolusOn) ? v.bolusOn : {}) }, foods: v.foods.filter(f => f && f.id && typeof f.name === 'string'), tpl: { sem: ok(v.tpl.sem) ? v.tpl.sem : d.tpl.sem, fds: ok(v.tpl.fds) ? v.tpl.fds : d.tpl.fds }, days: ok(v.days) ? v.days : {}, meals: blCleanMeals(v.meals), ratios: blCleanRatios(v.ratios), rhist: blCleanRhist(v.rhist), rlog: blCleanRlog(v.rlog), seed: v.seed };
+  blSeed(blNorm(S.bl));
 }
 const blToday = () => isoDate(new Date());
 const blDate = () => S.blUi.date || blToday();
 function blAdd(d, n) { const [y, m, dd] = d.split('-').map(Number); return isoDate(new Date(y, m - 1, dd + n)); }
 function blWeekend(d) { const [y, m, dd] = d.split('-').map(Number), g = new Date(y, m - 1, dd).getDay(); return g === 0 || g === 6; }
 const blTpl = d => blWeekend(d) ? S.bl.tpl.fds : S.bl.tpl.sem;
-function blM(w) { const d = blDate(); if (S.bl.days[d]) return S.bl.days[d]; const m = blClone(blTpl(d)); if (w) { S.bl.days[d] = m; const el = $('#bl-dstat'); if (el) { el.textContent = 'Registrado'; el.classList.add('on'); } } return m; }
+function blM(w) { const d = blDate(); if (S.bl.days[d]) return S.bl.days[d]; const m = blNorm({ tpl: { sem: blClone(blTpl(d)) } }).tpl.sem; if (w) { S.bl.days[d] = m; const el = $('#bl-dstat'); if (el) { el.textContent = 'Registrado'; el.classList.add('on'); } } return m; }
 function blEach(fn) { Object.values(S.bl.days).forEach(fn); fn(S.bl.tpl.sem); fn(S.bl.tpl.fds); }
 const blFood = id => S.bl.foods.find(f => f.id === id) || null;
 const blUnit = f => f.basis === 'g' ? 'g' : (f.unit || 'un');
@@ -115,7 +118,7 @@ document.addEventListener('click', e => {
   if (a === 'mlog-edit') { const m = blMeals().find(x => x.id === el.dataset.id); if (m) openSheet(mealLogForm(m)); }
   else if (a === 'mlog-del-ask') { el.dataset.act = 'mlog-del-do'; el.textContent = 'Toque de novo para excluir'; el.classList.add('pri'); }
   else if (a === 'mlog-del-do') { S.bl.meals = blMeals().filter(x => x.id !== el.dataset.id); blSave(); closeSheet(); render(); toast('Refeição excluída.'); }
-  else if (a === 'meal-fromcalc') { const id = el.dataset.meal, meal = blMeal(id), t = blSum(id); if (!meal || !t.rows.length) return; openSheet(mealForm({ name: meal.name, meal: id, carbs: Math.round(t.net * 10) / 10 })); }
+  else if (a === 'meal-fromcalc') { const id = el.dataset.meal, meal = blMeal(id), t = blSum(id); if (!meal || !t.rows.length) return; openSheet(mealForm({ name: meal.name, meal: MEALS[id] ? id : '', carbs: Math.round(t.net * 10) / 10 })); }
 });
 document.addEventListener('submit', e => {
   if (e.target.id !== 'mlog-form') return; e.preventDefault();
@@ -130,9 +133,9 @@ document.addEventListener('submit', e => {
   blSave(); closeSheet(); render(); toast(f.dataset.id ? 'Refeição atualizada.' : 'Refeição adicionada ao histórico.');
 });
 
-function blChips(c) { return `<span class="chip good">líq. ${blN(c.net)} g</span><span class="chip">tot. ${blN(c.carb)} g</span><span class="chip">fibras ${blN(c.fiber)} g</span><span class="chip">prot. ${blN(c.prot)} g</span><span class="chip">gord. ${blN(c.fat)} g</span><span class="chip">${blN(c.kcal, 0)} kcal</span>`; }
+function blChips(c, f, it) { return blNutri(c, f && it && f.basis !== 'g' && it.u !== 'g' && f.gpu > 0 ? blPortion(f, it.q, it.u) : ''); }
 function blFacts(t, note) {
-  return `<div class="bl-facts"><div class="row sp"><span>Carboidratos totais</span><b class="num">${blN(t.carb)} g</b></div><div class="row sp ind"><span>Fibras</span><b class="num">${blN(t.fiber)} g</b></div><div class="row sp net"><span>Carboidratos líquidos</span><b class="num">${blN(t.net)} g</b></div><div class="row sp"><span>Proteínas</span><b class="num">${blN(t.prot)} g</b></div><div class="row sp"><span>Gorduras</span><b class="num">${blN(t.fat)} g</b></div><div class="row sp"><span>Calorias</span><b class="num">${blN(t.kcal, 0)} kcal</b></div></div>`
+  return blNutri(t, '')
     + (note && t.est ? `<p class="hint" style="margin:12px 0 0">Itens com <span class="tag">est.</span> têm valores estimados. Ajuste pelo rótulo na aba Alimentos para o cálculo ficar exato.</p>` : '');
 }
 function blScale(exact) {
@@ -218,22 +221,22 @@ function blUnitCtl(id, i, it, f) {
 }
 function blMealView(id) {
   const meal = blMeal(id), t = blSum(id), pend = S.blUi.pend;
-  const items = (blM()[id] || []).map((it, i) => {
-    const f = blFood(it.f); if (!f) return ''; const c = blCalc(it);
-    return `<div class="bl-item"><div class="row sp" style="align-items:flex-start;flex-wrap:nowrap"><span class="bl-nm">${esc(f.name)}${f.est ? ' <span class="tag">est.</span>' : ''}${it.n ? `<small class="dim">pedido: ${esc(it.n)}</small>` : ''}</span><button class="bl-x" data-bl="remove" data-meal="${id}" data-idx="${i}" aria-label="Remover ${esc(f.name)}">×</button></div>
-      <div class="row" style="flex-wrap:nowrap"><input class="in bl-q num" type="number" inputmode="decimal" step="any" min="0" id="bl-q-${id}-${i}" data-meal="${id}" data-idx="${i}" value="${it.q || ''}" placeholder="0" aria-label="Quantidade de ${esc(f.name)}">${blUnitCtl(id, i, it, f)}</div><div class="bl-chips" id="bl-ch-${id}-${i}">${blChips(c)}</div></div>`;
-  }).join('');
   return `<div id="bl-hero">${blHero(meal, t)}</div>
-    <h2 class="sec">Refeição feita</h2><div class="card" id="bl-done">${blDoneHTML(id)}</div>
-    <h2 class="sec">Total da refeição</h2><div class="card" id="bl-facts">${t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos abaixo para ver os totais.</p>'}</div>
-    <h2 class="sec">Alimentos</h2><div class="card">${items ? `<div class="bl-items">${items}</div>` : '<p class="hint" style="margin:0">Nenhum alimento ainda.</p>'}
-      <div class="bl-add"><select class="in" id="bl-add-${id}" aria-label="Alimento para adicionar">${S.bl.foods.map(f => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join('')}</select><button class="btn pri full" data-bl="add" data-meal="${id}">Adicionar alimento</button><button class="btn full" data-bl="reset" data-meal="${id}">${pend === id ? 'Confirmar: voltar ao padrão' : 'Voltar ao padrão'}</button></div>${blAiBlock(id)}</div>`;
+    <h2 class="sec">Alimentos</h2><div class="card"><div id="bl-items">${blItemsHTML(id)}</div>
+      <div class="bl-fm" id="bl-fm">${blFreqHTML(id)}</div>${blSearchHTML(id)}
+      <div class="bl-add"><button class="btn full" data-bl="reset" data-meal="${id}">${pend === id ? 'Confirmar: voltar ao padrão' : 'Voltar ao padrão'}</button></div>${blAiBlock(id)}</div>
+    <h2 class="sec">Total da refeição</h2><div class="card" id="bl-facts">${t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos acima para ver os totais.</p>'}</div>
+    <h2 class="sec">Refeição feita</h2><div class="card" id="bl-done">${blDoneHTML(id)}</div>`;
+}
+/* atualiza só as partes da refeição, sem recarregar a tela (a rolagem fica onde está) */
+function blMealRefresh(id) {
+  const it = $('#bl-items'), fm = $('#bl-fm'); if (it) it.innerHTML = blItemsHTML(id); if (fm) fm.innerHTML = blFreqHTML(id); blRefresh(id);
 }
 function blRefresh(id) {
   const meal = blMeal(id), t = blSum(id);
   $('#bl-hero').innerHTML = blHero(meal, t); const dn = $('#bl-done'); if (dn) dn.innerHTML = blDoneHTML(id);
-  $('#bl-facts').innerHTML = t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos abaixo para ver os totais.</p>';
-  (blM()[id] || []).forEach((it, i) => { const el = $('#bl-ch-' + id + '-' + i), c = blCalc(it); if (el && c) el.innerHTML = blChips(c); });
+  $('#bl-facts').innerHTML = t.rows.length ? blFacts(t, true) : '<p class="hint" style="margin:0">Adicione alimentos acima para ver os totais.</p>';
+  (blM()[id] || []).forEach((it, i) => { const el = $('#bl-ch-' + id + '-' + i), c = blCalc(it); if (el && c) el.innerHTML = blChips(c, c.f, it); const rn = $('#bl-rn-' + id + '-' + i); if (rn) rn.hidden = !it.r; });
 }
 function blDayView() {
   const tot = { carb: 0, fiber: 0, net: 0, prot: 0, fat: 0, kcal: 0, est: false }; let ui = 0; const parts = [];
@@ -253,23 +256,40 @@ function blDayView() {
       return `<button class="bl-h ${k === d ? 'cur' : ''}" data-bl="goto" data-date="${k}"><span><b>${w} · ${fmtDate(k)}</b><small class="dim">${esc(ps.join(' · '))} · ${blN(net)} g líq.</small></span><span class="tag bl-dose">${u} Ui</span></button>`; }).join('') : '<p class="hint" style="margin:0">Nenhum dia registrado ainda. Registre o dia de hoje acima.</p>'}</div>`;
 }
 function blNum(id, field, label, v) { return `<label class="bl-fl">${label}<input class="in num" type="number" inputmode="decimal" step="any" min="0" data-food="${id}" data-field="${field}" value="${Math.round(v * 100) / 100}"></label>`; }
+const blFoodShow = f => { const q = blNm(S.blUi.fq || ''), fl = S.blUi.ff || 'todos'; return (!q || blNm(f.name).includes(q)) && (fl === 'todos' || (fl === 'fav' ? !!f.fav : fl === 'sem' ? !(f.meals || []).length : (f.meals || []).includes(fl))); };
+function blFoodFilter() {
+  const fl = S.blUi.ff || 'todos', ch = [['todos', 'Todos'], ['fav', '★ Favoritos']].concat(BL_MEALS.map(m => [m.id, m.short]), [['sem', 'Sem refeição']]);
+  return `<div class="bl-fsrch"><label class="fl" for="bl-fs">Buscar alimento</label><input class="in" type="search" id="bl-fs" placeholder="Digite o nome" value="${esc(S.blUi.fq || '')}" autocomplete="off"></div><div class="bl-flt" role="group" aria-label="Filtrar alimentos">${ch.map(c => `<button type="button" class="bl-fb${c[0] === fl ? ' on' : ''}" data-bl="flt" data-flt="${c[0]}" aria-pressed="${c[0] === fl}">${c[1]}</button>`).join('')}</div>`;
+}
+function blFoodCard(f) {
+  return `<div class="bl-food" data-fid="${esc(f.id)}"${blFoodShow(f) ? '' : ' hidden'}>
+    <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="bl-fh"><b class="bl-fn">${esc(f.name)}</b>${f.est ? ' <span class="tag">est.</span>' : ''}</div><button class="bl-star${f.fav ? ' on' : ''}" data-bl="fav" data-food="${f.id}" aria-pressed="${!!f.fav}" aria-label="${f.fav ? 'Remover dos favoritos' : 'Marcar como favorito'}">${f.fav ? '★' : '☆'}</button></div>
+    <p class="bl-fv">${f.basis === 'g' ? 'Valores por 100 g' : 'Valores por ' + esc(f.unit || 'unidade')}</p><div id="bl-fn-${f.id}">${blFoodNutri(f)}</div>
+    <div class="bl-fmeals"><span class="fl">Frequente em</span><div class="bl-flt">${BL_MEALS.map(m => { const on = (f.meals || []).includes(m.id); return `<button type="button" class="bl-fb${on ? ' on' : ''}" data-bl="fmeal" data-food="${f.id}" data-meal="${m.id}" aria-pressed="${on}">${m.name}</button>`; }).join('')}</div></div>
+    <details class="bl-edit"><summary>Editar nome, porção e valores</summary>
+    <div class="row" style="flex-wrap:nowrap;margin-top:10px"><input class="in" data-food="${f.id}" data-field="name" value="${esc(f.name)}" aria-label="Nome"><button class="btn danger sm" data-bl="delfood" data-food="${f.id}">Excluir</button></div>
+    <div class="row" style="margin-top:10px"><label class="bl-fl">Base<select class="in" data-food="${f.id}" data-field="basis"><option value="g"${f.basis === 'g' ? ' selected' : ''}>100 g</option><option value="un"${f.basis === 'un' ? ' selected' : ''}>Unidade</option></select></label>${f.basis === 'un' ? `<label class="bl-fl">Unidade<input class="in" data-food="${f.id}" data-field="unit" value="${esc(f.unit || '')}"></label><label class="bl-fl">g por unidade<input class="in num" type="number" inputmode="decimal" step="any" min="0" data-food="${f.id}" data-field="gpu" value="${f.gpu || 0}"></label>` : ''}<label class="bl-fl">Porção de referência (${f.basis === 'g' ? 'g' : esc(f.unit || 'un')})<input class="in num" type="number" inputmode="decimal" step="any" min="0" data-food="${f.id}" data-field="ref" value="${f.ref > 0 ? f.ref : ''}" placeholder="${f.basis === 'g' ? '100' : '1'}"></label></div>
+    <label class="bl-chk" style="margin-top:10px"><input type="checkbox" data-food="${f.id}" data-field="est" ${f.est ? 'checked' : ''}><span>Valores estimados</span></label><p class="hint" style="margin:8px 0">Valores ${f.basis === 'g' ? 'por 100 g' : 'por ' + esc(f.unit || 'unidade')}. A porção de referência é só o ponto de partida ao tocar no alimento: ajuste sempre para o que você comeu.</p>
+    <div class="bl-grid">${blNum(f.id, 'carb', 'Carboidratos totais (g)', f.carb)}${blNum(f.id, 'fiber', 'Fibras (g)', f.fiber)}${blNum(f.id, 'prot', 'Proteínas (g)', f.prot)}${blNum(f.id, 'fat', 'Gorduras (g)', f.fat)}${blNum(f.id, 'kcal', 'Calorias (kcal)', f.kcal)}</div></details></div>`;
+}
 function blFoodsView() {
   const sv = S.saved || [], saved = `<h2 class="sec">Refeições salvas</h2><div class="card"><p class="hint" style="margin:0 0 12px">Atalhos com nome e carboidratos para preencher o registro de uma medição com um toque. Use "Salvar como refeição salva" na aba de uma refeição. O app só preenche carboidratos e descrição, sem sugerir dose.</p><div class="stack" style="gap:8px">${sv.map(m => `<button class="menu-item" data-act="meal-edit" data-id="${m.id}"><div>${esc(m.name)}<span>${[m.meal ? MEALS[m.meal] : '', m.carbs != null ? fn(m.carbs, 0) + ' g de carboidratos' : '', m.desc || ''].filter(Boolean).map(esc).join(' · ') || 'Sem detalhes'}</span></div><svg viewBox="0 0 24 24">${IC.chev}</svg></button>`).join('')}<button class="btn full" data-act="meal-new">Nova refeição salva</button></div></div>`;
-  const cards = S.bl.foods.map(f => `<div class="bl-food"><div class="row" style="flex-wrap:nowrap"><input class="in" data-food="${f.id}" data-field="name" value="${esc(f.name)}" aria-label="Nome"><button class="btn danger sm" data-bl="delfood" data-food="${f.id}">Excluir</button></div>
-    <div class="row" style="margin-top:10px"><label class="bl-fl">Base<select class="in" data-food="${f.id}" data-field="basis"><option value="g"${f.basis === 'g' ? ' selected' : ''}>100 g</option><option value="un"${f.basis === 'un' ? ' selected' : ''}>Unidade</option></select></label>${f.basis === 'un' ? `<label class="bl-fl">Unidade<input class="in" data-food="${f.id}" data-field="unit" value="${esc(f.unit || '')}"></label><label class="bl-fl">g por unidade<input class="in num" type="number" inputmode="decimal" step="any" min="0" data-food="${f.id}" data-field="gpu" value="${f.gpu || 0}"></label>` : ''}</div>
-    <label class="bl-chk" style="margin-top:10px"><input type="checkbox" data-food="${f.id}" data-field="est" ${f.est ? 'checked' : ''}><span>Valores estimados</span></label><p class="hint" style="margin:8px 0">Valores ${f.basis === 'g' ? 'por 100 g' : 'por ' + esc(f.unit || 'unidade')}</p>
-    <div class="bl-grid">${blNum(f.id, 'carb', 'Carb. tot. (g)', f.carb)}${blNum(f.id, 'fiber', 'Fibras (g)', f.fiber)}${blNum(f.id, 'prot', 'Prot. (g)', f.prot)}${blNum(f.id, 'fat', 'Gord. (g)', f.fat)}${blNum(f.id, 'kcal', 'kcal', f.kcal)}</div></div>`).join('');
-  return `<div class="card soft" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">A sua razão insulina/carboidratos fica na aba <b>Razão</b>.</p><button class="btn full" data-bl="tab" data-tab="razao">Abrir Minha razão</button></div>` + saved + `<h2 class="sec">Seus alimentos</h2><p class="hint" style="margin:0 2px 10px">Valores por 100 g ou por unidade. Itens estimados vêm de tabelas médias: troque pelos números do rótulo.</p><div class="stack">${cards}</div>
+  const cards = S.bl.foods.slice().sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.name.localeCompare(b.name, 'pt-BR')).map(blFoodCard).join('');
+  return `<div class="card soft" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">A sua razão insulina/carboidratos fica na aba <b>Razão</b>.</p><button class="btn full" data-bl="tab" data-tab="razao">Abrir Minha razão</button></div>` + saved + `<h2 class="sec">Seus alimentos</h2><p class="hint" style="margin:0 2px 10px">Esta é a única biblioteca do app: as refeições usam estes mesmos alimentos. Valores por 100 g ou por unidade. Itens estimados vêm de tabelas médias: troque pelos números do rótulo.</p>${blFoodFilter()}<div class="stack" id="bl-flist">${cards}</div><p class="hint" id="bl-fnone" style="margin:10px 2px 0" hidden>Nenhum alimento encontrado.</p>
     <h2 class="sec">Novo alimento</h2><div class="card">${blAiBlock(null)}<form id="bl-new" class="stack" style="gap:10px;margin-top:14px"><p class="hint" style="margin:0">${aiState() === 'ok' ? 'Ou preencha à mão:' : 'Cadastre o alimento à mão:'}</p><input class="in" id="bl-nf-name" placeholder="Nome do alimento" required><div class="row"><select class="in" id="bl-nf-basis" style="flex:1 1 120px"><option value="g">Por 100 g</option><option value="un">Por unidade</option></select><input class="in" id="bl-nf-unit" placeholder="Unidade (ex.: fatia)" style="flex:1 1 120px"><input class="in num" type="number" inputmode="decimal" step="any" min="0" id="bl-nf-gpu" placeholder="g por unidade" style="flex:1 1 120px"></div>
-    <div class="bl-grid">${['carb:Carb. tot. (g)', 'fiber:Fibras (g)', 'prot:Prot. (g)', 'fat:Gord. (g)', 'kcal:kcal'].map(x => { const [k, l] = x.split(':'); return `<label class="bl-fl">${l}<input class="in num" type="number" inputmode="decimal" step="any" min="0" id="bl-nf-${k}" value="0"></label>`; }).join('')}</div><button class="btn pri full" type="submit">Salvar alimento</button></form></div>`;
+    <div class="bl-grid">${['carb:Carboidratos totais (g)', 'fiber:Fibras (g)', 'prot:Proteínas (g)', 'fat:Gorduras (g)', 'kcal:Calorias (kcal)'].map(x => { const [k, l] = x.split(':'); return `<label class="bl-fl">${l}<input class="in num" type="number" inputmode="decimal" step="any" min="0" id="bl-nf-${k}" value="0"></label>`; }).join('')}</div><button class="btn pri full" type="submit">Salvar alimento</button></form></div>`;
+}
+function blApplyFlt() {
+  let n = 0; document.querySelectorAll('#bl-flist .bl-food').forEach(el => { const f = blFood(el.dataset.fid), v = !!f && blFoodShow(f); el.hidden = !v; if (v) n++; });
+  const e = $('#bl-fnone'); if (e) e.hidden = n > 0;
 }
 function viewBolus() {
   const tab = S.blUi.tab, d = blDate(), com = !!S.bl.days[d], isT = d === blToday();
-  const tabs = BL_MEALS.map(m => ({ id: m.id, l: m.short, ic: m.ic })).concat([{ id: 'razao', l: 'Razão', ic: 'razao' }, { id: 'dia', l: 'Dia', ic: 'dia' }, { id: 'alimentos', l: 'Alimentos', ic: 'alimentos' }]);
+  const tabs = [{ id: 'razao', l: 'Razão', ic: 'razao' }].concat(BL_MEALS.map(m => ({ id: m.id, l: m.short, ic: m.ic })), [{ id: 'dia', l: 'Dia', ic: 'dia' }, { id: 'alimentos', l: 'Alimentos', ic: 'alimentos' }]);
   const dt = d.split('-').map(Number), wd = new Date(dt[0], dt[1] - 1, dt[2]).getDay();
   const bar = tab === 'alimentos' || tab === 'razao' ? '' : `<div class="bl-date"><button class="btn" data-bl="prev" aria-label="Dia anterior">‹</button><input class="in" type="date" id="bl-day" value="${d}" aria-label="Escolher o dia"><button class="btn" data-bl="next" aria-label="Próximo dia">›</button></div>
     <div class="row" style="margin:10px 2px 0;gap:6px"><span class="tag">${WD[wd]} · ${fmtDate(d)}</span><span id="bl-dstat" class="tag ${com ? 'on' : ''}">${com ? 'Registrado' : 'Não registrado'}</span><span class="tag">${blWeekend(d) ? 'Fim de semana' : 'Dia de semana'}</span>${isT ? '' : '<button class="btn sm" data-bl="today">Ir para hoje</button>'}</div>`;
-  return banners() + `<div id="bl"><div class="bl-tabs" role="tablist">${tabs.map(t => `<button class="seg-b ${t.id === tab ? 'on' : ''}" role="tab" aria-selected="${t.id === tab}" data-bl="tab" data-tab="${t.id}">${blIc(t.ic)}<span>${t.l}</span></button>`).join('')}</div>${bar}
+  return banners() + `<div id="bl"><div class="bl-tabs" role="tablist">${tabs.map(t => `<button class="seg-b ${t.id === tab ? 'on' : ''}${t.id === 'razao' ? ' bl-t-rz' : t.id === 'alimentos' ? ' bl-t-al' : ''}" role="tab" aria-selected="${t.id === tab}" data-bl="tab" data-tab="${t.id}">${blIc(t.ic)}<span>${t.l}</span></button>`).join('')}</div>${bar}
     <div class="stack" style="margin-top:14px;gap:0">${tab === 'razao' ? blRazaoView() : (tab === 'alimentos' ? '' : blRatioStrip()) + (tab === 'dia' ? blDayView() : tab === 'alimentos' ? blFoodsView() : blMealView(tab))}</div>
     <p class="hint" style="margin:18px 2px 0">Carboidrato líquido = carboidratos totais − fibras. A dose é calculada só com a sua razão insulina/carboidrato (aba Razão, definida com a sua equipe de saúde; arredondada para Ui inteira). Confira sempre o resultado antes de aplicar e siga o plano do seu médico. Em emergência, ligue 192 (SAMU).</p></div>`;
 }
@@ -314,7 +334,7 @@ function rlogForm(r) {
     <form id="rlog-form" data-id="${r ? r.id : ''}" novalidate><div class="form-grid">
     <div class="field"><label class="fl" for="rl-p">Período do dia</label><select class="in" id="rl-p">${BL_MEALS.map(m => `<option value="${m.id}"${m.id === per ? ' selected' : ''}>${m.name}</option>`).join('')}</select></div>
     <div class="field"><label class="fl" for="rl-dt">Data</label><input class="in" type="date" id="rl-dt" value="${r ? r.date : isoDate(now)}" max="${isoDate(now)}"></div>
-    ${num('rl-ui', 'Insulina rápida (Ui)', v('ui'), '0.5', 100, 'Ex.: 4')}
+    <div class="field"><label class="fl">Insulina rápida (Ui)</label>${uipHTML({ id: 'rl-ui', value: v('ui'), label: 'Insulina rápida' })}</div>
     <div class="field"><label class="fl" for="rl-it">Tipo de insulina</label><input class="in" id="rl-it" list="rl-its" maxlength="40" value="${esc(r ? r.itype : (last ? last.itype : ''))}" placeholder="Ex.: Lispro"><datalist id="rl-its">${BL_INS.map(i => `<option value="${esc(i)}">`).join('')}</datalist></div>
     ${num('rl-c', 'Carboidratos líquidos (g)', carb, 'any', 500, 'Ex.: 60')}
     <div class="field"><label class="fl" for="rl-tm">Horário da refeição</label><input class="in" type="time" id="rl-tm" value="${r ? r.mealTime : (HM(now.getTime()))}"></div>
@@ -335,7 +355,7 @@ document.addEventListener('submit', e => {
   if (e.target.id !== 'rlog-form') return; e.preventDefault();
   const f = e.target, err = m => { $('#rlog-err').textContent = m; }, g = id => $('#' + id).value.trim(), n = id => { const v = parseFloat(g(id).replace(',', '.')); return isNaN(v) ? null : v; };
   const ui = n('rl-ui'), carb = n('rl-c'), gb = n('rl-gb'), ga = n('rl-ga'), gm = n('rl-gm'), dt = g('rl-dt'), tm = g('rl-tm'), ta = g('rl-ta');
-  if (!(ui > 0 && ui <= 100)) return err('Informe a insulina rápida usada, em Ui (maior que 0).');
+  if (!(ui > 0 && ui <= Math.max(100, S.uip.max))) return err('Informe a insulina rápida usada, em Ui (maior que 0).');
   if (!(carb > 0 && carb <= 500)) return err('Informe os carboidratos líquidos da refeição, em gramas.');
   if (!dt || !/^\d{2}:\d{2}$/.test(tm)) return err('Informe a data e o horário da refeição.');
   if (ta && !/^\d{2}:\d{2}$/.test(ta)) return err('Horário da aplicação inválido.');
@@ -425,8 +445,8 @@ function blMerge(b) {
   });
   const rl = m => { const o = {}; BL_MEALS.forEach(x => { if (Array.isArray(m && m[x.id])) o[x.id] = m[x.id].filter(it => it && map[it.f]).map(it => ({ ...it, f: map[it.f] })); }); return o; };
   const empty = m => !m || BL_MEALS.every(x => !(m[x.id] || []).length);
-  if (b.tpl && typeof b.tpl === 'object') ['sem', 'fds'].forEach(k => { if (b.tpl[k] && typeof b.tpl[k] === 'object') { const r = rl(b.tpl[k]), cur = { cafe: [], almoco: [], jantar: [], lanche: [], ...S.bl.tpl[k] }; BL_MEALS.forEach(x => { if (Array.isArray(b.tpl[k][x.id]) && (r[x.id] || []).length && JSON.stringify(cur[x.id]) !== JSON.stringify(r[x.id])) { cur[x.id] = r[x.id]; st.tpl++; } }); S.bl.tpl[k] = cur; } });
-  if (b.days && typeof b.days === 'object') Object.keys(b.days).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d) && !S.bl.days[d] && b.days[d] && typeof b.days[d] === 'object') { S.bl.days[d] = { cafe: [], almoco: [], jantar: [], lanche: [], ...rl(b.days[d]) }; st.days++; } });
+  if (b.tpl && typeof b.tpl === 'object') ['sem', 'fds'].forEach(k => { if (b.tpl[k] && typeof b.tpl[k] === 'object') { const r = rl(b.tpl[k]), cur = { ...blEmptyM(), ...S.bl.tpl[k] }; BL_MEALS.forEach(x => { if (Array.isArray(b.tpl[k][x.id]) && (r[x.id] || []).length && JSON.stringify(cur[x.id]) !== JSON.stringify(r[x.id])) { cur[x.id] = r[x.id]; st.tpl++; } }); S.bl.tpl[k] = cur; } });
+  if (b.days && typeof b.days === 'object') Object.keys(b.days).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d) && !S.bl.days[d] && b.days[d] && typeof b.days[d] === 'object') { S.bl.days[d] = { ...blEmptyM(), ...rl(b.days[d]) }; st.days++; } });
   if (b.ratio >= 1 && b.ratio <= 200) S.bl.ratio = b.ratio;
   if (b.bolusOn && typeof b.bolusOn === 'object') S.bl.bolusOn = { ...S.bl.bolusOn, ...b.bolusOn };
   const rr = blCleanRatios(b.ratios); S.bl.ratios = S.bl.ratios || {}; Object.keys(rr).forEach(k => { S.bl.ratios[k] = rr[k]; });
@@ -452,15 +472,21 @@ document.addEventListener('click', e => {
   else if (a === 'daycommit') { blM(true); blSave(); }
   else if (a === 'daydel') { if (U.pend === 'day-del') { delete S.bl.days[blDate()]; U.pend = null; blSave(); } else { U.pend = 'day-del'; render(); return; } }
   else if (a === 'daytpl') { if (U.pend === 'day-tpl') { S.bl.tpl[blWeekend(blDate()) ? 'fds' : 'sem'] = blClone(blM()); U.pend = null; blSave(); } else { U.pend = 'day-tpl'; render(); return; } }
-  else if (a === 'add') { const f = blFood($('#bl-add-' + m).value); if (!f) return; const mm = blM(true); mm[m].push({ f: f.id, q: f.basis === 'g' ? 0 : 1 }); blSave(); render(); const qi = $('#bl-q-' + m + '-' + (mm[m].length - 1)); if (qi) qi.focus(); return; }
-  else if (a === 'remove') { blM(true)[m].splice(+b.dataset.idx, 1); blSave(); }
+  else if (a === 'addf') { if (!blAddFood(m, b.dataset.food)) return; blMealRefresh(m); const sr = $('#bl-sr-' + m), si = $('#bl-s-' + m); if (sr && sr.contains(b)) { sr.innerHTML = ''; if (si) si.value = ''; } const nb = $('#bl-fm [data-food="' + b.dataset.food + '"]'); if (nb) { nb.classList.add('added'); setTimeout(() => nb.classList.remove('added'), 700); } return; }
+  else if (a === 'fmall') { U.fall = U.fall || {}; U.fall[m] = !U.fall[m]; const fm = $('#bl-fm'); if (fm) fm.innerHTML = blFreqHTML(m); return; }
+  else if (a === 'fav') { const f = blFood(b.dataset.food); if (f) { f.fav = !f.fav; blSave(); b.classList.toggle('on', f.fav); b.textContent = f.fav ? '★' : '☆'; b.setAttribute('aria-pressed', f.fav); b.setAttribute('aria-label', f.fav ? 'Remover dos favoritos' : 'Marcar como favorito'); } return; }
+  else if (a === 'fmeal') { const f = blFood(b.dataset.food); if (f) { f.meals = f.meals || []; const i = f.meals.indexOf(m); if (i >= 0) f.meals.splice(i, 1); else { f.meals.push(m); f.pr = f.pr || {}; if (!f.pr[m]) f.pr[m] = 2; } blSave(); const on = f.meals.includes(m); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); } return; }
+  else if (a === 'flt') { U.ff = b.dataset.flt; document.querySelectorAll('.bl-flt [data-bl="flt"]').forEach(x => { const on = x.dataset.flt === U.ff; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); blApplyFlt(); return; }
+  else if (a === 'remove') { blL(blM(true), m).splice(+b.dataset.idx, 1); blSave(); blMealRefresh(m); return; }
   else if (a === 'reset') { if (U.pend === m) { blM(true)[m] = blClone(blTpl(blDate())[m] || []); U.pend = null; blSave(); } else { U.pend = m; render(); return; } }
   else if (a === 'delfood') { const id = b.dataset.food; S.bl.foods = S.bl.foods.filter(f => f.id !== id); blEach(mm => Object.keys(mm).forEach(k => { mm[k] = (mm[k] || []).filter(it => it.f !== id); })); blSave(); }
   U.pend = a.startsWith('day') ? null : U.pend; render();
 }, true);
 document.addEventListener('input', e => {
   const t = e.target; if (!t.closest || !t.closest('#bl')) return;
-  if (t.dataset.meal !== undefined && t.dataset.idx !== undefined && t.type === 'number') { const q = parseFloat(String(t.value).replace(',', '.')); blM(true)[t.dataset.meal][+t.dataset.idx].q = isNaN(q) || q < 0 ? 0 : q; blSave(); blRefresh(t.dataset.meal); }
+  if (t.dataset.meal !== undefined && t.dataset.idx !== undefined && t.type === 'number') { const q = parseFloat(String(t.value).replace(',', '.')); const it = blL(blM(true), t.dataset.meal)[+t.dataset.idx]; it.q = isNaN(q) || q < 0 ? 0 : q; delete it.r; blSave(); blRefresh(t.dataset.meal); }
+  if (t.id === 'bl-fs') { S.blUi.fq = t.value; blApplyFlt(); return; }
+  if (t.dataset.blsearch) { const r = $('#bl-sr-' + t.dataset.blsearch); if (r) r.innerHTML = blSearchRes(t.dataset.blsearch, t.value); }
 });
 document.addEventListener('change', e => {
   const t = e.target; if (!t.closest || !t.closest('#bl')) return;
@@ -469,12 +495,12 @@ document.addEventListener('change', e => {
   if (t.dataset.blrp) { const id = t.dataset.blrp, txt = String(t.value).trim(), n = parseFloat(txt.replace(',', '.')), cur = S.bl.ratios && S.bl.ratios[id] || null; S.bl.ratios = S.bl.ratios || {};
     if (!txt) { if (cur) { delete S.bl.ratios[id]; blRh(id, null); blSave(); } } else if (n >= 1 && n <= 200) { if (n !== cur) { S.bl.ratios[id] = n; blRh(id, n); blSave(); } } else toast('Informe um valor entre 1 e 200 g por Ui.'); render(); return; }
   if (t.dataset.blon) { S.bl.bolusOn[t.dataset.blon] = t.checked; blSave(); return; }
-  if (t.dataset.blunit) { const it = blM(true)[t.dataset.meal][+t.dataset.idx], fd = it && blFood(it.f); if (fd && fd.gpu > 0) { const toG = t.value === 'g', fromG = it.u === 'g'; if (toG && !fromG) it.q = Math.round(it.q * fd.gpu * 100) / 100; else if (!toG && fromG) it.q = Math.round(it.q / fd.gpu * 100) / 100; it.u = toG ? 'g' : 'un'; blSave(); render(); } return; }
+  if (t.dataset.blunit) { const it = blL(blM(true), t.dataset.meal)[+t.dataset.idx], fd = it && blFood(it.f); if (fd && fd.gpu > 0) { delete it.r; const toG = t.value === 'g', fromG = it.u === 'g'; if (toG && !fromG) it.q = Math.round(it.q * fd.gpu * 100) / 100; else if (!toG && fromG) it.q = Math.round(it.q / fd.gpu * 100) / 100; it.u = toG ? 'g' : 'un'; blSave(); render(); } return; }
   if (t.dataset.food === undefined || !t.dataset.field) return;
   const f = blFood(t.dataset.food); if (!f) return; const k = t.dataset.field;
   if (k === 'name') f.name = t.value.trim() || f.name; else if (k === 'unit') f.unit = t.value.trim() || 'un'; else if (k === 'basis') f.basis = t.value; else if (k === 'est') f.est = t.checked;
   else { const n = parseFloat(String(t.value).replace(',', '.')); f[k] = isNaN(n) || n < 0 ? 0 : n; }
-  blSave(); if (k === 'basis' || k === 'name') render();
+  blSave(); if (k === 'basis' || k === 'name') { render(); return; } const nb = $('#bl-fn-' + f.id); if (nb) nb.innerHTML = blFoodNutri(f);
 });
 document.addEventListener('keydown', e => { const k = e.target && e.target.dataset && e.target.dataset.blai; if (e.key === 'Enter' && !e.shiftKey && k) { e.preventDefault(); blAi(k === 'lib' ? null : k); } });
 document.addEventListener('submit', e => {

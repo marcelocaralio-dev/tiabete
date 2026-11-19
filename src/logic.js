@@ -407,11 +407,11 @@ function byTimeBlock(recs) {
 /* Regra de horários definida pelo usuário. Faixa 00h–04h não tem regra e não é alterada. */
 const TIME_RULE = [
   { a: 4, b: 8, label: '04h–08h', context: 'jejum', meal: null, name: 'Jejum' },
-  { a: 8, b: 10, label: '08h–10h', context: 'depois', meal: 'cafe', name: 'Pós-prandial do café da manhã' },
-  { a: 10, b: 12, label: '10h–12h', context: 'antes', meal: 'almoco', name: 'Pré-prandial do almoço' },
-  { a: 12, b: 16, label: '12h–16h', context: 'depois', meal: 'almoco', name: 'Pós-prandial do almoço' },
-  { a: 16, b: 19, label: '16h–19h', context: 'antes', meal: 'jantar', name: 'Pré-prandial do jantar' },
-  { a: 19, b: 24, label: '19h–00h', context: 'depois', meal: 'jantar', name: 'Pós-prandial do jantar' }
+  { a: 8, b: 10, label: '08h–10h', context: 'depois', meal: 'cafe', name: 'Depois do café da manhã' },
+  { a: 10, b: 12, label: '10h–12h', context: 'antes', meal: 'almoco', name: 'Antes do almoço' },
+  { a: 12, b: 16, label: '12h–16h', context: 'depois', meal: 'almoco', name: 'Depois do almoço' },
+  { a: 16, b: 19, label: '16h–19h', context: 'antes', meal: 'jantar', name: 'Antes do jantar' },
+  { a: 19, b: 24, label: '19h–00h', context: 'depois', meal: 'jantar', name: 'Depois do jantar' }
 ];
 function ruleFor(rec) {
   if (!rec || rec.noTime || !rec.time) return null;
@@ -420,7 +420,7 @@ function ruleFor(rec) {
 }
 /* Classificação-alvo de uma medição.
    mode 'horario': pela regra de horários.
-   mode 'etiquetas': pelas etiquetas do mySugr (Pré/Pós-prandial, Jejum, refeição); o horário só completa o que a etiqueta não diz. */
+   mode 'etiquetas': pelas etiquetas do mySugr (Pré/Depois da refeição, Jejum, refeição); o horário só completa o que a etiqueta não diz. */
 function targetFor(rec, mode) {
   const w = ruleFor(rec);
   if (mode === 'etiquetas') {

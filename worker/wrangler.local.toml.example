@@ -1,0 +1,18 @@
+# MODELO da configuração LOCAL de implantação (versionado, só com marcadores).
+# Uso: copie para "wrangler.local.toml" (mesma pasta) e preencha. O arquivo copiado está no .gitignore
+# e fica FORA do ZIP de distribuição. Nunca coloque aqui senhas, tokens ou chaves: segredos só com "wrangler secret put".
+name = "tiabete-license-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tiabete-licenses"
+database_id = "PREENCHA_O_UUID_REAL_DO_BANCO_D1"
+migrations_dir = "migrations"
+
+[vars]
+GOOGLE_CLIENT_ID = "PREENCHA_O_CLIENT_ID_REAL.apps.googleusercontent.com"
+PUBLIC_URL = "https://tiabete-license-api.PREENCHA-SUBDOMINIO.workers.dev"
+APP_RETURN = "app.tiabete.glicose:/pagamento"
+MP_SELLER_ID = "PREENCHA_O_ID_NUMERICO_DO_VENDEDOR"   # opcional; vazio desliga a consulta direta de contestações

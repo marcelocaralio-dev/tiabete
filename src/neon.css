@@ -1,0 +1,97 @@
+/* ================= Iluminação neon suave (Dark Tech) =================
+   Camada puramente visual. Nada aqui altera tamanho, posição, margem, espaçamento ou fluxo:
+   só box-shadow, gradientes, drop-shadow em ícones pequenos e pseudoelemento fixo atrás da página.
+   Vale apenas no tema escuro (o tema claro fica exatamente como era).
+   Para desligar tudo: remova "src/neon.css" da lista em scripts/build-web.js (e, se quiser, src/ambient.js).
+
+   Cores funcionais
+   · verde   → mesmo verde do app (--good-fill)         · vermelho → #FF5264 (vermelho luminoso)
+   · âmbar   → tom discreto, só onde já existir classificação amarela
+   Os cards NÃO ganham regra nova de classificação: o halo segue as classes que o app já aplica
+   (.st-ok = verde, .st-bad = vermelho, sem classe = neutro).                                      */
+
+/* Cor do fundo ambiente: registrada para poder animar a troca de estado (300–500 ms). */
+@property --amb-c { syntax: '<color>'; inherits: false; initial-value: rgba(0, 0, 0, 0); }
+
+/* ---------- 1) Fundo ambiente (só na tela inicial; o estado vem de ambient.js) ---------- */
+/* O corpo fica transparente apenas para a camada aparecer; o fundo de <html> continua o mesmo (--bg). */
+:root:not([data-theme="light"]) body { background: transparent; }
+
+:root:not([data-theme="light"])::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 150px 360px at 0% 40%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%),
+    radial-gradient(ellipse 150px 360px at 100% 52%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%);
+  transition: --amb-c .45s ease;
+}
+/* O topo da página é uma faixa opaca fixa; ela recebe o mesmo brilho dos cantos para a luz não ser cortada. */
+:root:not([data-theme="light"]) .top {
+  background:
+    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    var(--bg);
+  transition: --amb-c .45s ease;
+}
+/* Estados. Sem data-amb (ou "none") = fundo preto original, sem cor. */
+:root[data-amb="ok"]::before, :root[data-amb="ok"] .top { --amb-c: rgba(24, 128, 74, .30); }
+:root[data-amb="warn"]::before, :root[data-amb="warn"] .top { --amb-c: rgba(200, 138, 28, .25); }
+:root[data-amb="bad"]::before, :root[data-amb="bad"] .top { --amb-c: rgba(198, 40, 57, .34); }
+
+/* ---------- 2) Halo dos cards da tela inicial ---------- */
+:root:not([data-theme="light"]) .pn-c.st-ok { --nh: rgba(54, 201, 120, .34); --nh2: rgba(54, 201, 120, .55); }
+:root:not([data-theme="light"]) .pn-c.st-bad { --nh: rgba(255, 82, 100, .30); --nh2: rgba(255, 82, 100, .52); }
+:root:not([data-theme="light"]) .pn-c.st-warn { --nh: rgba(232, 163, 58, .30); --nh2: rgba(232, 163, 58, .50); }
+:root:not([data-theme="light"]) .pn-c.st-ok,
+:root:not([data-theme="light"]) .pn-c.st-bad,
+:root:not([data-theme="light"]) .pn-c.st-warn {
+  /* mantém as duas sombras originais do card e acrescenta halo externo + brilho de borda interno */
+  box-shadow: 0 0 12px -2px var(--nh), inset 0 0 12px -8px var(--nh),
+    0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  transition: transform .12s ease, border-color .15s ease, background-color .2s ease, box-shadow .4s ease;
+}
+:root:not([data-theme="light"]) .pn-c.st-ok:active,
+:root:not([data-theme="light"]) .pn-c.st-bad:active,
+:root:not([data-theme="light"]) .pn-c.st-warn:active {
+  box-shadow: 0 0 16px -1px var(--nh2), inset 0 0 14px -7px var(--nh2),
+    0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+/* Borda âmbar apenas para o gancho .st-warn (o app ainda não usa classificação amarela nos cards). */
+:root:not([data-theme="light"]) .pn-c.st-warn { border-color: #C98A1E; }
+
+/* Visual "Clássico": cartão principal já classificado por .b-* (o muted .oor continua neutro). */
+:root:not([data-theme="light"]) .card.red.hero.b-ok:not(.oor) { box-shadow: 0 0 12px -2px rgba(54, 201, 120, .34), inset 0 0 12px -8px rgba(54, 201, 120, .34); }
+:root:not([data-theme="light"]) .card.red.hero:is(.b-low, .b-vlow, .b-high, .b-vhigh):not(.oor) { box-shadow: 0 0 12px -2px rgba(255, 82, 100, .30), inset 0 0 12px -8px rgba(255, 82, 100, .30); }
+
+/* ---------- 3) Ícones e indicadores selecionados (cor funcional do próprio card) ---------- */
+:root:not([data-theme="light"]) .pn-c:is(.st-ok, .st-bad, .st-warn) .pn-ic { filter: drop-shadow(0 0 3px var(--nh)); }
+:root:not([data-theme="light"]) .pn-c.st-ok .badge.ok { box-shadow: 0 0 10px -3px rgba(54, 201, 120, .55); }
+:root:not([data-theme="light"]) :is(.pn-c, .hr-state) .badge:is(.low, .vlow, .high) { box-shadow: 0 0 10px -3px rgba(255, 82, 100, .50); }
+:root:not([data-theme="light"]) :is(.pn-c, .hr-state) .badge.vhigh { box-shadow: 0 0 0 2px var(--red-d), 0 0 10px -2px rgba(255, 82, 100, .55); }
+:root:not([data-theme="light"]) .hr-state .badge.ok { box-shadow: 0 0 10px -3px rgba(54, 201, 120, .55); }
+/* marcador do gráfico de evolução e barra de progresso */
+:root:not([data-theme="light"]) .pn-spark .spark { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp, var(--red-l)) 55%, transparent)); }
+:root:not([data-theme="light"]) .pr-prog i { box-shadow: 0 0 8px -1px rgba(255, 82, 100, .55); }
+/* item de navegação selecionado (o ícone já tinha brilho; aqui só o rótulo acompanha) */
+:root:not([data-theme="light"]) .nav button[aria-current="page"] { text-shadow: 0 0 10px rgba(255, 82, 100, .38); }
+
+/* ---------- 4) Botões importantes: brilho ao tocar/passar o mouse, volta suave ao soltar ---------- */
+:root:not([data-theme="light"]) .btn.pri, :root:not([data-theme="light"]) .nav .fab { transition: box-shadow .4s ease, transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease; }
+:root:not([data-theme="light"]) .btn.pri:active { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 20px 0 rgba(255, 82, 100, .50); transition-duration: .12s; }
+:root:not([data-theme="light"]) .nav .fab:active { box-shadow: 0 8px 28px rgba(var(--red-rgb), .5), 0 0 22px 2px rgba(255, 82, 100, .55), 0 0 0 5px var(--bg); transition-duration: .12s; }
+:root:not([data-theme="light"]) .rw-card .btn.pri:active { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 20px 0 rgba(54, 201, 120, .5); }
+@media (hover: hover) {
+  :root:not([data-theme="light"]) .btn.pri:hover { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 16px -2px rgba(255, 82, 100, .38); }
+  :root:not([data-theme="light"]) .nav .fab:hover { box-shadow: 0 8px 28px rgba(var(--red-rgb), .5), 0 0 18px 0 rgba(255, 82, 100, .40), 0 0 0 5px var(--bg); }
+  :root:not([data-theme="light"]) .rw-card .btn.pri:hover { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 16px -2px rgba(54, 201, 120, .4); }
+  :root:not([data-theme="light"]) .pn-c.st-ok:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
+  :root:not([data-theme="light"]) .pn-c.st-bad:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
+  :root:not([data-theme="light"]) .pn-c.st-warn:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
+}
+
+/* ---------- 5) Movimento reduzido: as cores continuam, as transições somem ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-theme="light"])::before, :root:not([data-theme="light"]) .top,
+  :root:not([data-theme="light"]) .pn-c, :root:not([data-theme="light"]) .btn.pri, :root:not([data-theme="light"]) .nav .fab { transition: none !important; }
+}

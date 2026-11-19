@@ -1,0 +1,33 @@
+/* ================= Tela de medição: paletas por faixa (ver glucoform.js) =================
+   Trocamos só variáveis de cor dentro de .sheet[data-gl]; todo componente existente (campos, cartões, chips,
+   botões, bordas) já usa essas variáveis, então acompanha sem mudar tamanho, posição ou estrutura. */
+.sheet[data-gl], .sheet[data-gl] .glu-in, .sheet[data-gl] .in, .sheet[data-gl] details.more, .sheet[data-gl] .btn, .sheet[data-gl] .mk span {
+  transition: background-color .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease, transform .12s ease;
+}
+/* vermelho fraco (< 70) */
+.sheet[data-gl="low"] { --sheet-bg: #1C1114; --bg: #150C0F; --s1: #231519; --s2: #2A191E; --line: #5C3239; --red: #B94651; --red-rgb: 185,70,81; --red-l: #FFA9B0; --red-d: #4A2328; --fg: #FFEFF1; --mut: #D6B0B5; --mut2: #C49CA2; --gl-ink: #FFB9BF; --gl-glow: rgba(255,150,160,.45); }
+/* verde (70 a 180) */
+.sheet[data-gl="ok"] { --sheet-bg: #0C1A12; --bg: #08130D; --s1: #112218; --s2: #152A1E; --line: #265A3B; --red: #178048; --red-rgb: 23,128,72; --red-l: #86EDB0; --red-d: #134A2C; --fg: #EDFBF2; --mut: #A8D2B9; --mut2: #92C0A5; --gl-ink: #7BEAA8; --gl-glow: rgba(54,201,120,.50); }
+/* vermelho forte (> 180) */
+.sheet[data-gl="high"] { --sheet-bg: #250A0E; --bg: #1B070A; --s1: #310E13; --s2: #3A1217; --line: #8F1F2C; --red: #DC1B2D; --red-rgb: 220,27,45; --red-l: #FF7A86; --red-d: #6A1019; --fg: #FFEDEF; --mut: #E8A7AE; --mut2: #D8959D; --gl-ink: #FF6B78; --gl-glow: rgba(255,82,100,.55); }
+:root[data-theme="light"] .sheet[data-gl="low"] { --sheet-bg: #FFF3F4; --bg: #FFFFFF; --s1: #FFF8F8; --s2: #FBE6E8; --line: #E3A8AE; --red: #B94651; --red-rgb: 185,70,81; --red-l: #A5323D; --red-d: #F6D2D6; --fg: #3A1519; --mut: #7A4A50; --mut2: #86565C; --gl-ink: #A5323D; --gl-glow: rgba(185,70,81,.35); }
+:root[data-theme="light"] .sheet[data-gl="ok"] { --sheet-bg: #F0FAF4; --bg: #FFFFFF; --s1: #F6FCF8; --s2: #DFF3E7; --line: #86C9A2; --red: #178048; --red-rgb: 23,128,72; --red-l: #0F6A3A; --red-d: #CDEFD9; --fg: #0F2A1A; --mut: #3F6B52; --mut2: #4C7A5F; --gl-ink: #0F6A3A; --gl-glow: rgba(23,128,72,.35); }
+:root[data-theme="light"] .sheet[data-gl="high"] { --sheet-bg: #FFEBED; --bg: #FFFFFF; --s1: #FFF4F5; --s2: #FAD3D7; --line: #E0707B; --red: #DC1B2D; --red-rgb: 220,27,45; --red-l: #B3101F; --red-d: #F8B9C0; --fg: #3A0A10; --mut: #7A2A33; --mut2: #8A3640; --gl-ink: #B3101F; --gl-glow: rgba(220,27,45,.40); }
+/* número digitado e unidade acompanham a cor da faixa */
+.sheet[data-gl] .glu-in input { color: var(--gl-ink); }
+.sheet[data-gl] .glu-in { border-width: 1.5px; }
+.sheet[data-gl="high"] .glu-in { border-width: 2px; }
+/* o brilho neon do botão acompanha a faixa (em vez do vermelho fixo) */
+:root .sheet[data-gl] .btn.pri:hover { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 16px -2px var(--gl-glow); }
+:root .sheet[data-gl] .btn.pri:active { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 20px 0 var(--gl-glow); }
+/* alerta (texto + símbolo, nunca só cor) */
+.gl-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--s2); color: var(--fg); }
+.gl-alert.gl-high { border-width: 2px; }
+.gl-alert.gl-low { border-style: dashed; }
+.gl-ic { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 800; line-height: 1; color: #fff; background: var(--red); }
+.gl-tx { flex: 1 1 170px; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; line-height: 1.35; }
+.gl-tx b { color: var(--gl-ink); font-size: 15px; }
+.gl-go { flex: 1 1 100%; border-color: var(--red-l); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet[data-gl], .sheet[data-gl] .glu-in, .sheet[data-gl] .in, .sheet[data-gl] details.more, .sheet[data-gl] .btn, .sheet[data-gl] .mk span { transition: none; }
+}

@@ -1,0 +1,344 @@
+/* TiaBete · API de licenciamento (Cloudflare Worker + D1). Autoridade final do direito premium.
+   Não recebe nem guarda dados de saúde. Tudo que depende de tempo usa o relógio DESTE servidor. */
+import core from '../../src/licensecore.js';
+const { LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, licComputeState, licTrialEnd, licSign } = core;
+const MAX_DEVICES = 2, ABUSE_WINDOW = 24 * 3600e3, ABUSE_MAX_NEW = 6;
+const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+
+const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+const err = (status, code, extra) => json(Object.assign({ error: code }, extra || {}), status);
+const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+const sha256 = async t => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)));
+const same = (a, b) => { a = String(a); b = String(b); let d = a.length ^ b.length; for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0); return d === 0; };
+async function readJson(req, max = 8192) { const t = await req.text(); if (t.length > max) return null; try { const j = JSON.parse(t || '{}'); return j && typeof j === 'object' ? j : null; } catch (e) { return null; } }
+/* Controle de frequência no D1 (por IP, conta ou aparelho). Devolve true se passou do limite. */
+async function limited(deps, key, max, windowMs) {
+  const db = deps.env.DB, now = deps.now();
+  await run(db, 'DELETE FROM rate_limits WHERE k=? AND at<?', key, now - windowMs);
+  const c = await one(db, 'SELECT COUNT(*) AS n FROM rate_limits WHERE k=? AND at>=?', key, now - windowMs);
+  if (c.n >= max) return true;
+  await run(db, 'INSERT INTO rate_limits(k,at) VALUES(?,?)', key, now); return false;
+}
+const ipOf = req => req.headers.get('cf-connecting-ip') || 'noip';
+const rid = n => core.licB64u(crypto.getRandomValues(new Uint8Array(n)));
+
+/* ---------- Google: valida o ID token (assinatura, emissor, público, validade) ---------- */
+let JW = { at: 0, keys: null };
+async function googleKeys(deps, force) {
+  if (!force && JW.keys && deps.now() - JW.at < 3600e3) return JW.keys;
+  const r = await deps.fetch(JWKS_URL); const j = await r.json(); JW = { at: deps.now(), keys: j.keys || [] }; return JW.keys;
+}
+export async function verifyGoogleIdToken(idToken, deps) {
+  if (typeof idToken !== 'string' || idToken.length > 4096) throw new Error('token');
+  const [h, p, s] = idToken.split('.'); if (!h || !p || !s) throw new Error('token');
+  const head = JSON.parse(new TextDecoder().decode(core.licB64d(h))), pay = JSON.parse(new TextDecoder().decode(core.licB64d(p)));
+  if (head.alg !== 'RS256') throw new Error('alg');
+  let jwk = (await googleKeys(deps)).find(k => k.kid === head.kid); if (!jwk) jwk = (await googleKeys(deps, true)).find(k => k.kid === head.kid); if (!jwk) throw new Error('kid');
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, core.licB64d(s), new TextEncoder().encode(h + '.' + p)); if (!ok) throw new Error('sig');
+  if (!['https://accounts.google.com', 'accounts.google.com'].includes(pay.iss)) throw new Error('iss');
+  if (!deps.env.GOOGLE_CLIENT_ID || pay.aud !== deps.env.GOOGLE_CLIENT_ID) throw new Error('aud');
+  if (!(pay.exp * 1000 > deps.now())) throw new Error('exp');
+  if (!pay.sub) throw new Error('sub');
+  return pay;
+}
+
+/* ---------- D1 ---------- */
+const one = (db, sql, ...a) => db.prepare(sql).bind(...a).first();
+const all = async (db, sql, ...a) => (await db.prepare(sql).bind(...a).all()).results || [];
+const run = (db, sql, ...a) => db.prepare(sql).bind(...a).run();
+const logEv = (db, sub, type, at, data) => run(db, 'INSERT INTO events(sub,type,at,data) VALUES(?,?,?,?)', sub, type, at, data ? JSON.stringify(data) : null);
+
+async function snapshot(deps, sub, devId) {
+  const db = deps.env.DB, now = deps.now();
+  const acct = await one(db, 'SELECT * FROM accounts WHERE sub=?', sub), lic = await one(db, 'SELECT * FROM licenses WHERE sub=?', sub);
+  const open = await one(db, "SELECT id FROM orders WHERE sub=? AND status='pending' AND created_at>?", sub, now - 7 * 864e5);
+  const st = licComputeState(acct, lic, !!open, now), te = licTrialEnd(acct);
+  const payload = { v: 1, sub, st, te, lic: st === 'lifetime_active', iat: now, vexp: now + (st === 'lifetime_active' ? LIC_GRACE_LIFETIME_MS : LIC_GRACE_MS), dev: devId || null };
+  const token = await licSign(payload, JSON.parse(deps.env.LICENSE_PRIVATE_JWK));
+  const price = await one(db, "SELECT value FROM config WHERE key='price_cents'");
+  return { token, status: st, trial_ends_at: te, server_time: now, price_cents: lic && lic.status === 'active' ? lic.price_cents : +(price && price.value || 2990), licensed_price_cents: lic && lic.status === 'active' ? lic.price_cents : null };
+}
+const listDevices = (db, sub) => all(db, 'SELECT id,name,created_at,last_seen FROM devices WHERE sub=? AND revoked_at IS NULL ORDER BY created_at', sub);
+
+async function deviceAuth(req, deps) {
+  const m = /^Device ([\w-]+)\.([\w-]+)$/.exec(req.headers.get('authorization') || ''); if (!m) return null;
+  const d = await one(deps.env.DB, 'SELECT * FROM devices WHERE id=? AND revoked_at IS NULL', m[1]);
+  if (!d || d.secret_hash !== await sha256(m[2])) return null;
+  await run(deps.env.DB, 'UPDATE devices SET last_seen=? WHERE id=?', deps.now(), d.id); return d;
+}
+
+/* ---------- rotas ---------- */
+/* Vagas de aparelho: a vaga é tomada por UM comando SQL condicional (atômico no D1), nunca "conta e depois insere". */
+async function takeSlot(db, sub, devId, name, secretHash, now) {
+  const nm = String(name || '').slice(0, 60) || null;
+  await run(db, `INSERT OR IGNORE INTO devices(id,sub,name,secret_hash,created_at,last_seen)
+    SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM devices WHERE sub=? AND revoked_at IS NULL) < ${MAX_DEVICES}`, devId, sub, nm, secretHash, now, now, sub);
+  await run(db, `UPDATE devices SET revoked_at=NULL, secret_hash=?, last_seen=?, name=COALESCE(?,name)
+    WHERE id=? AND sub=? AND revoked_at IS NOT NULL AND (SELECT COUNT(*) FROM devices WHERE sub=? AND revoked_at IS NULL) < ${MAX_DEVICES}`, secretHash, now, nm, devId, sub, sub);
+  const d = await one(db, 'SELECT revoked_at FROM devices WHERE id=? AND sub=?', devId, sub);
+  return !!d && d.revoked_at == null;
+}
+async function session(req, deps) {
+  if (await limited(deps, 'ip:' + ipOf(req), 40, 10 * 60e3)) return err(429, 'rate_limited');
+  const b = await readJson(req); if (!b) return err(400, 'bad_request');
+  const db = deps.env.DB, now = deps.now();
+  let pay; try { pay = await verifyGoogleIdToken(b.id_token, deps); } catch (e) { return err(401, 'invalid_id_token'); }
+  const devId = String(b.device_id || ''); if (!/^[\w-]{16,64}$/.test(devId)) return err(400, 'bad_device');
+  const sub = pay.sub;
+  if (await limited(deps, 'sub:' + sub, 30, 10 * 60e3)) return err(429, 'rate_limited');
+  /* conta: o teste só começa aqui (primeiro acesso autenticado) e nunca é reescrito */
+  await run(db, 'INSERT OR IGNORE INTO accounts(sub,email,name,created_at,trial_started_at) VALUES(?,?,?,?,?)', sub, pay.email || null, pay.name || null, now, now);
+  await run(db, 'UPDATE accounts SET email=COALESCE(?,email), name=COALESCE(?,name) WHERE sub=?', pay.email || null, pay.name || null, sub);
+  const existing = await one(db, 'SELECT * FROM devices WHERE id=?', devId);
+  if (existing && existing.sub !== sub) return err(409, 'device_belongs_to_other_account');
+  if (b.replace_device_id) await run(db, 'UPDATE devices SET revoked_at=? WHERE id=? AND sub=? AND revoked_at IS NULL', now, String(b.replace_device_id).slice(0, 64), sub);
+  const secret = rid(24), hash = await sha256(secret);
+  if (existing && !existing.revoked_at) await run(db, 'UPDATE devices SET secret_hash=?, last_seen=?, name=COALESCE(?,name) WHERE id=?', hash, now, b.device_name ? String(b.device_name).slice(0, 60) : null, devId);
+  else {
+    const recent = await one(db, 'SELECT COUNT(*) AS n FROM devices WHERE sub=? AND created_at>?', sub, now - ABUSE_WINDOW);
+    if (!existing && recent.n >= ABUSE_MAX_NEW) return err(429, 'abuse_guard');
+    if (!(await takeSlot(db, sub, devId, b.device_name, hash, now))) return err(409, 'device_limit', { devices: await listDevices(db, sub), max: MAX_DEVICES });
+    await logEv(db, sub, 'device_add', now, { id: devId });
+  }
+  await reconcile(deps, sub);
+  return json(Object.assign(await snapshot(deps, sub, devId), { device_secret: secret, devices: await listDevices(db, sub), email: pay.email || null, name: pay.name || null }));
+}
+async function refresh(req, deps) {
+  const d = await deviceAuth(req, deps); if (!d) return err(401, 'device_unauthorized');
+  if (await limited(deps, 'dev:' + d.id, 60, 3600e3)) return err(429, 'rate_limited');
+  await reconcile(deps, d.sub);
+  return json(Object.assign(await snapshot(deps, d.sub, d.id), { devices: await listDevices(deps.env.DB, d.sub) }));
+}
+async function removeDevice(req, deps) {
+  const d = await deviceAuth(req, deps); if (!d) return err(401, 'device_unauthorized');
+  const b = await readJson(req); if (!b) return err(400, 'bad_request');
+  await run(deps.env.DB, 'UPDATE devices SET revoked_at=? WHERE id=? AND sub=? AND revoked_at IS NULL', deps.now(), String(b.id || '').slice(0, 64), d.sub);
+  await logEv(deps.env.DB, d.sub, 'device_remove', deps.now(), { id: String(b.id || '').slice(0, 64) });
+  return json({ devices: await listDevices(deps.env.DB, d.sub) });
+}
+async function createOrder(req, deps) {
+  const d = await deviceAuth(req, deps); if (!d) return err(401, 'device_unauthorized');
+  if (await limited(deps, 'order:' + d.sub, 6, 3600e3)) return err(429, 'rate_limited');
+  const db = deps.env.DB, now = deps.now(), lic = await one(db, 'SELECT * FROM licenses WHERE sub=?', d.sub);
+  if (lic && lic.status === 'active') return err(409, 'already_licensed');
+  const cfg = await one(db, "SELECT value FROM config WHERE key='price_cents'"), cents = +(cfg && cfg.value || 2990);
+  if (!(cents >= 100) || !Number.isInteger(cents)) return err(500, 'bad_price');
+  if (!/^https:\/\//.test(deps.env.PUBLIC_URL || '')) return err(500, 'not_configured');
+  const id = 'ord_' + rid(12);                                   /* único por pedido */
+  await run(db, "INSERT INTO orders(id,sub,price_cents,currency,status,created_at,updated_at) VALUES(?,?,?,?, 'pending',?,?)", id, d.sub, cents, 'BRL', now, now);
+  const ret = `${deps.env.PUBLIC_URL}/v1/return?order=${id}`, total = (cents / 100).toFixed(2);
+  /* Checkout Pro via Orders API (POST /v1/orders, modo manual). total_amount é string = soma de unit_price × quantity. */
+  const body = {
+    type: 'online', processing_mode: 'manual', total_amount: total, external_reference: id,
+    description: 'TiaBete · Licença Premium Vitalícia',
+    items: [{ title: 'TiaBete · Licença Premium Vitalícia', unit_price: total, quantity: 1 }],
+    config: { online: { success_url: ret, pending_url: ret, failure_url: ret, auto_return: 'approved' } }
+  };
+  let r, j = {};
+  try {
+    r = await deps.fetch('https://api.mercadopago.com/v1/orders', { method: 'POST', headers: { authorization: 'Bearer ' + deps.env.MP_ACCESS_TOKEN, 'content-type': 'application/json', 'x-idempotency-key': id }, body: JSON.stringify(body) });
+    j = await r.json().catch(() => ({}));
+  } catch (e) { r = null; }
+  if (!r || !r.ok || !j.id || !/^https:\/\//.test(j.checkout_url || '')) { await run(db, "UPDATE orders SET status='failed',updated_at=? WHERE id=?", now, id); return err(502, 'mp_unavailable'); }
+  await run(db, 'UPDATE orders SET mp_order_id=? WHERE id=?', String(j.id).slice(0, 64), id);
+  return json({ order_id: id, price_cents: cents, checkout_url: j.checkout_url });
+}
+
+/* ---------- Mercado Pago (Orders API): pedido → licença ----------
+   Nada vem do conteúdo do webhook: a Order é SEMPRE buscada na API oficial (GET /v1/orders/{id}) com o token do servidor.
+   Só ativa se: pedido local existe e é desta Order · valor e valor pago == preço gravado no pedido · moeda BRL ·
+   status processed/accredited · pagamento não usado por outro pedido · pedido ainda não processado.
+   Pix pendente (created/processing/action_required) não ativa nada. */
+/* Pagamento relevante de uma Order (pode ter várias tentativas, reembolsos e contestações):
+   1) se o pedido já guardou o pagamento que ativou a licença, é ESSE (qualquer status);
+   2) senão, só um pagamento "processed" cujo valor pago == preço do pedido; se houver mais de um, é ambíguo ('ambiguous').
+   Nunca se escolhe "a primeira da lista". */
+function orderPayment(mo, o) {
+  const ps = (mo && mo.transactions && Array.isArray(mo.transactions.payments)) ? mo.transactions.payments.filter(x => x && x.id != null) : [];
+  if (o && o.mp_payment_id) return ps.find(x => String(x.id) === o.mp_payment_id) || null;
+  const price = o ? o.price_cents : NaN, amt = x => Math.round(+(x.paid_amount != null ? x.paid_amount : x.amount) * 100);
+  const good = ps.filter(x => x.status === 'processed' && amt(x) === price);
+  return good.length === 1 ? good[0] : (good.length > 1 ? 'ambiguous' : null);
+}
+const msOf = v => { const t = Date.parse(v || ''); return Number.isFinite(t) ? t : null; };
+/* JSON da API sem perder identificadores numéricos grandes: números de 15+ dígitos em "id"/"case_id" viram texto ANTES do parse
+   (JSON.parse arredondaria acima de 2^53). Qualquer outra forma numérica fora do inteiro seguro é tratada como inválida adiante. */
+const parseIds = t => { try { return JSON.parse(String(t).replace(/("(?:case_id|id)"\s*:\s*)(-?\d{15,})(?=\s*[,}\]])/g, '$1"$2"')); } catch (e) { return null; } };
+const readIds = async r => { try { return parseIds(await r.text()); } catch (e) { return null; } };
+const validCase = v => (typeof v === 'string' && /^\d{1,30}$/.test(v)) || (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0);
+/* ID do vendedor para o X-Caller-Id. A documentação diz "ID do usuário autenticado (seller ID)" e não diz onde obtê-lo, nem que o user_id da Order seja esse valor.
+   Por isso só vem de MP_SELLER_ID (variável pública do Worker, configurada por você); o user_id da Order, se existir, só serve de conferência. Sem isso, não há chamada. */
+const sellerId = (env, mo) => { const v = String((env && env.MP_SELLER_ID) || '').trim(); if (!/^\d{1,20}$/.test(v)) return null; if (mo && mo.user_id != null && String(mo.user_id) !== v) return 'conflict'; return v; };
+/* Contestações: GET /v1/chargebacks/{case_id} (Authorization + X-Caller-Id = vendedor). coverage_applied: true = favorável ao vendedor, false = perdida, null = sem decisão. */
+async function fetchChargeback(deps, caseId, callerId) {
+  try {
+    const r = await deps.fetch('https://api.mercadopago.com/v1/chargebacks/' + encodeURIComponent(caseId), { headers: { authorization: 'Bearer ' + deps.env.MP_ACCESS_TOKEN, 'x-caller-id': callerId } });
+    return r.ok ? await readIds(r) : null;
+  } catch (e) { return null; }
+}
+const MAX_CASES = 5;                                          /* acima disso: unverified (nunca decide com parte dos casos) */
+/* Situação da contestação desta Order: 'none' | 'open' | 'won' | 'lost' | 'unverified'. Só a API decide; o corpo do webhook nunca.
+   Associação: cada contestação da Order traz transaction_id (id do pagamento na própria Order). Só vale para o pagamento `pay` se for igual a ele;
+   sem identificação inequívoca ou sem pagamento confirmado, nada é decidido. */
+async function chargebackState(deps, mo, pay, o) {
+  const txs = mo.transactions || {}, pays = Array.isArray(txs.payments) ? txs.payments : [];
+  const badList = txs.chargebacks != null && !Array.isArray(txs.chargebacks), cbs = Array.isArray(txs.chargebacks) ? txs.chargebacks : [];
+  const flagged = mo.status === 'charged_back' || (pay && pay.status === 'charged_back') || pays.some(x => x && x.status === 'charged_back');
+  if (!badList && !cbs.length && !flagged) return 'none';
+  if (!pay) return (o && o.mp_payment_id) ? 'unverified' : 'none';       /* sem pagamento confirmado: não associa; pedido nunca ativado não tem licença a proteger */
+  /* Status oficial charged_back, confirmado na consulta direta da Order e com pagamento inequívoco: o próprio pagamento marcado, ou a Order com um único pagamento. */
+  const officialLost = (pay.status === 'charged_back') || (mo.status === 'charged_back' && pays.length === 1);
+  if (mo.status === 'charged_back' && !officialLost) return 'unverified'; /* Order contestada com vários pagamentos, nenhum confirmado como o contestado */
+  /* Sem como verificar caso a caso (lista inesperada, caso sem transaction_id, excesso de casos, vendedor divergente): o status oficial decide; senão, nada muda. */
+  const cannot = () => officialLost ? 'lost' : 'unverified';
+  if (badList) return cannot();
+  const known = new Set(pays.filter(x => x && x.id != null).map(x => String(x.id))), mine = [];
+  for (const c of cbs) {
+    if (!c || typeof c !== 'object' || !validCase(c.case_id)) return cannot();
+    const tid = typeof c.transaction_id === 'string' ? c.transaction_id : '';
+    if (!tid || !known.has(tid)) return cannot();                           /* contestação sem pagamento identificado na Order */
+    if (tid === String(pay.id)) mine.push(c);                               /* de outro pagamento da Order: não é deste pedido */
+  }
+  if (mine.length > MAX_CASES) return cannot();
+  const sid = sellerId(deps.env, mo);
+  if (sid === 'conflict') return cannot();                                  /* user_id da Order diverge de MP_SELLER_ID: sem consulta; status oficial ainda vale */
+  let won = false, lost = false, open = false;
+  if (!sid) {                                                               /* sem ID do vendedor confirmado: sem chamada; só status oficial da Order */
+    if (officialLost) return 'lost';
+    if (!mine.length) return 'none';
+    return mine.every(c => c.status === 'in_process') ? 'open' : 'unverified';
+  }
+  for (const c of mine) {
+    const caseId = String(c.case_id), cb = await fetchChargeback(deps, caseId, sid);
+    if (!cb || typeof cb !== 'object' || String(cb.id) !== caseId || !('coverage_applied' in cb)) return 'unverified';
+    if (cb.coverage_applied === true) won = true; else if (cb.coverage_applied === false) lost = true; else if (cb.coverage_applied === null) open = true; else return 'unverified';
+  }
+  if (lost) return 'lost';
+  if (won) return 'won';
+  if (officialLost) return 'lost';                                          /* status oficial charged_back, sem decisão contrária da API */
+  return open ? 'open' : 'none';
+}
+async function applyOrder(deps, mo) {
+  const db = deps.env.DB, now = deps.now(), mpId = String(mo.id || '').slice(0, 64);
+  const o = await one(db, 'SELECT * FROM orders WHERE id=?', String(mo.external_reference || '')); if (!o) return 'no_order';
+  if (!o.mp_order_id || o.mp_order_id !== mpId) { await logEv(db, o.sub, 'order_mismatch', now, { order: o.id }); return 'order_mismatch'; }
+  const upd = msOf(mo.last_updated_date);
+  if (upd != null && o.mp_updated_at != null && upd < o.mp_updated_at) return 'stale';       /* notificação/consulta mais antiga que a já aplicada */
+  const lic = await one(db, 'SELECT * FROM licenses WHERE sub=?', o.sub), pay0 = orderPayment(mo, o);
+  if (pay0 === 'ambiguous') { await logEv(db, o.sub, 'ambiguous_payments', now, { order: o.id }); return 'mismatch'; }
+  const pay = pay0, payId = String((pay && pay.id) || '').slice(0, 64), mine = !!(lic && lic.order_id === o.id);   /* a licença é deste pedido? */
+  const other = payId && await one(db, 'SELECT id FROM orders WHERE mp_payment_id=? AND id<>?', payId, o.id); if (other) return 'payment_reused';
+  const stamp = () => upd != null ? run(db, 'UPDATE orders SET mp_updated_at=? WHERE id=?', upd, o.id) : null;
+  /* contestação */
+  const cb = await chargebackState(deps, mo, pay, o); if (cb === 'unverified') return 'chargeback_unverified';
+  if (cb === 'open') { if (o.chargeback_state !== 'open') { await run(db, "UPDATE orders SET chargeback_state='open', updated_at=? WHERE id=?", now, o.id); await logEv(db, o.sub, 'chargeback_open', now, { order: o.id }); } await stamp(); return 'chargeback_open'; }   /* aberta: não revoga */
+  if (cb === 'lost') {
+    await run(db, "UPDATE orders SET chargeback_state='lost', updated_at=? WHERE id=?", now, o.id); await stamp();
+    if (mine && lic.status === 'active') { await run(db, "UPDATE licenses SET status='revoked', updated_at=? WHERE sub=?", now, o.sub); await logEv(db, o.sub, 'charged_back', now, { order: o.id }); }
+    return 'chargeback_lost';
+  }
+  if (cb === 'won') {
+    await run(db, "UPDATE orders SET chargeback_state='won', updated_at=? WHERE id=?", now, o.id); await stamp();
+    if (o.chargeback_state === 'lost') {                                                       /* só restaura se o pagamento original continua válido */
+      if (mine && lic.status === 'revoked' && mo.status === 'processed' && mo.status_detail === 'accredited' && pay && pay.status === 'processed') { await run(db, "UPDATE licenses SET status='active', updated_at=? WHERE sub=?", now, o.sub); await logEv(db, o.sub, 'chargeback_won_restored', now, { order: o.id }); return 'chargeback_won_restored'; }
+      await logEv(db, o.sub, 'chargeback_won_unconfirmed', now, { order: o.id }); return 'chargeback_won_unconfirmed';
+    }
+    await logEv(db, o.sub, 'chargeback_won', now, { order: o.id });
+  }
+  if (o.chargeback_state === 'lost' && cb === 'none') return 'chargeback_lost';                 /* decisão anterior não é revertida por "sem contestação" */
+  /* reembolso */
+  if (mo.status === 'refunded' || (pay && pay.status === 'refunded')) {
+    await run(db, "UPDATE orders SET status='refunded', updated_at=? WHERE id=?", now, o.id); await stamp();
+    if (mine && lic.status === 'active') { await run(db, "UPDATE licenses SET status='refunded', updated_at=? WHERE sub=?", now, o.sub); await logEv(db, o.sub, 'refunded', now, { order: o.id }); }
+    return 'refunded';
+  }
+  if (mo.status === 'processed' && mo.status_detail === 'accredited') {
+    if (o.status === 'paid' && lic && lic.status === 'active') { await stamp(); return 'already_processed'; }
+    if (o.status === 'refunded') return 'order_refunded';
+    if (o.chargeback_state === 'lost') return 'chargeback_lost';
+    const paid = pay ? Math.round(+(pay.paid_amount != null ? pay.paid_amount : pay.amount) * 100) : NaN;
+    if (!payId || Math.round(+mo.total_amount * 100) !== o.price_cents || paid !== o.price_cents || mo.currency !== 'BRL' || o.currency !== 'BRL') { await logEv(db, o.sub, 'amount_mismatch', now, { order: o.id, payId }); return 'mismatch'; }
+    await run(db, "UPDATE orders SET status='paid', mp_payment_id=?, updated_at=? WHERE id=?", payId, now, o.id); await stamp();
+    if (!lic) await run(db, "INSERT OR IGNORE INTO licenses(sub,status,price_cents,currency,order_id,payment_id,activated_at,updated_at) VALUES(?, 'active',?,?,?,?,?,?)", o.sub, o.price_cents, 'BRL', o.id, payId, now, now);
+    else if (lic.status !== 'active' && lic.status !== 'revoked') await run(db, "UPDATE licenses SET status='active',price_cents=?,currency='BRL',order_id=?,payment_id=?,activated_at=?,updated_at=? WHERE sub=?", o.price_cents, o.id, payId, now, now, o.sub);
+    await logEv(db, o.sub, 'license_active', now, { order: o.id });
+    return 'activated';
+  }
+  if (mo.status === 'canceled') { await run(db, "UPDATE orders SET status='failed', updated_at=? WHERE id=? AND status='pending'", now, o.id); await stamp(); return 'failed'; }
+  return 'pending';                       /* created, processing, action_required, failed (nova tentativa possível), partially_refunded: não ativa */
+}
+async function fetchOrder(deps, mpId) {
+  const r = await deps.fetch('https://api.mercadopago.com/v1/orders/' + encodeURIComponent(mpId), { headers: { authorization: 'Bearer ' + deps.env.MP_ACCESS_TOKEN } });
+  return r.ok ? await readIds(r) : null;
+}
+/* Rede de segurança: ao atualizar a situação, o servidor consulta na API as Orders dos pedidos em aberto. */
+async function reconcile(deps, sub) {
+  try {
+    const db = deps.env.DB, open = await all(db, "SELECT id, mp_order_id FROM orders WHERE sub=? AND status='pending' AND mp_order_id IS NOT NULL AND created_at>?", sub, deps.now() - 7 * 864e5);
+    for (const o of open.slice(0, 3)) {
+      const mo = await fetchOrder(deps, o.mp_order_id);
+      if (mo && String(mo.id) === o.mp_order_id && mo.external_reference === o.id) await applyOrder(deps, mo);
+    }
+  } catch (e) { /* só uma verificação extra: falha aqui nunca bloqueia nada */ }
+}
+/* Assinatura do webhook: manifesto "id:<data.id>;request-id:<x-request-id>;ts:<ts>;" assinado com HMAC-SHA256 (data.id como recebido ou em minúsculas).
+   Partes ausentes saem do manifesto. A comparação é em tempo constante. */
+export async function mpSignatureOk(req, url, secret) {
+  const sig = req.headers.get('x-signature') || '', reqId = req.headers.get('x-request-id') || '';
+  const ts = (/(?:^|,)\s*ts=(\d{6,16})/.exec(sig) || [])[1], v1 = (/(?:^|,)\s*v1=([a-fA-F0-9]{64})/.exec(sig) || [])[1];
+  const raw = url.searchParams.get('data.id') || '';
+  if (!ts || !v1 || !secret) return false;
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  /* A documentação de Orders dá o manifesto id:<data.id>;request-id:<x-request-id>;ts:<ts>; mas só as páginas de pagamentos falam em minúsculas.
+     Ids de Orders são alfanuméricos em maiúsculas (ORD01…): aceita o data.id como recebido OU em minúsculas. As duas variantes exigem o segredo; nenhuma é "mais fraca". */
+  let okAny = false;
+  for (const dataId of new Set([raw, raw.toLowerCase()])) {
+    const manifest = (dataId ? `id:${dataId};` : '') + (reqId ? `request-id:${reqId};` : '') + `ts:${ts};`;
+    if (same(hex(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(manifest))), v1.toLowerCase())) okAny = true;
+  }
+  return okAny;
+}
+async function webhook(req, deps) {
+  const url = new URL(req.url);
+  if (await limited(deps, 'wh:' + ipOf(req), 300, 10 * 60e3)) return err(429, 'rate_limited');
+  if (!await mpSignatureOk(req, url, deps.env.MP_WEBHOOK_SECRET)) return err(401, 'bad_signature');
+  const b = await readJson(req); if (!b) return err(400, 'bad_request');
+  const qid = url.searchParams.get('data.id'), bid = b.data && b.data.id != null ? String(b.data.id) : null, ordId = qid || bid;
+  if (!ordId || !/^[\w-]{1,64}$/.test(ordId) || (qid && bid && qid !== bid)) return err(400, 'bad_order_id');
+  const typ = b.type || url.searchParams.get('type');
+  if (typ !== 'order') return json({ ok: true, ignored: 'not_order' });            /* só o tópico "orders" */
+  const sig = req.headers.get('x-signature') || '', key = `${ordId}:${(/ts=(\d+)/.exec(sig) || [])[1]}:${req.headers.get('x-request-id') || ''}`, db = deps.env.DB;
+  if (await one(db, 'SELECT 1 AS x FROM webhook_log WHERE key=?', key)) return json({ ok: true, duplicate: true });   /* repetição exata */
+  const mo = await fetchOrder(deps, ordId);
+  if (!mo) return err(502, 'mp_unavailable');                     /* o Mercado Pago tenta de novo */
+  if (String(mo.id) !== ordId) return err(400, 'order_id_mismatch');
+  const res = await applyOrder(deps, mo);
+  if (res === 'chargeback_unverified') return err(502, 'mp_unavailable');   /* não registra: o Mercado Pago reenvia */
+  await run(db, 'INSERT OR IGNORE INTO webhook_log(key,at) VALUES(?,?)', key, deps.now());
+  return json({ ok: true, result: res });
+}
+function returnPage(url, env) {
+  const id = (url.searchParams.get('order') || '').replace(/[^\w-]/g, '').slice(0, 40), to = `${env.APP_RETURN || 'app.tiabete.glicose:/pagamento'}?order=${id}`;
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TiaBete</title><body style="font:16px system-ui;background:#08070A;color:#F5F3F4;padding:32px;text-align:center"><h1>Voltando ao TiaBete…</h1><p>Voltar não significa pagamento aprovado: a licença só é liberada quando o servidor confirma o pagamento. Ela aparece em Mais → Perfil e configurações → Licença.</p><p><a style="color:#FF8E98" href="${to}">Abrir o TiaBete</a></p><script>location.replace(${JSON.stringify(to)})</script>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+}
+/* Não existem rotas administrativas: preço e configuração só mudam por "wrangler d1 execute" (exige login na sua conta Cloudflare). */
+export function createApp(base) {
+  return async function handle(req, env, fetchImpl, nowImpl) {
+    const deps = { env, fetch: fetchImpl || base.fetch, now: nowImpl || base.now }, url = new URL(req.url), p = url.pathname;
+    try {
+      if (req.method === 'POST') {
+        if (p === '/v1/session') return await session(req, deps);
+        if (p === '/v1/refresh') return await refresh(req, deps);
+        if (p === '/v1/devices/remove') return await removeDevice(req, deps);
+        if (p === '/v1/order') return await createOrder(req, deps);
+        if (p === '/v1/mp/webhook') return await webhook(req, deps);
+      }
+      if (req.method === 'GET' && p === '/v1/return') return returnPage(url, env);
+      if (req.method === 'GET' && p === '/v1/health') return json({ ok: true });
+      return err(404, 'not_found');
+    } catch (e) { return err(500, 'server_error'); }
+  };
+}
+const app = createApp({ fetch: (...a) => fetch(...a), now: () => Date.now() });
+export default { fetch: (req, env) => app(req, env) };

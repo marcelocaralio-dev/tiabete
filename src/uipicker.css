@@ -1,0 +1,68 @@
+/* ================= Contador universal de UI (roleta) ================= */
+.uip { --uh: 40px; position: relative; width: 100%; max-width: 190px; margin: 0 auto; }
+.uip.r5 { --rows: 5; } .uip.r3 { --rows: 3; }
+.uip-w { height: calc(var(--uh) * var(--rows)); overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: none; border: 1px solid var(--line); border-radius: 16px; background: var(--s1); outline: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 74%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 26%, #000 74%, transparent 100%); cursor: grab; }
+.uip-w::-webkit-scrollbar { display: none; }
+.uip-w.drag { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+.uip-w:focus-visible { border-color: var(--red); box-shadow: 0 0 0 2px rgba(var(--red-rgb), .35); }
+.uip-l { padding: calc(var(--uh) * var(--n, 2)) 0; }
+.uip-i { height: var(--uh); display: flex; align-items: center; justify-content: center; scroll-snap-align: center; font: 600 20px/1 var(--f-mono); color: var(--mut2); opacity: .5; transform: scale(.82); transition: transform .14s ease, opacity .14s ease, color .14s ease; user-select: none; -webkit-user-select: none; cursor: pointer; font-variant-numeric: tabular-nums; }
+.uip-i.n1 { opacity: .78; transform: scale(.94); color: var(--mut); }
+.uip-i.s { opacity: 1; transform: scale(1.32); color: var(--fg); font-weight: 800; }
+/* duas linhas que delimitam o valor escolhido */
+.uip-ln { position: absolute; left: 12px; right: 12px; height: 2px; border-radius: 2px; background: var(--red); opacity: .85; pointer-events: none; }
+.uip-ln.a { top: calc(var(--uh) * (var(--rows) - 1) / 2); } .uip-ln.b { top: calc(var(--uh) * ((var(--rows) - 1) / 2 + 1) - 2px); }
+.uip-u { position: absolute; right: 16px; top: calc(var(--uh) * (var(--rows) - 1) / 2); height: var(--uh); display: flex; align-items: center; font: 700 12px var(--f-body); letter-spacing: .08em; color: var(--red-l); pointer-events: none; }
+:root[data-theme="light"] .uip-i.s { color: var(--red-l); }
+/* três contadores lado a lado (formulário de medição) */
+.uip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.uip-grid > div { min-width: 0; text-align: center; }
+.uip-grid .uip-lb { display: block; font-size: 13px; font-weight: 700; color: var(--mut); margin-bottom: 6px; }
+.uip-grid .uip-u { right: 8px; font-size: 11px; }
+/* dentro dos cartões de insulina do Início */
+.un-row .uip { max-width: 150px; margin: 0; }
+.un-row .uip-w { border-color: transparent; background: transparent; }
+.un-row { flex-wrap: wrap; }
+.uip-cfg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (prefers-reduced-motion: reduce) { .uip-i { transition: none; } }
+
+/* resumo do tratamento no Início */
+.tr-sum { margin-top: 12px; padding: 6px 14px; }
+.tr-r { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.tr-r:last-child { border-bottom: 0; }
+.tr-k { font: 700 12px var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--red-l); }
+.tr-v { font-weight: 600; overflow-wrap: anywhere; }
+.tr-edit { letter-spacing: .05em; }
+
+/* Insulinas do Início: cartão verde depois de "Tomei agora", até o fim do dia */
+.ins-sec { flex-wrap: nowrap; }
+.ins-card.ins-done { border-color: var(--good-fill); }
+.ins-done .un-row { border-color: var(--good-fill); }
+.ins-done .uip-ln { background: var(--good-fill); }
+.ins-done .uip-u { color: var(--good-fill); }
+.ins-card.ins-done .btn:not(.pri):not(.dark):not(.danger):not(.ghost) { border-color: var(--good-fill); }
+.ins-done .btn.pri { background: linear-gradient(145deg, #22c55e, #15803d); border-color: #22c55e; color: #fff; box-shadow: 0 6px 18px rgba(22,163,74,.4); }
+.ins-done .ins-act[disabled] { opacity: 1; }
+.ins-done .btn:not(:disabled):is(:active, .is-press) { background: color-mix(in srgb, var(--good-fill) 30%, #000); border-color: var(--good-fill); color: #fff; }
+.ins-done .btn.pri:not(:disabled):is(:active, .is-press) { background: #15803d; border-color: #15803d; }
+
+/* ===== Insulinas do Início: roleta à esquerda; "Tomei agora" e botões menores à direita, mesma altura ===== */
+.ins-card .ins-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
+.ins-card .ins-hd .eyebrow { margin: 0; }
+.ins-card .ins-stop { min-height: 30px; padding: 3px 10px; font-size: 12.5px; flex: none; }
+.ins-card .ins-st { font-size: 14px; color: var(--mut); margin-top: 2px; overflow-wrap: anywhere; }
+.ins-card .ins-line { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 8px; align-items: stretch; margin-top: 12px; }
+.ins-card .ins-line .un-row { margin: 0; padding: 0; display: block; border-radius: 14px; overflow: hidden; }
+.ins-card .ins-line .un-row > label { display: none; }
+.ins-card .ins-line .uip { --uh: 34px; max-width: none; width: 100%; margin: 0; }
+.ins-card .ins-line .uip-w { height: calc(var(--uh) * 3); border-radius: 14px; }
+.ins-card .ins-line .uip-ln { left: 14px; right: 14px; }
+.ins-card .ins-line .uip-u { right: 16px; }
+.ins-card .ins-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ins-card .ins-side .ins-act { width: 100%; flex: 1 1 auto; min-height: 54px; font-size: 16px; border-radius: 14px; white-space: normal; line-height: 1.15; }
+.ins-card .ins-side .ins-sec { margin: 0; gap: 6px; flex: none; }
+.ins-card .ins-side .ins-sec .btn { min-height: 38px; padding: 4px 6px; font-size: 12.5px; line-height: 1.1; border-radius: 12px; }
+.ins-card > .ins-sec { margin-top: 10px; }
+/* insulina ainda não tomada: borda vermelha (vira verde quando registrar) */
+.ins-card:not(.ins-done) { border-color: var(--red); }

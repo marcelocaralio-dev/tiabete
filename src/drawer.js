@@ -15,7 +15,7 @@ const DR_IC = {
 };
 const drIc = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${DR_IC[k] || DR_IC.dot}</svg>`;
 const DR = { open: false, more: false, last: null };
-const DR_MAIN = [['painel', 'Painel', 'home'], ['historico', 'Histórico', 'list'], ['analise', 'Análise', 'chart'], ['perfil', 'Meu Perfil', 'user'], ['bolus', 'Cálculo de bolus', 'calc'], ['esquemas', 'Esquemas de tratamento', 'pill'], ['hba1c', 'Hemoglobina glicada', 'drop'], ['backup', 'Backup e dados', 'cloud']];
+const DR_MAIN = [['painel', 'Início', 'home'], ['historico', 'Histórico', 'list'], ['analise', 'Análise', 'chart'], ['perfil', 'Meu perfil', 'user'], ['bolus', 'Cálculo de bolus', 'calc'], ['esquemas', 'Meu tratamento', 'pill'], ['hba1c', 'Hemoglobina glicada', 'drop'], ['backup', 'Cópia de segurança', 'cloud']];
 
 function drMetrics() {
   const rs = S.records.filter(r => !isEx(r)), n = rs.length;
@@ -35,11 +35,11 @@ function drMore() {
   return out;
 }
 function drBody() {
-  const p = S.profile || {}, name = p.name || '', type = p.type && p.type !== 'Prefiro não informar' ? p.type : '';
+  const p = S.profile || {}, name = p.name || '', type = dbLabel(p);
   const light = themeEff() === 'light', mt = drMetrics();
   return `<div class="dr-head"><button class="dr-x" type="button" data-dr-close aria-label="Fechar menu">${drIc('x')}</button>
-    <button class="dr-me" type="button" data-dr-go="perfil" aria-label="Abrir Meu Perfil"><span class="dr-av pf-av">${pfAvatarHTML()}</span></button>
-    <div class="dr-name">${esc(name || 'Seu perfil')}</div><div class="dr-sub">${esc(type ? 'Diabetes ' + type : (name ? 'Ver e editar perfil' : 'Toque para criar o seu perfil'))}</div>
+    <button class="dr-me" type="button" data-dr-go="perfil" aria-label="Abrir Meu perfil"><span class="dr-av pf-av">${pfAvatarHTML()}</span></button>
+    <div class="dr-name">${esc(name || 'Seu perfil')}</div><div class="dr-sub">${esc(type ? type : (name ? 'Ver e editar perfil' : 'Toque para criar o seu perfil'))}</div>
     <div class="dr-met">${mt.map(m => `<div><b>${esc(m[0])}</b><span>${esc(m[1])}</span></div>`).join('')}</div></div>
   <nav class="dr-nav" aria-label="Menu principal">${DR_MAIN.filter(x => VIEWS[x[0]]).map(x => drItem(x[0], x[1], x[2])).join('')}
     <button class="dr-it dr-mb" type="button" data-dr-more aria-expanded="${DR.more}" aria-controls="dr-more">${drIc('more')}<span>Mais</span><i class="dr-ch${DR.more ? ' on' : ''}">${drIc('chev')}</i></button>
@@ -136,7 +136,7 @@ S.swipeNav = true;
 const navZone = () => S.swipeNav !== false && NAV_PAGES.includes(S.route);
 function swipeNavCard() {
   const on = S.swipeNav !== false;
-  return `<h2 class="sec">Navegação entre páginas por gestos</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Navegação entre páginas por gestos</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize horizontalmente pela tela para avançar ou retornar entre as páginas principais (Painel, Histórico, Análise e Mais). O menu lateral abre pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Navegação entre páginas por gestos" data-act="swipe-nav"><i>${on ? '✓' : ''}</i></button></div></div>`;
+  return `<h2 class="sec">Navegação entre páginas por gestos</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Navegação entre páginas por gestos</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize para os lados para trocar entre as páginas principais (Início, Histórico, Análise e Mais). O menu lateral abre pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Navegação entre páginas por gestos" data-act="swipe-nav"><i>${on ? '✓' : ''}</i></button></div></div>`;
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act="swipe-nav"]'); if (!el) return;
