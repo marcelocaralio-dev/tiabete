@@ -7,14 +7,25 @@
 const AC_CATS = { hipo: 'Hipoglicemia', glic: 'Glicemia', lembrete: 'Lembretes', plano: 'Tratamento', backup: 'Cópia e sincronização', pers: 'Alertas personalizados', conquista: 'Conquistas', info: 'Informações', conf: 'Confirmações', atencao: 'Atenção', ia: 'Inteligência artificial', rel: 'Relatórios', analise: 'Análise', config: 'Configurações' };
 const AC_PRIO = { 0: 'Baixa', 1: 'Normal', 2: 'Alta', 3: 'Crítica' }, AC_MAX = 300, AC_SIZE = 56;
 S.ac = { mode: 'classic', pos: null, hidden: false, items: [] };
-const AC = { open: false, id: null, timer: null, fresh: false, only: null, confirm: false };
+const AC = { open: false, id: null, timer: null, fresh: false, only: null, confirm: false, exp: new Set(), bound: false };
 const acBubbleOn = () => S.ac.mode === 'bubble';
 const acNorm = s => String(s || '').replace(/\s+/g, ' ').trim();
 let acSaveT = null;
-function acSave() { clearTimeout(acSaveT); acSaveT = setTimeout(async () => { try { await Store.put('meta', { id: 'alert-center', value: { mode: S.ac.mode, pos: S.ac.pos, hidden: S.ac.hidden, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } }); } catch (e) { } }, 250); }
+/* Persistência: o estado da bolha (modo, margem, altura, oculta) é gravado NA HORA no espelho síncrono (localStorage) e no armazenamento permanente
+   do app (IndexedDB, junto dos alertas). O espelho sobrevive mesmo se o sistema encerrar o app antes da gravação assíncrona terminar e permite
+   restaurar a bolha logo na abertura, sem esperar o resto da inicialização. Vale o registro mais recente (campo ts). */
+const AC_MIR = 'tb-acb';
+function acMirrorWrite() { try { S.ac.ts = Date.now(); localStorage.setItem(AC_MIR, JSON.stringify({ mode: S.ac.mode, pos: S.ac.pos, hidden: S.ac.hidden, ts: S.ac.ts })); } catch (e) { } }
+function acMirrorRead() { try { const m = JSON.parse(localStorage.getItem(AC_MIR) || 'null'); return m && typeof m === 'object' && isFinite(m.ts) ? m : null; } catch (e) { return null; } }
+async function acStoreNow() { try { await Store.put('meta', { id: 'alert-center', value: { mode: S.ac.mode, pos: S.ac.pos, hidden: S.ac.hidden, ts: S.ac.ts || Date.now(), items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } }); } catch (e) { } }
+function acSave(now) { acMirrorWrite(); clearTimeout(acSaveT); if (now) { acStoreNow(); return; } acSaveT = setTimeout(acStoreNow, 250); }
+const acFlush = () => { if (acSaveT) { clearTimeout(acSaveT); acSaveT = null; acStoreNow(); } };
+document.addEventListener('visibilitychange', () => { if (document.hidden) acFlush(); }); addEventListener('pagehide', acFlush);
+const acPos = p => p && isFinite(p.fx) && isFinite(p.fy) ? { fx: p.fx >= .5 ? 1 : 0, fy: Math.min(1, Math.max(0, p.fy)) } : null; /* margem sempre 0 (esquerda) ou 1 (direita) */
 function acLoad(v) {
-  v = v || {};
-  S.ac = { mode: v.mode === 'bubble' ? 'bubble' : 'classic', pos: v.pos && isFinite(v.pos.fx) && isFinite(v.pos.fy) ? { fx: Math.min(1, Math.max(0, v.pos.fx)), fy: Math.min(1, Math.max(0, v.pos.fy)) } : null, hidden: !!v.hidden, items: (Array.isArray(v.items) ? v.items : []).filter(x => x && x.id && x.key).slice(0, AC_MAX) };
+  v = v || {}; let mode = v.mode === 'bubble' ? 'bubble' : 'classic', pos = acPos(v.pos), hidden = !!v.hidden, ts = +v.ts || 0;
+  const m = acMirrorRead(); if (m && m.ts >= ts) { mode = m.mode === 'bubble' ? 'bubble' : 'classic'; pos = acPos(m.pos); hidden = !!m.hidden; ts = m.ts; }
+  S.ac = { mode, pos, hidden, ts, items: (Array.isArray(v.items) ? v.items : []).filter(x => x && x.id && x.key).slice(0, AC_MAX) };
 }
 /* ----- fontes de alerta: todas as faixas do app, com categoria e prioridade ----- */
 function acSources() {
@@ -77,6 +88,7 @@ function acEnsure() {
   if (document.getElementById('acb')) return;
   document.body.insertAdjacentHTML('beforeend', `<button id="acb" class="acb" type="button" aria-haspopup="true" aria-expanded="false" hidden>${AC_DROP}<span class="acb-n" hidden></span></button><div id="acz" class="acz" aria-hidden="true" hidden><span>Solte aqui para dispensar</span></div><div id="acp" class="acp" role="region" aria-live="polite" aria-label="Alertas do TiaBete" hidden></div>`);
   acBind(document.getElementById('acb'));
+  if (AC.bound) return; AC.bound = true;
   document.addEventListener('pointerdown', e => { if (AC.open && !e.target.closest('#acp, #acb')) acCollapse(); }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && AC.open) { acCollapse(); const b = document.getElementById('acb'); if (b) b.focus(); } });
   document.addEventListener('focusin', e => document.body.classList.toggle('acb-typing', /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !/^(checkbox|radio|button|range)$/.test(e.target.type || '')));
@@ -86,10 +98,12 @@ function acEnsure() {
 }
 /* A bolha fica sempre encostada numa das laterais (esquerda ou direita); só a altura é livre. Margem de baixo respeita a barra de navegação. */
 /* Escala entre os pixels da tela (retângulos e ponteiro) e os do estilo: o app usa "zoom" no html, então medimos pela própria bolha. */
-const acK = b => { if (!b || b.classList.contains('drag')) return (b && b._k) || 1; const w = b.getBoundingClientRect().width; return w > 8 ? w / AC_SIZE : (b._k || 1); };
+const acK = b => { /* escala tela/estilo (o app usa zoom no html): medida numa sonda sem transform, então não é afetada pela animação da bolha (antes isso desalinhava a margem direita) */
+  let q = document.getElementById('acbk'); if (!q && document.body) { document.body.insertAdjacentHTML('beforeend', `<i id="acbk" aria-hidden="true" style="position:fixed;left:-200px;top:0;width:${AC_SIZE}px;height:1px;visibility:hidden;pointer-events:none"></i>`); q = document.getElementById('acbk'); }
+  const w = q ? q.getBoundingClientRect().width : 0; return w > 8 ? w / AC_SIZE : ((b && b._k) || 1); };
 function acBounds(k) { k = k || 1; const nav = document.getElementById('nav'), nh = nav ? nav.getBoundingClientRect().height : 0; return { M: 6 * k, TOP: 64 * k, BOT: (nh || 64 * k) + 10 * k }; }
-function acPlace(left, top) {
-  const b = document.getElementById('acb'); if (!b) return; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, side = p.fx >= .5 ? 1 : 0;
+function acPlace(left, top, forceSide) {
+  const b = document.getElementById('acb'); if (!b) return; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, side = forceSide != null ? forceSide : (p.fx >= .5 ? 1 : 0);
   const L = left != null ? left : (side ? vw - sz - M : M), T = top != null ? top : TOP + p.fy * (vh - sz - TOP - BOT);
   b.style.left = Math.min(vw - sz - M, Math.max(M, L)) / k + 'px'; b.style.top = Math.min(vh - sz - BOT, Math.max(TOP, T)) / k + 'px'; b.dataset.side = side ? 'r' : 'l';
 }
@@ -106,10 +120,10 @@ function acRefresh() {
 /* ----- painel que se expande da gota ----- */
 function acPanelPos() {
   const b = document.getElementById('acb'), p = document.getElementById('acp'); if (!b || !p) return;
-  const k = b._k || acK(b), r = b.getBoundingClientRect(), vw = innerWidth, vh = innerHeight, W = Math.min(340 * k, vw - 24 * k); p.style.width = W / k + 'px';
+  const k = b._k || acK(b), r = b.getBoundingClientRect(), vw = innerWidth, vh = innerHeight, W = Math.min(560 * k, vw - 24 * k); p.style.width = W / k + 'px';
   const left = Math.min(vw - W - 12 * k, Math.max(12 * k, r.left + r.width / 2 - W / 2)), above = r.top + r.height / 2 > vh / 2;
   p.style.left = left / k + 'px'; p.classList.toggle('below', !above);
-  p.style.maxHeight = Math.max(160, ((above ? r.top : vh - r.bottom) - 24 * k) / k) + 'px';
+  p.style.maxHeight = Math.max(160, ((above ? r.top : vh - r.bottom) - 24 * k) / k) + 'px'; p.style.boxSizing = 'border-box';
   if (above) { p.style.bottom = (vh - r.top + 8 * k) / k + 'px'; p.style.top = 'auto'; } else { p.style.top = (r.bottom + 8 * k) / k + 'px'; p.style.bottom = 'auto'; }
   p.style.setProperty('--tx', (r.left + r.width / 2 - left) / k + 'px'); p.style.transformOrigin = (r.left + r.width / 2 - left) / k + 'px ' + (above ? '100%' : '0%');
 }
@@ -145,7 +159,7 @@ function acMsg(it) {
 function acRow(it) {
   const d = new Date(it.ts), tm = pad(d.getHours()) + ':' + pad(d.getMinutes()), cat = AC_CATS[it.cat] || 'Alerta', a = acActions(it), n = a.n + (it.read ? 0 : 1) + 1;
   return `<div class="acr${it.read ? ' read' : ''}${it.active && it.prio >= 3 ? ' crit' : ''}" data-ac-row="${it.id}" role="group" aria-label="${esc(cat)}" title="${esc(cat)} · ${tm}"><span class="acr-c" aria-hidden="true">${acSvg(AC_CIC[it.cat] || 'info', 15)}</span>
-    <p class="acr-m"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</p>
+    <div class="acr-w${AC.exp.has(it.id) ? ' open' : ''}"><p class="acr-m" data-ac="expand" data-id="${it.id}"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</p><button type="button" class="acr-t" data-ac="expand" data-id="${it.id}" aria-expanded="${AC.exp.has(it.id)}" hidden>${AC.exp.has(it.id) ? 'Recolher' : 'Ler tudo'}</button></div>
     <span class="acr-a" style="--rows:${n > 3 ? 2 : 1}">${a.h}${it.read ? '' : `<button class="acr-i" data-ac="read" data-id="${it.id}" title="Marcar como lido" aria-label="Marcar como lido">${acSvg('ok', 16)}</button>`}<button class="acr-i" data-ac="dismiss" data-id="${it.id}" title="Dispensar" aria-label="Dispensar este alerta">${acSvg('x', 16)}</button></span></div>`;
 }
 function acPanel() {
@@ -158,8 +172,11 @@ function acPanel() {
     : `<div class="acp-h2"><span class="acp-ti">${acSvg('bell', 16)}<b>Alertas</b>${all.length ? `<span class="num">${all.length}</span>` : ''}</span><span class="acp-ctl">${ib('hist', 'clock', 'Histórico de alertas')}${all.length ? ib('readall', 'all', 'Marcar todos como lidos') + ib('dismissall', 'clear', 'Dispensar todos os alertas') : ''}</span></div>`;
   const body = list.length ? `<div class="acp-l">${list.slice(0, 40).map(acRow).join('')}</div>` : `<div class="acp-l"><div class="acr read"><span class="acr-c" aria-hidden="true">${acSvg('ok', 15)}</span><p class="acr-m">Nenhum alerta no momento.</p><span></span></div></div>`;
   const h = head + body; if (p._h !== h) { p.innerHTML = h; p._h = h; }
-  acPanelPos();
+  acFit(); acPanelPos();
 }
+/* mensagem que não cabe no espaço inicial ganha o botão "Ler tudo" (e "Recolher" depois); nada é cortado com reticências */
+function acFit() { const p = document.getElementById('acp'); if (!p || p.hidden) return; p.querySelectorAll('.acr-w').forEach(w => { const m = w.querySelector('.acr-m'), t = w.querySelector('.acr-t'), open = w.classList.contains('open'); const over = !open && m.scrollHeight > m.clientHeight + 1; w.classList.toggle('more', over); t.hidden = !(over || open); }); }
+const p_h_reset = () => { const p = document.getElementById('acp'); if (p) p._h = null; };
 function acDismiss(ids) {
   const p = document.getElementById('acp'); AC.confirm = false;
   if (p) ids.forEach((id, k) => { const r = p.querySelector(`[data-ac-row="${id}"]`); if (r) { r.style.transitionDelay = Math.min(k, 6) * 30 + 'ms'; r.classList.add('out'); } });
@@ -167,11 +184,11 @@ function acDismiss(ids) {
 }
 function acPop(it, ms) {
   acEnsure(); const b = document.getElementById('acb'); if (!b) return;
-  S.ac.hidden = false; AC.id = it ? it.id : null; AC.confirm = false; AC.only = it && it.src === 'toast' && it.prio === 0 ? it.id : null; acOpen(ms || (it && it.prio >= 3 ? 14000 : 8000));
+  S.ac.hidden = false; AC.id = it ? it.id : null; AC.confirm = false; AC.only = it && it.src === 'toast' && it.prio === 0 ? it.id : null; acOpen((ms || (it && it.prio >= 3 ? 14000 : 8000)) + (it ? Math.min(9000, acMsg(it).length * 35) : 0)); /* mensagens longas ficam mais tempo abertas */
 }
 function acOpen(ms) {
   const b = document.getElementById('acb'), p = document.getElementById('acp'); if (!b || !p || b.hidden && !acBubbleOn()) return;
-  b.hidden = false; AC.open = true; b.setAttribute('aria-expanded', 'true'); acPanel(); p.hidden = false;
+  b.hidden = false; AC.open = true; b.setAttribute('aria-expanded', 'true'); p.hidden = false; acPanel();
   p.classList.add('fresh'); setTimeout(() => p.classList.remove('fresh'), 600); requestAnimationFrame(() => requestAnimationFrame(() => p.classList.add('on'))); acTimer(ms || 10000);
 }
 function acTimer(ms) { clearTimeout(AC.timer); AC.timer = setTimeout(() => acCollapse(), ms); }
@@ -182,28 +199,39 @@ function acCollapse(now) {
   if (now) { p.hidden = true; return; } setTimeout(() => { if (!AC.open) p.hidden = true; }, 260);
   if (b) { const n = acUnread(), nb = b.querySelector('.acb-n'); nb.hidden = !n; nb.textContent = n > 9 ? '9+' : n; }
 }
-/* ----- gestos: tocar abre o último alerta; arrastar reposiciona; arrastar para baixo até a área de descarte dispensa ----- */
+/* ----- gestos: tocar abre o último alerta; arrastar muda só a ALTURA (a bolha nunca fica solta: está sempre numa das laterais);
+   passar o dedo para o outro lado da tela troca de margem; arrastar para a área de descarte dispensa a bolha ----- */
 function acBind(b) {
   let d = null; const z = () => document.getElementById('acz');
   const zone = () => { const vw = innerWidth, vh = innerHeight; return { x: vw / 2, y: vh - 56 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0) }; };
-  b.addEventListener('pointerdown', e => { if (e.button > 0) return; try { b.setPointerCapture(e.pointerId); } catch (x) { } b._k = acK(b); const r = b.getBoundingClientRect(); d = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, t: Date.now(), moved: false, hot: false }; });
+  const flip = () => { b.classList.add('flip'); clearTimeout(b._ft); b._ft = setTimeout(() => b.classList.remove('flip'), 230); };
+  b.addEventListener('pointerdown', e => { if (e.button > 0) return; try { b.setPointerCapture(e.pointerId); } catch (x) { } b._k = acK(b); const r = b.getBoundingClientRect(), p = S.ac.pos || { fx: 1 }; d = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, side: p.fx >= .5 ? 1 : 0, t: Date.now(), moved: false, hot: false }; });
   b.addEventListener('pointermove', e => {
-    if (!d) return; const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d) return; const dx = e.clientX - d.sx, dy = e.clientY - d.sy, vw = innerWidth;
     if (!d.moved && Math.hypot(dx, dy) > 9) { d.moved = true; b.classList.add('drag'); document.body.classList.add('acb-drag'); acCollapse(true); const zz = z(); zz.hidden = false; requestAnimationFrame(() => zz.classList.add('on')); }
-    if (!d.moved) return; acPlace(d.ox + dx, d.oy + dy);
-    const r = b.getBoundingClientRect(), c = zone(), dist = Math.hypot(r.left + r.width / 2 - c.x, r.top + r.height / 2 - c.y);
-    d.hot = dist < 64 && dy > 90; z().classList.toggle('hot', d.hot);
+    if (!d.moved) return;
+    /* margem pelo dedo, com folga de 8% ao redor do meio da tela para não ficar trocando; a bolha nunca é desenhada no meio */
+    if (d.side === 1 && e.clientX < vw * .42) { d.side = 0; flip(); } else if (d.side === 0 && e.clientX > vw * .58) { d.side = 1; flip(); }
+    const c = zone(), k = b._k || 1; d.hot = Math.hypot(e.clientX - c.x, e.clientY - c.y) < 64 * k && dy > 90; z().classList.toggle('hot', d.hot);
+    if (d.hot) acPlace(c.x - AC_SIZE * k / 2, c.y - AC_SIZE * k / 2); /* só na área de descarte a bolha acompanha o dedo, para mostrar que será dispensada */
+    else acPlace(null, d.oy + dy, d.side);
   });
   const end = e => {
-    if (!d) return; const g = d; d = null; b.classList.remove('drag'); document.body.classList.remove('acb-drag'); const zz = z(); zz.classList.remove('on', 'hot'); setTimeout(() => { zz.hidden = true; }, 200);
-    if (e.type === 'pointercancel') { acPlace(); return; }
+    if (!d) return; const g = d; d = null; b.classList.remove('drag', 'flip'); document.body.classList.remove('acb-drag'); const zz = z(); zz.classList.remove('on', 'hot'); setTimeout(() => { zz.hidden = true; }, 200);
+    if (e.type === 'pointercancel' || e.type === 'lostpointercapture') { if (g.moved) acCommit(g.side); else acPlace(); return; }
     if (!g.moved) { if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } return; }
-    const r = b.getBoundingClientRect(), vh = innerHeight;
-    if (g.hot) { b.classList.add('gone'); setTimeout(() => { S.ac.hidden = true; b.classList.remove('gone'); acSave(); acRefresh(); }, 220); return; }
-    if (r.top + r.height / 2 > vh * .72 && e.clientY - g.sy > 40) { b.classList.add('back'); acPlace(g.ox, g.oy); setTimeout(() => b.classList.remove('back'), 300); return; } /* arrastou para baixo sem chegar à área de descarte: volta */
-    const vw = innerWidth, k = b._k || 1, { TOP, BOT } = acBounds(k); S.ac.pos = { fx: (r.left + r.width / 2) > vw / 2 ? 1 : 0, fy: Math.min(1, Math.max(0, (r.top - TOP) / (vh - AC_SIZE * k - TOP - BOT))) }; acSave(); b.classList.add('snap'); acPlace(); setTimeout(() => b.classList.remove('snap'), 340); /* encaixe automático na margem mais próxima */
+    const vh = innerHeight;
+    if (g.hot) { b.classList.add('gone'); setTimeout(() => { S.ac.hidden = true; b.classList.remove('gone'); acSave(true); acRefresh(); acPlace(); }, 220); return; }
+    const r = b.getBoundingClientRect();
+    if (r.top + r.height / 2 > vh * .72 && e.clientY - g.sy > 40) { b.classList.add('back'); acPlace(g.ox, g.oy, g.side); setTimeout(() => b.classList.remove('back'), 300); acCommit(g.side); return; } /* arrastou para baixo sem chegar à área de descarte: volta */
+    acCommit(g.side);
   };
-  b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
+  /* grava margem (0 esquerda, 1 direita) e altura relativa, e encosta a bolha na lateral */
+  function acCommit(side) {
+    const r = b.getBoundingClientRect(), vh = innerHeight, k = b._k || acK(b), { TOP, BOT } = acBounds(k);
+    S.ac.pos = { fx: side, fy: Math.min(1, Math.max(0, (r.top - TOP) / (vh - AC_SIZE * k - TOP - BOT))) }; acSave(true); b.classList.add('snap'); acPlace(); setTimeout(() => b.classList.remove('snap'), 340);
+  }
+  b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', e => { if (d) end(e); });
   b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } } });
 }
 document.addEventListener('click', e => {
@@ -215,6 +243,7 @@ document.addEventListener('click', e => {
     else if (a === 'dismissall') { const l = acList(); if (l.length > 1) { AC.confirm = true; acPanel(); acTimer(8000); return; } acDismiss(l.map(x => x.id)); return; } /* com mais de um alerta, pede confirmação antes de dispensar todos */
     else if (a === 'dismissall-yes') { acDismiss(acList().map(x => x.id)); return; }
     else if (a === 'dismissall-no') { AC.confirm = false; }
+    else if (a === 'expand') { if (AC.exp.has(id)) AC.exp.delete(id); else AC.exp.add(id); p_h_reset(); acPanel(); acTimer(AC.exp.size ? 25000 : 12000); return; }
     else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(); acRefresh(); }
     else if (a === 'hist') { acCollapse(); go('alertashist'); return; }
     acPanel(); acTimer(12000); return;
@@ -223,7 +252,7 @@ document.addEventListener('click', e => {
   else if (inP) acTimer(12000);
 });
 /* ----- configuração e histórico ----- */
-function acSetMode(m) { S.ac.mode = m === 'bubble' ? 'bubble' : 'classic'; if (m === 'bubble') S.ac.hidden = false; acSave(); acCollapse(true); acRefresh(); render(); }
+function acSetMode(m) { S.ac.mode = m === 'bubble' ? 'bubble' : 'classic'; if (m === 'bubble') S.ac.hidden = false; acSave(true); acCollapse(true); acRefresh(); render(); }
 function acModeCard() {
   const on = acBubbleOn(), n = S.ac.items.length, un = acUnread(), opt = (k, t, d) => `<button class="ac-opt${(on ? 'bubble' : 'classic') === k ? ' on' : ''}" role="radio" aria-checked="${(on ? 'bubble' : 'classic') === k}" data-acm="${k}"><span class="ac-r"></span><span style="min-width:0"><b>${t}</b><span class="dim">${d}</span></span></button>`;
   return `<h2 class="sec">Modo de exibição dos alertas</h2><div class="card"><div role="radiogroup" aria-label="Modo de exibição dos alertas" class="stack" style="gap:8px">${opt('classic', 'Modo convencional', 'Faixas e avisos como sempre foram, dentro de cada página.')}${opt('bubble', 'Bolha flutuante', 'Uma gota sobre as páginas; o alerta se abre a partir dela e recolhe sozinho.')}</div>
@@ -247,7 +276,7 @@ function viewAlertasHist() {
 }
 document.addEventListener('click', e => {
   let el = e.target.closest('[data-acm]'); if (el) { acSetMode(el.dataset.acm); return; }
-  el = e.target.closest('[data-acm-do]'); if (el) { const a = el.dataset.acmDo; if (a === 'show') { S.ac.hidden = false; acSave(); acRefresh(); render(); } else if (a === 'reset') { S.ac.pos = null; acSave(); acPlace(); toast('Posição padrão restaurada.'); } else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(); acRefresh(); render(); } return; }
+  el = e.target.closest('[data-acm-do]'); if (el) { const a = el.dataset.acmDo; if (a === 'show') { S.ac.hidden = false; acSave(true); acRefresh(); render(); } else if (a === 'reset') { S.ac.pos = null; acSave(true); acPlace(); toast('Posição padrão restaurada.'); } else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(); acRefresh(); render(); } return; }
   el = e.target.closest('[data-acf]'); if (el) { acFilter = el.dataset.acf; render(); return; }
   el = e.target.closest('[data-acid]'); if (el) { const a = el.dataset.acid; acSetState(el.dataset.id, a === 'read' ? { read: true } : a === 'dismiss' ? { dismissed: true, read: true } : { dismissed: false }); render(); }
 });
@@ -255,3 +284,5 @@ setInterval(() => { try { acSync(); } catch (e) { } }, 5000);
 (function () { const _l = loadAll; loadAll = async function () { const r = await _l.apply(this, arguments); try { acSync(); } catch (e) { } return r; }; })();
 /* logotipo -> Painel (sem recarregar; não mexe em dados) */
 (function () { const go2 = () => { if (S.route === 'painel') window.scrollTo(0, 0); else go('painel'); }; document.addEventListener('click', e => { if (e.target.closest('#logo-home')) go2(); }); document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.id === 'logo-home') { e.preventDefault(); go2(); } }); })();
+/* Restauração antecipada: lê o espelho síncrono e mostra a bolha já na abertura, sem esperar a leitura do banco; init.js reconcilia depois (vale o mais recente). */
+(function () { const early = () => { try { const m = acMirrorRead(); if (!m) return; S.ac.mode = m.mode === 'bubble' ? 'bubble' : 'classic'; S.ac.pos = acPos(m.pos); S.ac.hidden = !!m.hidden; S.ac.ts = m.ts; acRefresh(); } catch (e) { } }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', early); else early(); })();
