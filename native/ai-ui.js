@@ -60,7 +60,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
   const stepsDone = () => { const a = A(), w = a.w; return [w.prov, w.site, w.acct, w.keyp && w.copied, a.hasKey || !!a.keyBuf, !!a.model && w.model, done7()]; };
   const curStep = () => { const d = stepsDone(), a = A(); if (a.w.view) return a.w.view; const i = d.findIndex(x => !x); return i < 0 ? 7 : i + 1; };
   const ic = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-  const IC = { info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', list: '<path d="M4 6h16M4 12h16M4 18h10"/>', key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' };
+  const IC = { spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>', steps: '<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>', chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>', server: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>', pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', list: '<path d="M4 6h16M4 12h16M4 18h10"/>', key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' };
   const tier = k => `<span class="ia-t ${TIER[k][1]}">${TIER[k][0]}</span>`;
   const logo = p => `<span class="ia-logo" style="background:${PV[p].col}" aria-hidden="true">${esc(PV[p].ini)}</span>`;
   const uiChip = t => t ? `<span class="ia-ui" title="Nome aproximado do botão na tela do site; pode mudar">${esc(t)}</span>` : '';
@@ -68,7 +68,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
   const btn = (act, label, extra, cls) => `<button type="button" class="btn ${cls || ''}" data-act="${act}" ${extra || ''} ${A().busy ? 'disabled' : ''}>${label}</button>`;
 
   /* ---- 1. Introdução ---- */
-  const secIntro = () => sec('Como a IA funciona no TiaBete', 'info') + `<div class="card"><div class="stack" style="gap:10px">
+  const secIntro = () => sec('Como a IA funciona no TiaBete', 'spark') + `<div class="card"><div class="stack" style="gap:10px">
     <p style="margin:0">A IA do TiaBete lê exames, responde perguntas sobre os seus registros e estima os carboidratos dos alimentos. Ela <b>não calcula doses</b> e não substitui a sua equipe de saúde.</p>
     <details class="more"><summary>O que é uma API?</summary><p class="hint" style="margin:0 0 12px">É uma “porta” que deixa um aplicativo conversar com um serviço de inteligência artificial pela internet. O TiaBete a usa para enviar sua pergunta e receber a resposta.</p></details>
     <details class="more"><summary>O que é a chave de API?</summary><p class="hint" style="margin:0 0 12px">É uma senha longa e pessoal, gerada no site do provedor. Ela mostra que o pedido é seu e define a cobrança (ou o limite gratuito). <b>Não compartilhe a sua chave com ninguém.</b></p></details>
@@ -89,7 +89,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
   }
   function secWizard() {
     const a = A(), d = stepsDone(), n = curStep(), pct = Math.round(d.filter(Boolean).length / 7 * 100);
-    return sec('Assistente de configuração', 'list') + `<div class="card"><div class="stack" style="gap:12px">
+    return sec('Assistente de configuração', 'steps') + `<div class="card"><div class="stack" style="gap:12px">
       ${a.resume && !done7() ? `<div class="ia-resume" role="status">Você parou na <b>etapa ${curStepRaw()} de 7</b>. Continue de onde estava.</div>` : ''}
       <div class="ia-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Progresso da configuração"><i style="width:${pct}%"></i></div>
       <ol class="ia-steps">${STEPS.map((t, i) => `<li><button type="button" class="ia-st ${d[i] ? 'done' : ''} ${i + 1 === n ? 'cur' : ''}" data-act="ai-step" data-n="${i + 1}" aria-current="${i + 1 === n ? 'step' : 'false'}"><b>${d[i] ? '✓' : i + 1}</b><span>${t}</span></button></li>`).join('')}</ol>
@@ -99,7 +99,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
   const curStepRaw = () => { const d = stepsDone(), i = d.findIndex(x => !x); return i < 0 ? 7 : i + 1; };
 
   /* ---- 3. Provedores ---- */
-  const secProv = () => sec('Provedores', 'globe') + `<div class="stack" style="gap:10px">${Object.keys(PV).map(k => { const P = PV[k], a = A(), on = a.provider === k;
+  const secProv = () => sec('Provedores', 'server') + `<div class="stack" style="gap:10px">${Object.keys(PV).map(k => { const P = PV[k], a = A(), on = a.provider === k;
     return `<div class="card ia-pc ${on ? 'sel' : ''}"><div class="ia-ph">${logo(k)}<div style="min-width:0"><b>${esc(P.name)}</b><div>${tier(P.tier)}</div></div></div>
       <p class="hint" style="margin:8px 0">${esc(P.sum)}</p>
       <div class="ia-row">${btn('ai-pick', on ? '✓ Escolhido' : 'Escolher', `data-p="${k}"`, on ? '' : 'pri')}${P.site ? btn('ai-open', ic(IC.ext) + 'Site', `data-url="${P.site}"`) : ''}${P.keys ? btn('ai-open', ic(IC.key) + 'Criar chave', `data-url="${P.keys}"`) : ''}${P.site ? btn('ai-copy', ic(IC.copy) + 'Copiar site', `data-t="${P.site}"`) : ''}</div>
@@ -129,7 +129,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
     const a = A(), cur = MODELS[a.provider] || [], known = new Set(cur.map(m => m[0]));
     const others = a.models.filter(m => !known.has(m)).slice(0, 80), isOR = a.provider === 'openrouter', meta = (window.TB_AI.meta || {});
     const oRow = id => { const free = isOR && meta[id] ? meta[id].free : null, k = free === true ? 'lim' : free === false ? 'paid' : null; return `<button type="button" class="ia-m sm ${a.model === id ? 'on' : ''}" data-act="ai-mpick" data-m="${esc(id)}"><b>${esc(id)}</b>${k ? tier(k) : ''}</button>`; };
-    return sec('Modelos', 'list') + `<div class="card"><div class="stack" style="gap:12px">
+    return sec('Modelos', 'chip') + `<div class="card"><div class="stack" style="gap:12px">
       <div class="ia-leg">${Object.keys(TIER).map(k => tier(k)).join('')}</div>
       <p class="hint" style="margin:0">Os recomendados aparecem primeiro. Conferido em ${CHECKED}; confirme as condições no site do provedor antes de usar.</p>
       ${cur.length ? `<div class="stack" style="gap:8px">${cur.map(mRow).join('')}</div>` : '<p class="hint" style="margin:0">Para este provedor eu não listo modelos fixos, porque os nomes mudam. Carregue a lista com a sua chave e escolha um com “mini” ou “small” no nome (mais baratos).</p>'}
@@ -155,7 +155,7 @@ if (window.TB_PUBLIC && window.TB_AI) {
   const HELP = { ai_auth: 'A chave foi recusada. Confira se copiou ela inteira, sem espaços, e se é do provedor escolhido.', rate_limited: 'Você atingiu o limite de pedidos. Espere alguns minutos ou escolha outro modelo.', ai_billing: 'O provedor pede crédito ou cobrança ativa. Confira o saldo na conta dele.', ai_model: 'Esse modelo não existe ou não está liberado para a sua chave. Escolha um da seção Modelos.', ai_network: 'Sem conexão com o provedor. Confira a internet e tente de novo.', ai_busy: 'O modelo está ocupado agora. Tente de novo em alguns minutos ou troque de modelo.', ai_insecure: 'O endereço precisa começar com https://.' };
   function secTest() {
     const a = A(), [k, tx] = connState(), t = a.w.tested;
-    return sec('Teste de conexão', 'info') + `<div class="card"><div class="stack" style="gap:12px">
+    return sec('Teste de conexão', 'pulse') + `<div class="card"><div class="stack" style="gap:12px">
       <div class="ia-conn ${k}" role="status"><i></i><div><b>${tx}</b>${t && t.ts ? `<div class="hint" style="margin:2px 0 0">Último teste ${t.ok ? 'ok' : 'com falha'} em ${new Date(t.ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${t.ms ? ' · ' + (t.ms / 1000).toFixed(1).replace('.', ',') + ' s' : ''}</div>` : ''}</div></div>
       <p class="hint" style="margin:0">O teste faz um pedido <b>real</b> ao provedor com a chave e o modelo informados. Ele não acerta por simulação: se a chave, o modelo ou a internet falhar, aparece o motivo.</p>
       ${a.msg ? `<p class="ia-msg ${a.ok ? 'ok' : 'bad'}" role="${a.ok ? 'status' : 'alert'}">${esc(scrub(a.msg))}</p>` : ''}${a.errCode && HELP[a.errCode] ? `<p class="hint" style="margin:0"><b>O que fazer:</b> ${esc(HELP[a.errCode])}</p>` : ''}

@@ -75,7 +75,7 @@ function blSum(id, mm) {
 }
 const blDose = (net, id) => blRule(id) ? Math.round(net / blRatioOf(id)) : 0;
 const blOn = id => !!S.bl.bolusOn[id];
-const blIc = k => `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${k === 'razao' ? '<path d="M5 19L19 5M7.5 8.5a2 2 0 100-4 2 2 0 000 4zM16.5 19.5a2 2 0 100-4 2 2 0 000 4z"/>' : k === 'dia' ? '<path d="M5 20V10M12 20V4M19 20v-7"/>' : k === 'alimentos' ? '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>' : MIC[k]}</svg>`;
+const blIc = k => `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${k === 'razao' ? '<path d="M5 19L19 5M7.5 8.5a2 2 0 100-4 2 2 0 000 4zM16.5 19.5a2 2 0 100-4 2 2 0 000 4z"/>' : k === 'dia' ? '<path d="M18 5H6l6 7-6 7h12"/>' : k === 'alimentos' ? '<path d="M12 8c-2.5-2-7-1-7 4.5C5 17 8 21 10.5 21c.8 0 1-.5 1.5-.5s.7.5 1.5.5c2.5 0 5.5-4 5.5-8.5C19 7 14.5 6 12 8zM12 8c0-2 1-3.5 3-4.5"/>' : MIC[k]}</svg>`;
 
 
 /* ---- Refeição feita: card no histórico (sem lista de alimentos) ---- */
