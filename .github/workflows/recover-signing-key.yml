@@ -1,0 +1,86 @@
+
+name: Recuperacao criptografada da assinatura
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  encrypt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Criptografar credenciais
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RECOVERY_PUBLIC_KEY: ${{ vars.RECOVERY_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+
+          const names = [
+            'KEYSTORE_BASE64',
+            'KEYSTORE_PASSWORD',
+            'KEY_ALIAS',
+            'RECOVERY_PUBLIC_KEY'
+          ];
+
+          for (const name of names) {
+            if (!process.env[name]) {
+              throw new Error('Variavel ou segredo ausente: ' + name);
+            }
+          }
+
+          const payload = Buffer.from(JSON.stringify({
+            KEYSTORE_BASE64: process.env.KEYSTORE_BASE64,
+            KEYSTORE_PASSWORD: process.env.KEYSTORE_PASSWORD,
+            KEY_ALIAS: process.env.KEY_ALIAS
+          }), 'utf8');
+
+          const aesKey = crypto.randomBytes(32);
+          const iv = crypto.randomBytes(12);
+
+          const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, iv);
+          const ciphertext = Buffer.concat([
+            cipher.update(payload),
+            cipher.final()
+          ]);
+
+          const encryptedKey = crypto.publicEncrypt({
+            key: process.env.RECOVERY_PUBLIC_KEY,
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: 'sha256'
+          }, aesKey);
+
+          const result = {
+            version: 1,
+            algorithm: 'RSA-OAEP-SHA256+A256GCM',
+            encryptedKey: encryptedKey.toString('base64'),
+            iv: iv.toString('base64'),
+            authTag: cipher.getAuthTag().toString('base64'),
+            ciphertext: ciphertext.toString('base64')
+          };
+
+          fs.writeFileSync(
+            'recovery.enc.json',
+            JSON.stringify(result),
+            { flag: 'wx' }
+          );
+
+          console.log('Pacote criptografado criado com sucesso.');
+          NODE
+
+      - name: Disponibilizar arquivo criptografado
+        uses: actions/upload-artifact@v4
+        with:
+          name: gluxo-signing-recovery-encrypted
+          path: recovery.enc.json
+          retention-days: 1
