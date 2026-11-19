@@ -5,3 +5,9 @@ android/
 *.keystore
 keystore.b64
 .DS_Store
+# licenciamento: nunca versionar segredos
+worker/.dev.vars
+worker/.wrangler/
+*.private.json
+# configuração local de implantação (valores reais): nunca versionar nem distribuir
+worker/wrangler.local.toml
