@@ -551,10 +551,13 @@ S.hypoOff = {};
 try { S.hypoOff = JSON.parse(localStorage.getItem('tb-hypo-off') || '{}') || {}; } catch (e) { }
 function hypoState() { const st = hypoEpisode(S.records, Date.now()); return st && st.protocol ? st : null; } // episódio com reavaliação ativa (glicemia <= 60)
 function hypoLow() { const st = hypoEpisode(S.records, Date.now()); return st && !st.protocol ? st : null; } // 61 a 69: só registro, sem reavaliação
-function hypoNextTxt(st) {
-  const rem = st.last.ts + HYPO_STEP - Date.now();
-  return rem > 0 ? 'Próxima medição em <b class="num">' + (m => pad(Math.floor(m / 60)) + ':' + pad(m % 60))(Math.ceil(rem / 1000)) + '</b>' : '<b>⏱ Já passaram 15 min: meça de novo agora.</b>';
-}
+/* Cronômetro: o tempo restante vem sempre da data/hora real da última medição (ts), nunca de um contador em memória.
+   Por isso continua certo ao minimizar, bloquear a tela, fechar e reabrir o app. */
+const HYPO_MSG = 'Hora de medir novamente sua glicemia!';
+function hypoLeft(st) { return st.last.ts + HYPO_STEP - Date.now(); }
+function hypoDue(st) { return hypoLeft(st) <= 0; }
+function hypoClock(st) { const m = Math.max(0, Math.ceil(hypoLeft(st) / 1000)); return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+function hypoNextTxt(st) { return hypoDue(st) ? '<b>⏱ ' + HYPO_MSG + '</b>' : 'Próxima medição em <b class="num">' + hypoClock(st) + '</b>'; }
 function hypoBanner() {
   if (!alCfg().bHypo) return '';
   const lo = hypoLow();
@@ -563,25 +566,31 @@ function hypoBanner() {
   const g = st.last.glucose;
   return `<div class="banner hypo" role="alert"><div><b>⚠ Hipoglicemia:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
 }
-function hypoRow(i, t) {
-  return `<div class="hy-row"><span class="hy-n">${i}</span><input class="in" type="time" data-hy="t" value="${t}" aria-label="Horário da medição ${i}"><input class="in" data-hy="g" inputmode="decimal" autocomplete="off" placeholder="mg/dL" aria-label="Glicemia da medição ${i}"><button class="btn sm" type="button" data-act="hypo-rm" aria-label="Remover campo">×</button></div>`;
-}
-function hypoSheet() {
-  const st = hypoState(), now = nowHM();
+function hypoSheet(conf) {
+  const st = hypoState(), due = !!st && hypoDue(st);
   let top;
   if (st) {
     const g = st.last.glucose, ago = Math.max(0, Math.round((Date.now() - st.last.ts) / 60000));
-    top = `<div class="hy-big"><span class="num">${f0(g)}</span><small>mg/dL</small></div><div class="dim" style="font-size:14.5px">às ${st.last.time} · há ${ago} min ${g < LIM.vlow ? '<span class="badge vlow">▼ Muito baixa</span>' : ''}</div><div class="hy-next" data-hy-next>${hypoNextTxt(st)}</div>`;
-  } else top = `<p class="hint" style="margin:0 0 8px">Nenhuma reavaliação ativa. O protocolo começa com glicemia de 60 mg/dL ou menos. Se medir agora e estiver baixa, registre abaixo.</p>`;
-  const list = st ? `<h3 class="hy-h">Medições deste episódio</h3><div class="stack" style="gap:6px">${st.ep.map(r => `<div class="row" style="justify-content:space-between;gap:8px;font-size:14px"><span class="num dim">${r.time}</span><span class="num"><b>${f0(r.glucose)}</b> mg/dL</span>${badge(r.glucose, r.context)}</div>`).join('')}</div>` : '';
+    top = `<div class="hy-last"><span class="hy-lv num">${f0(g)}</span><small>mg/dL</small><span class="dim hy-lt">às ${st.last.time} · há ${ago} min</span>${g < LIM.vlow ? '<span class="badge vlow">▼ Muito baixa</span>' : ''}</div>
+    <div class="hy-timer${due ? ' due' : ''}" data-hy-box role="timer" aria-label="Tempo até a próxima medição"><div class="hy-tl" data-hy-label>${due ? 'Medição pendente' : 'Próxima medição em'}</div><div class="hy-tn num" data-hy-clock>${hypoClock(st)}</div><div class="hy-tm" data-hy-msg aria-live="assertive">${due ? HYPO_MSG : ''}</div></div>`;
+  } else top = `<p class="hint" style="margin:0 0 8px">Nenhum episódio ativo. Digite abaixo o resultado da glicemia. Se estiver abaixo de 70 mg/dL, o cronômetro de 15 minutos começa sozinho.</p>`;
+  const list = st ? `<h3 class="hy-h">Medições deste episódio</h3><div class="stack" style="gap:6px">${st.ep.map((r, i) => `<div class="row" style="justify-content:space-between;gap:8px;font-size:14px"><span class="num dim">${i + 1}ª · ${r.time}</span><span class="num"><b>${f0(r.glucose)}</b> mg/dL</span>${badge(r.glucose, r.context)}</div>`).join('')}</div>` : '';
+  const ok = conf ? `<div class="hy-ok" role="status">✓ Registrado às <b class="num">${conf.time}</b>: <b class="num">${f0(conf.g)}</b> mg/dL (medição ${conf.n}).${conf.low ? ' O cronômetro de 15 minutos recomeçou.' : ''}</div>` : '';
   return `<h2>${st ? '⚠ Hipoglicemia' : 'Protocolo de hipoglicemia'}</h2>${top}
-  <p class="hint" style="margin:10px 0 8px">Meça de novo a cada 15 minutos até voltar a 70 mg/dL ou mais. Siga o plano de hipoglicemia combinado com seu médico.</p>
-  <div class="hy-warn"><b>Emergência:</b> com confusão, convulsão, desmaio ou dificuldade para engolir, peça ajuda agora (SAMU 192).</div>
-  ${list}<h3 class="hy-h">Registrar reavaliações</h3>
-  <form id="hypo-form" novalidate><div id="hy-rows">${hypoRow(1, now)}${hypoRow(2, now)}</div>
-  <button class="btn full" type="button" data-act="hypo-add" style="margin-top:8px">+ Adicionar outro campo</button>
-  <p class="err" id="hy-err" role="alert" style="min-height:18px;margin:8px 0 0"></p>
-  <div class="row" style="margin-top:8px"><button class="btn pri grow" type="submit">Salvar medições</button><button class="btn" type="button" data-act="close">Fechar</button></div></form>`;
+  <form id="hypo-form" class="hy-reg${due ? ' hy-due' : ''}" novalidate>
+    <div class="hy-line"><input class="in hy-in" id="hy-g" inputmode="decimal" autocomplete="off" placeholder="mg/dL" aria-label="Resultado da glicemia em mg/dL"><button class="btn pri hy-go" type="submit">Registrar agora</button></div>
+    <p class="err" id="hy-err" role="alert" style="min-height:18px;margin:6px 0 0"></p>${ok}
+  </form>
+  <div class="hy-warn"><b>Emergência:</b> com confusão intensa, convulsão, desmaio ou dificuldade para engolir, peça ajuda agora (SAMU 192), sem esperar o cronômetro. O cronômetro é só um apoio: não substitui a orientação do seu médico nem deve atrasar o tratamento.</div>
+  <p class="hint" style="margin:10px 0 0">Meça de novo a cada 15 minutos até voltar a 70 mg/dL ou mais. Siga o plano de hipoglicemia combinado com seu médico.</p>
+  ${list}<button class="btn full" type="button" data-act="close" style="margin-top:14px">Fechar</button>`;
+}
+/* Atualiza o card aberto sem fechá-lo (o card continua na tela depois de cada medição). */
+function hypoRefresh(conf) {
+  const f = document.getElementById('hypo-form'), sh = f && f.closest('.sheet'); if (!sh) return false;
+  const html = hypoSheet(conf); sh.innerHTML = '<div class="grab"></div>' + (sh.closest('#gl-over') ? html.replace('data-act="close"', 'data-act="gl-over-close"') : html); sh.scrollTop = 0;
+  if (conf) setTimeout(() => { const o = document.querySelector('#hypo-form .hy-ok'); if (o) o.remove(); }, 9000);
+  return true;
 }
 /* Com o formulário de medição aberto, o protocolo abre por cima dele (glucoform.js) para não perder o preenchimento. */
 function hypoOpen() { if (document.getElementById('rec-form')) glHypoOver(); else openSheet(hypoSheet()); }
@@ -591,29 +600,62 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act^="hypo-"]'); if (!el) return; const act = el.dataset.act;
   if (act === 'hypo-open') hypoOpen();
   else if (act === 'hypo-off') { const st = hypoState() || hypoLow(); if (st) { S.hypoOff[st.id] = 1; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } render(); }
-  else if (act === 'hypo-add') { const rows = document.getElementById('hy-rows'); rows.insertAdjacentHTML('beforeend', hypoRow(rows.children.length + 1, nowHM())); const l = rows.lastElementChild.querySelector('[data-hy=g]'); if (l) l.focus(); }
-  else if (act === 'hypo-rm') { const rows = document.getElementById('hy-rows'); if (rows.children.length > 2) { el.closest('.hy-row').remove(); [...rows.children].forEach((r, i) => { r.querySelector('.hy-n').textContent = i + 1; }); } else toast('Mantenha ao menos 2 campos.'); }
 });
+/* Som e vibração do alerta (só quando o aparelho permite; o navegador pode bloquear o som sem toque anterior). */
+let hypoAudio = null, hypoAlertMem = '', hypoBusy = false;
+function hypoAudioUnlock() { try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; hypoAudio = hypoAudio || new AC(); if (hypoAudio.state === 'suspended') hypoAudio.resume(); } catch (e) { } }
+function hypoBeep() {
+  try {
+    hypoAudioUnlock(); const c = hypoAudio;
+    if (c) [0, .45, .9].forEach(d => { const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + d; o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.5, t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + .35); o.start(t); o.stop(t + .4); });
+  } catch (e) { }
+  try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) { }
+}
+const hypoAlertGet = () => { try { return localStorage.getItem('tb-hypo-alert') || ''; } catch (e) { return ''; } };
+/* Um único alerta por contagem (chave = id da última medição). Se o app estava fechado, o alerta aparece ao voltar. */
+function hypoWatch() {
+  const st = hypoState(); if (!st || !hypoDue(st)) return;
+  if (document.visibilityState === 'hidden' || (typeof SEC !== 'undefined' && SEC.locked) || document.getElementById('lk') || document.getElementById('tb-gate') || document.getElementById('tb-splash')) return;
+  const key = st.last.id; if (hypoAlertMem === key || hypoAlertGet() === key) return;
+  hypoAlertMem = key; try { localStorage.setItem('tb-hypo-alert', key); } catch (e) { }
+  hypoBeep(); toast(HYPO_MSG);
+  if (!document.getElementById('hypo-form')) hypoOpen();
+  try { if (typeof hypoNativeAck === 'function') hypoNativeAck(); } catch (e) { } // a notificação do sistema da mesma contagem não repete
+}
+function hypoTick() {
+  const st = hypoState(); if (!st) return; const due = hypoDue(st);
+  document.querySelectorAll('[data-hy-next]').forEach(n => { n.innerHTML = hypoNextTxt(st); });
+  document.querySelectorAll('[data-hy-clock]').forEach(n => { n.textContent = hypoClock(st); });
+  document.querySelectorAll('[data-hy-box]').forEach(b => {
+    b.classList.toggle('due', due); const l = b.querySelector('[data-hy-label]'), m = b.querySelector('[data-hy-msg]');
+    if (l) l.textContent = due ? 'Medição pendente' : 'Próxima medição em'; if (m && m.textContent !== (due ? HYPO_MSG : '')) m.textContent = due ? HYPO_MSG : '';
+  });
+  document.querySelectorAll('#hypo-form').forEach(f => f.classList.toggle('hy-due', due));
+  hypoWatch();
+}
+setInterval(hypoTick, 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') hypoTick(); });
+window.addEventListener('focus', hypoTick); window.addEventListener('pageshow', hypoTick);
 document.addEventListener('submit', async e => {
   if (e.target.id !== 'hypo-form') return; e.preventDefault();
-  const err = m => { $('#hy-err').textContent = m; }, out = [], today = isoDate(new Date());
-  for (const row of document.querySelectorAll('#hy-rows .hy-row')) {
-    const gv = row.querySelector('[data-hy=g]').value.trim(); if (!gv) continue;
-    const g = parseNum(gv), t = parseTime(row.querySelector('[data-hy=t]').value);
-    if (g === null || g < GLU_MIN || g > GLU_MAX) return err(`Glicemia entre ${GLU_MIN} e ${GLU_MAX} mg/dL.`);
-    if (!t) return err('Informe o horário de cada medição.');
-    const ts = mkTs(today, t); if (ts > Date.now() + 60000) return err('Esse horário ainda não chegou.');
-    out.push(hypoStamp({ id: uid(), date: today, time: t, glucose: g, source: 'manual', marks: ['hipo'], ts }));
-  }
-  if (!out.length) return err('Preencha ao menos uma glicemia.');
+  if (hypoBusy) return; // toques repetidos não geram registros duplicados
+  const err = m => { const x = $('#hy-err'); if (x) x.textContent = m; }, inp = $('#hy-g'), btn = e.target.querySelector('.hy-go');
+  const raw = inp ? inp.value.trim() : '', g = raw ? parseNum(raw) : null;
+  if (!raw) return err('Digite o resultado da glicemia.');
+  if (g === null || g < GLU_MIN || g > GLU_MAX) return err(`Glicemia entre ${GLU_MIN} e ${GLU_MAX} mg/dL.`);
+  hypoBusy = true; if (btn) btn.disabled = true; hypoAudioUnlock();
   try {
+    const ts = Date.now(), d = new Date(ts), st0 = hypoState(), n = st0 ? st0.ep.length + 1 : 1; // data e hora do instante do toque, no fuso do aparelho
+    const rec = hypoStamp({ id: uid(), date: isoDate(d), time: pad(d.getHours()) + ':' + pad(d.getMinutes()), glucose: g, source: 'manual', marks: ['hipo'], ts, hypoStep: n });
     if (hasExamples()) await removeExamples();
-    await Store.putMany('records', out); await loadAll(); hypoClose(); render();
-    if (!hypoState()) toast(hypoLow() ? 'Medições salvas. A glicemia ainda está abaixo de 70.' : 'Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.');
-    else { toast('Medições salvas. Meça de novo em 15 min.'); setTimeout(hypoOpen, 200); }
-  } catch (x) { console.error(x); toast('Não foi possível salvar: ' + (x && x.message || x)); }
+    await Store.put('records', rec); await loadAll();
+    if (st0 && S.hypoOff[st0.id]) { delete S.hypoOff[st0.id]; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } // nova medição: o aviso volta à tela inicial
+    render();
+    if (hypoState()) { if (!hypoRefresh({ g, time: rec.time, n, low: true })) hypoOpen(); toast('Medição registrada. Meça de novo em 15 min.'); }
+    else { hypoClose(); toast('Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.'); }
+  } catch (x) { console.error(x); err('Não foi possível salvar: ' + (x && x.message || x)); if (btn) btn.disabled = false; }
+  finally { setTimeout(() => { hypoBusy = false; }, 700); }
 });
-setInterval(() => { const st = hypoState(); if (!st) return; document.querySelectorAll('[data-hy-next]').forEach(n => { n.innerHTML = hypoNextTxt(st); }); }, 1000);
 
 
 /* ---------- Alerta de glicemia muito elevada (> 250 mg/dL) — só aviso, sem protocolo ---------- */
@@ -859,7 +901,7 @@ function alertsPanel() {
   ${row('bHypo', c.bHypo, 'Faixa de hipoglicemia', 'Alerta vermelho quando a última medição está abaixo de 70 mg/dL. É um aviso de segurança: desligue só se tiver certeza.')}
   ${row('bHyper', c.bHyper, 'Faixa de glicemia muito alta', 'Alerta quando a última medição está muito elevada.')}</div>
   <h2 class="sec">Notificações com o app fechado</h2><div class="card al-card">
-  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição de 60 mg/dL ou menos, avisar para medir de novo (de 61 a 69 só registra). Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
+  ${row('hypo', c.hypo, 'Reavaliar após hipoglicemia', 'Depois de uma medição abaixo de 70 mg/dL, avisar para medir de novo. Segue o protocolo de hipoglicemia; não indica doses.', `<select class="in al-sel" data-k="hypoMin" aria-label="Minutos para reavaliar">${opt([10, 15, 20], c.hypoMin, x => x + ' min depois')}</select>`)}
   ${row('postFast', c.postFast, 'Medir 2 h após a insulina do jejum', 'Avisa 2 horas depois de registrar a insulina rápida do jejum. Se você não registrar a glicemia em até 10 minutos depois, o aviso some.')}
   ${row('postLunch', c.postLunch, 'Medir 2 h após a insulina do almoço', 'Notifica 2 horas depois de registrar a insulina rápida do almoço. Some sozinha após 10 minutos sem medição.')}
   ${row('postDinner', c.postDinner, 'Medir 2 h após a insulina do jantar', 'Notifica 2 horas depois de registrar a insulina rápida do jantar. Some sozinha após 10 minutos sem medição.')}

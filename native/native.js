@@ -91,7 +91,7 @@ if (NATIVE) {
   async function hypoSync() {
     const ln = LN(); if (!ln) return;
     try {
-      const c = alCfg(), ep = hypoEpisode(S.records, Date.now()), last = ep && ep.last; // só reavalia com glicemia <= 60 (61 a 69 apenas registra)
+      const c = alCfg(), ep = hypoEpisode(S.records, Date.now()), last = ep && ep.last; // reavalia toda glicemia abaixo de 70 (o episódio só existe com a última medição < 70)
       const low = !!(ep && ep.protocol && Date.now() - last.ts < 60 * 60000);
       if (!c.hypo || !low) { await ln.cancel({ notifications: [{ id: HYPO_ID }] }); return; }
       const at = last.ts + c.hypoMin * 60000; if (at <= Date.now() + 5000) return;
@@ -100,6 +100,8 @@ if (NATIVE) {
       await ln.schedule({ notifications: [{ id: HYPO_ID, title: 'TiaBete · medir de novo', body: 'Passaram ' + c.hypoMin + ' minutos da glicemia baixa. Meça novamente e siga o protocolo do seu médico. Emergência: 192 (SAMU).', channelId: 'hipo', schedule: { at: new Date(at), allowWhileIdle: true } }] });
     } catch (e) { console.error(e); }
   }
+  /* O alerta do cronômetro já apareceu dentro do app: tira a notificação do sistema da mesma contagem para não repetir. */
+  window.hypoNativeAck = async function () { const ln = LN(); if (!ln) return; try { await ln.cancel({ notifications: [{ id: HYPO_ID }] }); await ln.removeDeliveredNotifications({ notifications: [{ id: HYPO_ID }] }); } catch (e) { } };
   /* ---- Lembretes condicionais: medir 2 h depois da insulina rápida pré-prandial; some sozinho se passar 10 min sem medir ---- */
   const POST_MIN = 120, POST_WIN = 10, TBX = () => capP('TbExpire');
   const postId = ts => 310000 + (Math.floor(ts / 60000) % 100000);

@@ -8,16 +8,15 @@ const FAST = { low: 70, high: 130 };  /* faixa considerada normal em jejum */
 const GLU_MIN = 10, GLU_MAX = 1000;
 const DAY = 86400000;
 /* Hipoglicemia: toda glicemia < 70 é categorizada como "Hipoglicemia".
-   A reavaliação obrigatória (protocolo, lembretes) só dispara quando há glicemia <= 60 no episódio.
-   Os valores 61 a 69 apenas são registrados. O valor 60 (que o enunciado não cobre) segue o lado seguro: reavalia. */
-const HYPO_PROTO = 60, HYPO_TAG = 'Hipoglicemia';
-function hypoClass(g) { const hypo = Number.isFinite(g) && g < LIM.low; return { hypo, tag: hypo ? HYPO_TAG : null, protocol: hypo && g <= HYPO_PROTO }; }
+   O protocolo (abertura automática, cronômetro de 15 min, lembretes) vale para toda glicemia abaixo de 70 mg/dL (HYPO_PROTO = 70, comparação "<"). */
+const HYPO_PROTO = 70, HYPO_TAG = 'Hipoglicemia';
+function hypoClass(g) { const hypo = Number.isFinite(g) && g < LIM.low; return { hypo, tag: hypo ? HYPO_TAG : null, protocol: hypo && g < HYPO_PROTO }; }
 function hypoEpisode(records, now) {
   const real = records.filter(r => !r.noTime && r.source !== 'exemplo' && r.ts).sort((a, b) => a.ts - b.ts), last = real[real.length - 1];
   if (!last || last.glucose >= LIM.low || now - last.ts > 4 * 3600e3) return null;
   let i = real.length - 1;
   while (i > 0) { const p = real[i - 1]; if ((p.glucose < LIM.low || (p.marks || []).includes('hipo')) && real[i].ts - p.ts <= 90 * 60e3) i--; else break; }
-  const ep = real.slice(i); return { last, start: ep[0], ep, id: ep[0].id, protocol: ep.some(r => r.glucose <= HYPO_PROTO) };
+  const ep = real.slice(i); return { last, start: ep[0], ep, id: ep[0].id, protocol: ep.some(r => r.glucose < HYPO_PROTO) };
 }
 function hypoStamp(rec) { const c = hypoClass(rec.glucose); if (c.tag) rec.status = c.tag; else delete rec.status; return rec; }
 const MIN_BUCKET = 3;

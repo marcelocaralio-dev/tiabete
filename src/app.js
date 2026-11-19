@@ -415,7 +415,9 @@ async function saveRecord(form) {
   const glucose = parseNum(v('f-glu'));
   if (glucose === null || glucose < GLU_MIN || glucose > GLU_MAX) return err(`Informe a glicemia entre ${GLU_MIN} e ${GLU_MAX} mg/dL.`);
   const date = parseDate(v('f-date')); if (!date) return err('Informe uma data válida.');
-  const time = v('f-time') ? parseTime(v('f-time')) : null; if (v('f-time') && !time) return err('Horário inválido.');
+  let time = v('f-time') ? parseTime(v('f-time')) : null; if (v('f-time') && !time) return err('Horário inválido.');
+  /* Glicemia baixa nova, de hoje e sem horário: usa o horário do toque para o protocolo e o cronômetro funcionarem. */
+  if (!time && !form.dataset.id && glucose < LIM.low && date === isoDate(new Date())) time = nowHM();
   const opt = (id, label, max) => { const raw = v(id); if (!raw) return undefined; const n = parseNum(raw); if (n === null || n < 0 || n > max) { err(`${label}: valor inválido (0 a ${max}).`); return false; } return n; };
   const carbs = opt('f-carbs', 'Carboidratos', 500), insMeal = opt('f-ins-meal', 'Insulina rápida', 200), insBasal = opt('f-ins-basal', 'Insulina basal', 300), insCorr = opt('f-ins-corr', 'Insulina de correção', 200), actMin = opt('f-act-min', 'Duração da atividade', 720);
   if ([carbs, insMeal, insBasal, insCorr, actMin].includes(false)) return false;

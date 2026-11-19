@@ -369,6 +369,29 @@ h2.sec.acc-h { margin-top: 18px; margin-bottom: 4px; }
 .hy-row { display: grid; grid-template-columns: 24px 1fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: 8px; }
 .hy-row .btn { padding: 0; height: 44px; }
 .hy-n { font-family: var(--f-mono); color: var(--mut); font-size: 14.5px; text-align: center; }
+/* Protocolo de hipoglicemia: cronômetro em destaque e campo + botão lado a lado, moderadamente maiores que os controles comuns (46px / 15px) */
+.hy-last { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 2px 0 10px; }
+.hy-lv { font-family: var(--f-display); font-size: 34px; font-weight: 500; letter-spacing: -.03em; color: var(--red-t); line-height: 1.1; }
+.hy-last small { font-family: var(--f-mono); font-size: 13.5px; color: var(--mut); }
+.hy-lt { font-size: 14.5px; }
+.hy-timer { text-align: center; padding: 14px 12px 12px; border-radius: 18px; background: var(--s2); border: 2px solid var(--line); margin-bottom: 14px; }
+.hy-tl { font-family: var(--f-mono); font-size: 13.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); }
+.hy-tn { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 68px; font-weight: 500; line-height: 1.05; letter-spacing: -.02em; color: var(--fg); margin: 2px 0; }
+.hy-tm { font-size: 17px; font-weight: 800; }
+.hy-tm:empty { display: none; }
+.hy-timer.due { background: var(--red); border-color: var(--red); color: #fff; }
+.hy-timer.due .hy-tl, .hy-timer.due .hy-tn { color: #fff; }
+.hy-reg { margin: 0 0 12px; }
+.hy-line { display: flex; flex-direction: row; align-items: stretch; gap: 12px; }
+.hy-line .hy-in { flex: 1 1 0; min-width: 0; width: auto; height: 62px; min-height: 62px; font-size: 26px; font-weight: 600; font-family: var(--f-mono); text-align: center; border-radius: 14px; }
+.hy-line .hy-go { flex: 1 1 0; min-width: 0; height: 62px; min-height: 62px; font-size: 17px; border-radius: 14px; padding: 0 10px; white-space: normal; line-height: 1.15; }
+.hy-ok { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--s2); border: 1px solid var(--line); font-size: 14.5px; }
+.hy-reg.hy-due .hy-in { border: 3px solid var(--red); box-shadow: 0 0 0 4px rgba(var(--red-rgb), .25); }
+.hy-reg.hy-due .hy-go { box-shadow: 0 0 0 4px rgba(var(--red-rgb), .35), 0 6px 22px rgba(var(--red-rgb), .5); }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes hy-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+  .hy-timer.due { animation: hy-pulse 1s ease-in-out infinite; }
+}
 
 .banner.hyper { background: var(--red-d); border-color: var(--red); color: var(--fg); align-items: center; gap: 12px; border-width: 2px; }
 .banner.hyper b { color: var(--fg); }
