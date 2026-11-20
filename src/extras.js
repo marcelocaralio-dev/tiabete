@@ -1223,7 +1223,7 @@ function driveCardBody(intro) {
     <div class="row sp"><span>Status</span><b>${ok ? '✓ Concluído' : bad ? '✗ Falhou' : '—'}</b></div>${bad ? `<div class="row sp"><span>Última tentativa</span><b class="num">${fmt(d.lastAt)}</b></div>` : ''}
     ${d.auto && d.lastTs ? `<div class="row sp"><span>Próxima verificação</span><b class="num">depois de ${fmt(d.lastTs + drvGap())}</b></div>` : ''}</div>${bad ? `<p class="hint" style="margin:0 0 12px;color:var(--red-t)" role="alert">${esc(d.lastMsg || d.msg || 'A cópia não foi concluída.')}</p>` : ''}`;
   return `<p class="hint" style="margin:0 0 12px">${intro}</p>${acct}${status}
-    <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled' : ''}>${d.busy ? 'Aguarde…' : 'Fazer cópia agora'}</button>
+    <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled aria-busy="true"' : ''}>${d.busy ? 'Aguarde…' : 'Fazer cópia agora'}</button>
     <button class="btn full" data-act="drv-list" ${d.busy ? 'disabled' : ''}>Ver cópias no Drive</button></div>${list}
     <div class="fl" style="margin:18px 0 8px">Cópia programada</div>
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" id="drv-auto" ${d.auto ? 'checked' : ''}><span><b>Fazer cópia ao abrir o app</b><small>Quando passar o intervalo escolhido, a cópia é feita na próxima vez que você abrir ou voltar ao app.</small></span></label>

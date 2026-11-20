@@ -168,6 +168,13 @@ const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar de outros aplicativos', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : (r === 'metricas' || r === 'metrica') ? 'painel' : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+/* Comparação visual (Design System) da média entre períodos; só apresenta números já calculados acima. */
+function dsCmpMean(sc, sp, cmp, cur, prev) {
+  if (!window.TBDS || !sc.n || !sp.n) return '';
+  const pe = r => `${fmtDM(r[0])}–${fmtDM(r[1])}`;
+  const foot = '<span>Média</span>' + TBDS.delta(sc.mean, sp.mean, { goodWhen: 'down', text: fsign(cmp.diff, 0) + ' mg/dL' }) + (cmp.pct == null ? '' : TBDS.delta(sc.mean, sp.mean, { goodWhen: 'down', text: fsign(cmp.pct, 0) + '%' }));
+  return `<div style="margin:0 0 14px">${TBDS.cmp({ label: 'Atual', period: pe(cur), value: fm(sc.mean), unit: 'mg/dL' }, { label: 'Anterior', period: pe(prev), value: fm(sp.mean), unit: 'mg/dL' }, foot).replace('ds-card ds-cmp', 'ds-card is-compact ds-cmp')}</div>`;
+}
 function toast(msg) {
   try { if (acToast(msg)) return; } catch (e) { }
   const old = $('.toast'); if (old) old.remove();
@@ -309,7 +316,7 @@ function viewPainelClassic() {
     </div></div>`;
   const row = (lb, a, b, d, cls = '') => `<tr><td>${lb}</td><td>${a}</td><td class="dim">${b}</td><td class="${cls}">${d}</td></tr>`;
   const few = (sc.n && sc.n < 5) || (sp.n && sp.n < 5);
-  h += `<h2 class="sec">Comparação com o período anterior</h2><div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Diferença<small>&nbsp;</small></th></tr></thead><tbody>
+  h += `<h2 class="sec">Comparação com o período anterior</h2><div class="card">${dsCmpMean(sc, sp, cmp, cur, prev)}<div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Atual<small>${fmtDM(cur[0])}–${fmtDM(cur[1])}</small></th><th>Anterior<small>${fmtDM(prev[0])}–${fmtDM(prev[1])}</small></th><th>Diferença<small>&nbsp;</small></th></tr></thead><tbody>
     ${row('Média (mg/dL)', fm(sc.mean), fm(sp.mean), fsign(cmp.diff), cmp.diff > 0 ? 'delta-up' : '')}
     ${row('Variação %', '', '', cmp.pct == null ? '—' : fsign(cmp.pct) + '%', cmp.pct > 0 ? 'delta-up' : '')}
     ${row('Medições', sc.n, sp.n, fsign(sc.n - sp.n, 0))}
