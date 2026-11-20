@@ -1,5 +1,5 @@
 /* ================= Central de Métricas Glicêmicas (Premium) =================
-   Superfície escura própria, igual nos temas claro e escuro: é um "componente Premium" que não depende do tema.
+   Escuro por padrão; no tema claro a seção "PARIDADE · TEMA CLARO" (final do arquivo) reaplica os mesmos recursos, efeitos e animações com superfícies e contrastes próprios.
    Só vermelhos do app + os três sinais de classificação (verde, âmbar, vermelho-vivo). Estado nunca só por cor: sempre texto e símbolo.
    Animações curtas e suaves; todas desligam com prefers-reduced-motion. */
 :root {
@@ -347,3 +347,78 @@ i.b-vlow { background: #7D1020; } i.b-low1 { background: #E5586A; } i.b-ok { bac
   .mt-root, .mt-ring .rp, .mt-bar i, .mt-mt .fl, .mt-mt .kn, .mt-disp .bn, .mt-gauge .gp, .mt-evo .br, .mt-lrb i, .mt-tb i { animation: none !important; }
   .mt-blk, .mt-row, .mt-cta-a, .mt-more .mt-svg, .mt-seg button { transition: none !important; }
 }
+
+/* ================= PARIDADE · TEMA CLARO =================
+   Mesmos componentes, gráficos, brilhos e animações do tema escuro; muda só a linguagem cromática e o contraste.
+   Nenhum cálculo, classe ou estado é novo: tudo reaproveita as classes lv-*, b-* e os tokens --mt-*. */
+:root[data-theme="light"] {
+  --mt-0: #FBF3F2; --mt-1: #FFFFFF; --mt-2: #FFF1F2; --mt-3: #FBE4E7;
+  --mt-line: #EBD9DC; --mt-line2: #DDB8BE;
+  --mt-fg: #1C1719; --mt-mut: #4B4247; --mt-mut2: #62575C;
+  --mt-red: #D4162A; --mt-redl: #B3101F; --mt-redt: #C4132A;
+  --mt-ok: #1F9A58; --mt-okl: #14693A; --mt-warn: #C9860E; --mt-warnl: #7A4B00; --mt-bad: #D4162A;
+  --mt-gl: rgba(28,23,25,.045); --mt-gl2: rgba(28,23,25,.08);
+}
+:root[data-theme="light"] .mt-prem { color: #8E0F1D; border-color: #E3939C; background: linear-gradient(135deg, rgba(212,22,42,.16), rgba(212,22,42,.05)); box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
+/* bloco da tela inicial */
+:root[data-theme="light"] .mt-blk { border-color: #E3A3AB; color: var(--mt-fg);
+  background: radial-gradient(120% 85% at 100% 0%, rgba(212,22,42,.16), transparent 62%), radial-gradient(90% 70% at 0% 100%, rgba(212,22,42,.08), transparent 70%), linear-gradient(165deg, #FFFFFF 0%, #FFF3F4 55%, #FCE6E9 100%);
+  box-shadow: 0 10px 30px rgba(150,30,45,.16), 0 0 0 1px rgba(212,22,42,.08), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-blk::before { background: linear-gradient(115deg, transparent 38%, rgba(212,22,42,.10) 50%, transparent 62%); }
+@media (hover: hover) { :root[data-theme="light"] .mt-blk:hover { border-color: #D4162A; box-shadow: 0 12px 34px rgba(150,30,45,.22), 0 0 22px -4px rgba(212,22,42,.38), inset 0 1px 0 #fff; } }
+:root[data-theme="light"] .mt-blk-ic, :root[data-theme="light"] .mt-ph-ic { color: #fff; }
+:root[data-theme="light"] .mt-chip { border-color: var(--mt-line2); background: linear-gradient(180deg, #fff, #FFF6F6); box-shadow: 0 2px 8px rgba(150,30,45,.06); }
+:root[data-theme="light"] .mt-chip b, :root[data-theme="light"] .mt-blk.locked .mt-chip b { color: var(--mt-fg); }
+:root[data-theme="light"] .mt-blk.locked .mt-chip { background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.5)); }
+:root[data-theme="light"] .mt-blk.locked .mt-cta { background: linear-gradient(135deg, #C0303E, #96161F); border-color: rgba(150,22,31,.5); box-shadow: 0 6px 18px rgba(150,30,45,.25), inset 0 1px 0 rgba(255,255,255,.2); }
+/* chips de classificação */
+:root[data-theme="light"] .mt-lv.lv-ok { color: #14693A; border-color: rgba(31,154,88,.55); background: rgba(31,154,88,.12); }
+:root[data-theme="light"] .mt-lv.lv-warn { color: #7A4B00; border-color: rgba(201,134,14,.6); background: rgba(201,134,14,.14); }
+:root[data-theme="light"] .mt-lv.lv-bad { color: #9E1020; border-color: rgba(212,22,42,.55); background: rgba(212,22,42,.10); }
+:root[data-theme="light"] .mt-lv.lv-none { background: var(--mt-gl); }
+/* cabeçalho, seletor de período, avisos */
+:root[data-theme="light"] .mt-hero, :root[data-theme="light"] .mt-dh { background: radial-gradient(110% 120% at 100% 0%, rgba(212,22,42,.12), transparent 60%), linear-gradient(165deg, #fff, #FFF1F2); box-shadow: 0 8px 24px rgba(150,30,45,.12), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-dh.lv-ok { border-color: rgba(31,154,88,.6); box-shadow: 0 10px 28px rgba(150,30,45,.10), 0 0 24px -8px rgba(31,154,88,.5), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-dh.lv-warn { border-color: rgba(201,134,14,.65); box-shadow: 0 10px 28px rgba(150,30,45,.10), 0 0 24px -8px rgba(201,134,14,.45), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-dh.lv-bad { border-color: rgba(212,22,42,.6); box-shadow: 0 10px 28px rgba(150,30,45,.12), 0 0 24px -8px rgba(212,22,42,.45), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-seg button[aria-pressed="true"] { color: #fff; }
+:root[data-theme="light"] .mt-warn, :root[data-theme="light"] .mt-buy-n { border-color: rgba(201,134,14,.5); background: rgba(201,134,14,.10); color: #5C3A00; }
+:root[data-theme="light"] .mt-warn b { color: #2E1C00; }
+/* painel integrado */
+:root[data-theme="light"] .mt-panel { background: radial-gradient(100% 60% at 100% 0%, rgba(212,22,42,.07), transparent 70%), linear-gradient(180deg, #fff, #FFF8F8); box-shadow: 0 10px 30px rgba(150,30,45,.12), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-row.lv-ok::before { box-shadow: 0 0 12px rgba(31,154,88,.5); }
+:root[data-theme="light"] .mt-row.lv-warn::before { box-shadow: 0 0 12px rgba(201,134,14,.5); }
+:root[data-theme="light"] .mt-row.lv-bad::before { box-shadow: 0 0 12px rgba(212,22,42,.5); }
+@media (hover: hover) { :root[data-theme="light"] .mt-row:hover { background: rgba(212,22,42,.04); } }
+:root[data-theme="light"] .mt-row:active { background: rgba(212,22,42,.07); }
+:root[data-theme="light"] .mt-nd, :root[data-theme="light"] .mt-cmp, :root[data-theme="light"] .mt-x, :root[data-theme="light"] .mt-itp { background: var(--mt-gl); }
+/* gráficos */
+:root[data-theme="light"] .mt-ring .rt { stroke: rgba(28,23,25,.09); }
+:root[data-theme="light"] .mt-ring .rg, :root[data-theme="light"] .mt-gauge .rg { stroke: #1C1719; }
+:root[data-theme="light"] .mt-ring.lv-ok .rp, :root[data-theme="light"] .mt-gauge.lv-ok .gp { color: rgba(31,154,88,.5); }
+:root[data-theme="light"] .mt-ring.lv-warn .rp, :root[data-theme="light"] .mt-gauge.lv-warn .gp { color: rgba(201,134,14,.5); }
+:root[data-theme="light"] .mt-ring.lv-bad .rp, :root[data-theme="light"] .mt-gauge.lv-bad .gp { color: rgba(212,22,42,.5); }
+:root[data-theme="light"] .mt-bar, :root[data-theme="light"] .mt-tb, :root[data-theme="light"] .mt-lrb { background: var(--mt-gl2); }
+:root[data-theme="light"] .mt-mt { background: var(--mt-gl); }
+:root[data-theme="light"] .mt-mt .z, :root[data-theme="light"] .mt-gauge .z { opacity: .34; }
+:root[data-theme="light"] .mt-mt .kn { box-shadow: 0 2px 8px rgba(60,20,30,.35); }
+:root[data-theme="light"] .mt-mt .gt { background: rgba(28,23,25,.7); }
+:root[data-theme="light"] .mt-disp .sd { fill: rgba(179,16,31,.10); stroke: rgba(179,16,31,.4); }
+:root[data-theme="light"] .mt-disp .mn, :root[data-theme="light"] .lg-mn { stroke: #1C1719; background: #1C1719; }
+:root[data-theme="light"] .mt-disp text.tm, :root[data-theme="light"] .mt-fm-r b, :root[data-theme="light"] .mt-chip b { fill: #1C1719; color: #1C1719; }
+:root[data-theme="light"] .lg-sd { background: rgba(179,16,31,.14); border-color: rgba(179,16,31,.55); }
+:root[data-theme="light"] .mt-lrb u { background: #1C1719; }
+:root[data-theme="light"] .mt-lrb i, :root[data-theme="light"] .mt-tb i { background: linear-gradient(90deg, #E8505F, #B3101F); }
+/* comparativos e legendas */
+:root[data-theme="light"] .mt-cmp-a { background: var(--mt-gl2); }
+:root[data-theme="light"] .mt-cmp.good { border-color: rgba(31,154,88,.5); } :root[data-theme="light"] .mt-cmp.good .mt-cmp-a { color: #14693A; background: rgba(31,154,88,.15); }
+:root[data-theme="light"] .mt-cmp.worse { border-color: rgba(212,22,42,.5); } :root[data-theme="light"] .mt-cmp.worse .mt-cmp-a { color: #9E1020; background: rgba(212,22,42,.12); }
+:root[data-theme="light"] .mt-itp.lv-ok { border-color: rgba(31,154,88,.5); } :root[data-theme="light"] .mt-itp.lv-warn { border-color: rgba(201,134,14,.55); } :root[data-theme="light"] .mt-itp.lv-bad { border-color: rgba(212,22,42,.55); }
+:root[data-theme="light"] .mt-amb i.lv-ok { box-shadow: 0 0 8px rgba(31,154,88,.7); } :root[data-theme="light"] .mt-amb i.lv-warn { box-shadow: 0 0 8px rgba(201,134,14,.7); } :root[data-theme="light"] .mt-amb i.lv-bad { box-shadow: 0 0 8px rgba(212,22,42,.7); }
+/* apresentação (sem licença vitalícia) e compra */
+:root[data-theme="light"] .mt-ph { border-color: #E3A3AB; background: radial-gradient(120% 90% at 100% 0%, rgba(212,22,42,.16), transparent 62%), radial-gradient(90% 70% at 0% 100%, rgba(212,22,42,.07), transparent 70%), linear-gradient(165deg, #fff, #FCE6E9); box-shadow: 0 12px 32px rgba(150,30,45,.16), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .mt-ph-lk { color: #8E0F1D; }
+:root[data-theme="light"] .mt-buy { border-color: #E3A3AB; background: radial-gradient(110% 90% at 100% 0%, rgba(212,22,42,.12), transparent 62%), linear-gradient(165deg, #fff, #FFF1F2); }
+:root[data-theme="light"] .mt-sh::after { background: linear-gradient(90deg, var(--mt-line2), transparent); }
+:root[data-theme="light"] .mt-sec, :root[data-theme="light"] .mt-list, :root[data-theme="light"] .mt-why > div, :root[data-theme="light"] .mt-cfgb, :root[data-theme="light"] .mt-pn button { box-shadow: 0 4px 14px rgba(150,30,45,.07); }
+@media (prefers-reduced-motion: reduce) { :root[data-theme="light"] .mt-blk::before { animation: none; display: none; } }

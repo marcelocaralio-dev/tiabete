@@ -19,3 +19,47 @@
 .pr-det summary::-webkit-details-marker { display: none; }
 .pr-det summary::after { content: "+"; font-family: var(--f-mono); color: var(--red-l); font-size: 18px; }
 .pr-det[open] summary::after { content: "–"; }
+
+/* ---- etiquetas alinhadas (badges e chips desta tela): altura única, texto centralizado nos dois eixos ---- */
+.pr-tag { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 30px; padding: 0 11px; line-height: 1; text-align: center; vertical-align: middle; }
+.pr-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 0; }
+.pr-dh { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 30px; }
+.pr-dh .pr-dt { line-height: 1.25; flex: 1 1 auto; }
+.pr-dh .pr-tag { flex: none; margin-left: auto; }
+
+/* ---- card Premium (topo da licença): composição própria, vermelhos do GLUXO ---- */
+.pr-hero { position: relative; isolation: isolate; overflow: hidden; padding: 18px 18px 16px; border-radius: 26px; border: 1px solid transparent;
+  background: radial-gradient(120% 90% at 100% 0%, rgba(227,30,44,.36), transparent 60%), radial-gradient(80% 70% at 0% 100%, rgba(91,13,22,.55), transparent 72%), linear-gradient(165deg, #2A0C13 0%, #160A0E 58%, #0C070A 100%) padding-box,
+    linear-gradient(140deg, rgba(255,142,152,.85), rgba(227,30,44,.35) 38%, rgba(255,142,152,.12) 62%, rgba(255,142,152,.7)) border-box;
+  box-shadow: 0 14px 38px rgba(0,0,0,.5), 0 0 30px -10px rgba(227,30,44,.5), inset 0 1px 0 rgba(255,255,255,.12); color: var(--fg); }
+.pr-hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(115deg, transparent 38%, rgba(255,142,152,.12) 50%, transparent 62%); transform: translateX(-120%); animation: prShine 8s ease-in-out 1s infinite; }
+@keyframes prShine { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.pr-glow { position: absolute; z-index: -1; right: -40px; top: -50px; width: 55%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(255,82,100,.32), transparent 68%); pointer-events: none; }
+.pr-top { display: flex; align-items: center; gap: 12px; }
+.pr-seal { flex: none; width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; color: #FFE3E6; background: linear-gradient(145deg, #E31E2C, #7A1020); box-shadow: 0 6px 18px rgba(227,30,44,.45), inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 3px rgba(227,30,44,.16); }
+.pr-seal svg { width: 26px; height: 26px; fill: rgba(255,255,255,.18); stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pr-id { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.pr-id .eyebrow { line-height: 1.1; color: #FFB8C0; }
+.pr-plan { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .14em; line-height: 1.1; color: #fff; text-shadow: 0 0 14px rgba(255,82,100,.55); }
+.pr-hero .badge.ok { background: rgba(54,201,120,.16); }
+.pr-ti { margin: 16px 0 6px; font-family: var(--f-display); font-weight: 600; font-size: clamp(22px, 6.4vw, 27px); line-height: 1.15; letter-spacing: -.02em; }
+.pr-hero .pr-p { color: #E3D6DA; }
+.pr-hero .pr-p b { color: #fff; }
+.pr-hero .chip { background: rgba(255,255,255,.06); border-color: rgba(255,142,152,.3); color: #F5E9EC; }
+.pr-hero .chip.good { background: rgba(54,201,120,.16); border-color: #1F6B42; color: #7BEAA8; }
+
+:root[data-theme="light"] .pr-hero { color: var(--fg);
+  background: radial-gradient(120% 90% at 100% 0%, rgba(212,22,42,.16), transparent 60%), radial-gradient(80% 70% at 0% 100%, rgba(212,22,42,.07), transparent 72%), linear-gradient(165deg, #FFFFFF 0%, #FFF3F4 58%, #FCE3E6 100%) padding-box,
+    linear-gradient(140deg, #D4162A, rgba(212,22,42,.3) 40%, rgba(212,22,42,.12) 62%, #B3101F) border-box;
+  box-shadow: 0 14px 34px rgba(150,30,45,.2), 0 0 28px -10px rgba(212,22,42,.4), inset 0 1px 0 #fff; }
+:root[data-theme="light"] .pr-hero::before { background: linear-gradient(115deg, transparent 38%, rgba(212,22,42,.10) 50%, transparent 62%); }
+:root[data-theme="light"] .pr-glow { background: radial-gradient(circle, rgba(212,22,42,.2), transparent 68%); }
+:root[data-theme="light"] .pr-seal { color: #fff; box-shadow: 0 6px 16px rgba(212,22,42,.35), inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px rgba(212,22,42,.12); }
+:root[data-theme="light"] .pr-id .eyebrow { color: #6A5F64; }
+:root[data-theme="light"] .pr-plan { color: #B3101F; text-shadow: 0 0 12px rgba(212,22,42,.25); }
+:root[data-theme="light"] .pr-hero .badge.ok { background: rgba(31,154,88,.12); }
+:root[data-theme="light"] .pr-hero .pr-p { color: var(--mut); }
+:root[data-theme="light"] .pr-hero .pr-p b { color: var(--fg); }
+:root[data-theme="light"] .pr-hero .chip { background: rgba(255,255,255,.75); border-color: #E3A3AB; color: var(--fg); }
+:root[data-theme="light"] .pr-hero .chip.good { background: rgba(31,154,88,.12); border-color: #86C9A2; color: #14693A; }
+@media (prefers-reduced-motion: reduce) { .pr-hero::before { animation: none; display: none; } }

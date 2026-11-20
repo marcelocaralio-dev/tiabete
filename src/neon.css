@@ -1,7 +1,7 @@
 /* ================= Iluminação neon suave (Dark Tech) =================
    Camada puramente visual. Nada aqui altera tamanho, posição, margem, espaçamento ou fluxo:
    só box-shadow, gradientes, drop-shadow em ícones pequenos e pseudoelemento fixo atrás da página.
-   Vale apenas no tema escuro (o tema claro fica exatamente como era).
+   Os blocos ":root:not([data-theme=\"light\"])" valem no tema escuro; a seção 6 (final) traz a correspondência exata no tema claro (mesmos estados, mesma lógica de ambient.js, só cores/transparências adaptadas).
    Para desligar tudo: remova "src/neon.css" da lista em scripts/build-web.js (e, se quiser, src/ambient.js).
 
    Cores funcionais
@@ -94,4 +94,66 @@
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-theme="light"])::before, :root:not([data-theme="light"]) .top,
   :root:not([data-theme="light"]) .pn-c, :root:not([data-theme="light"]) .btn.pri, :root:not([data-theme="light"]) .nav .fab { transition: none !important; }
+}
+
+/* ================= 6) PARIDADE · TEMA CLARO =================
+   Mesmos efeitos do tema escuro, com tonalidades e intensidades adaptadas a superfícies claras.
+   O estado continua vindo de ambient.js (data-amb): nenhuma lógica nova. */
+:root[data-theme="light"] body { background: transparent; }
+:root[data-theme="light"]::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 150px 360px at 0% 40%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%),
+    radial-gradient(ellipse 150px 360px at 100% 52%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%);
+  transition: --amb-c .45s ease;
+}
+:root[data-theme="light"] .top {
+  background:
+    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
+    var(--bg);
+  transition: --amb-c .45s ease;
+}
+:root[data-theme="light"][data-amb="ok"]::before, :root[data-theme="light"][data-amb="ok"] .top { --amb-c: rgba(31, 154, 88, .34); }
+:root[data-theme="light"][data-amb="warn"]::before, :root[data-theme="light"][data-amb="warn"] .top { --amb-c: rgba(208, 138, 18, .32); }
+:root[data-theme="light"][data-amb="bad"]::before, :root[data-theme="light"][data-amb="bad"] .top { --amb-c: rgba(212, 22, 42, .30); }
+
+/* halo dos cards */
+:root[data-theme="light"] .pn-c.st-ok { --nh: rgba(31, 154, 88, .36); --nh2: rgba(31, 154, 88, .55); }
+:root[data-theme="light"] .pn-c.st-bad { --nh: rgba(212, 22, 42, .32); --nh2: rgba(212, 22, 42, .52); }
+:root[data-theme="light"] .pn-c.st-warn { --nh: rgba(208, 138, 18, .34); --nh2: rgba(208, 138, 18, .52); border-color: #D9A144; }
+:root[data-theme="light"] .pn-c.st-ok, :root[data-theme="light"] .pn-c.st-bad, :root[data-theme="light"] .pn-c.st-warn {
+  box-shadow: 0 0 12px -2px var(--nh), inset 0 0 12px -8px var(--nh), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent);
+  transition: transform .12s ease, border-color .15s ease, background-color .2s ease, box-shadow .4s ease;
+}
+:root[data-theme="light"] .pn-c.st-ok:active, :root[data-theme="light"] .pn-c.st-bad:active, :root[data-theme="light"] .pn-c.st-warn:active {
+  box-shadow: 0 0 16px -1px var(--nh2), inset 0 0 14px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent);
+}
+:root[data-theme="light"] .card.red.hero.b-ok:not(.oor) { box-shadow: 0 0 12px -2px rgba(31, 154, 88, .38), inset 0 0 12px -8px rgba(31, 154, 88, .38); }
+:root[data-theme="light"] .card.red.hero:is(.b-low, .b-vlow, .b-high, .b-vhigh):not(.oor) { box-shadow: 0 0 12px -2px rgba(212, 22, 42, .34), inset 0 0 12px -8px rgba(212, 22, 42, .34); }
+
+/* ícones e indicadores */
+:root[data-theme="light"] .pn-c:is(.st-ok, .st-bad, .st-warn) .pn-ic { filter: drop-shadow(0 0 3px var(--nh)); }
+:root[data-theme="light"] .pn-c.st-ok .badge.ok, :root[data-theme="light"] .hr-state .badge.ok { box-shadow: 0 0 10px -3px rgba(31, 154, 88, .55); }
+:root[data-theme="light"] :is(.pn-c, .hr-state) .badge:is(.low, .vlow, .high) { box-shadow: 0 0 10px -3px rgba(212, 22, 42, .50); }
+:root[data-theme="light"] :is(.pn-c, .hr-state) .badge.vhigh { box-shadow: 0 0 0 2px #F6B9C0, 0 0 10px -2px rgba(212, 22, 42, .55); }
+:root[data-theme="light"] .pn-spark .spark { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp, var(--red-l)) 45%, transparent)); }
+:root[data-theme="light"] .pr-prog i { box-shadow: 0 0 8px -1px rgba(212, 22, 42, .5); }
+:root[data-theme="light"] .nav button[aria-current="page"] { text-shadow: 0 0 10px rgba(212, 22, 42, .28); }
+
+/* botões importantes */
+:root[data-theme="light"] .btn.pri, :root[data-theme="light"] .nav .fab { transition: box-shadow .4s ease, transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease; }
+:root[data-theme="light"] .btn.pri:active { box-shadow: 0 6px 22px rgba(212, 22, 42, .34), 0 0 20px 0 rgba(212, 22, 42, .38); transition-duration: .12s; }
+:root[data-theme="light"] .nav .fab:active { box-shadow: 0 8px 28px rgba(212, 22, 42, .5), 0 0 22px 2px rgba(212, 22, 42, .4), 0 0 0 5px var(--bg); transition-duration: .12s; }
+:root[data-theme="light"] .rw-card .btn.pri:active { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 20px 0 rgba(31, 154, 88, .45); }
+@media (hover: hover) {
+  :root[data-theme="light"] .btn.pri:hover { box-shadow: 0 6px 22px rgba(212, 22, 42, .32), 0 0 16px -2px rgba(212, 22, 42, .32); }
+  :root[data-theme="light"] .nav .fab:hover { box-shadow: 0 8px 28px rgba(212, 22, 42, .45), 0 0 18px 0 rgba(212, 22, 42, .32), 0 0 0 5px var(--bg); }
+  :root[data-theme="light"] .rw-card .btn.pri:hover { box-shadow: 0 6px 18px rgba(22, 163, 74, .38), 0 0 16px -2px rgba(31, 154, 88, .38); }
+  :root[data-theme="light"] .pn-c:is(.st-ok, .st-bad, .st-warn):hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="light"]::before, :root[data-theme="light"] .top, :root[data-theme="light"] .pn-c, :root[data-theme="light"] .btn.pri, :root[data-theme="light"] .nav .fab { transition: none !important; }
 }

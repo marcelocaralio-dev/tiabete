@@ -119,11 +119,13 @@
     const first = +lsGet(KF) || 0; if (!first) lsSet(KF, String(n));
     const welcome = !first || n - first < FIRST_WEEK;
     const dv = (LK.devices || []).length;
-    return `<div class="card pr-hero"><div class="row sp"><div class="eyebrow">Licença vitalícia</div><span class="badge ok">✓ Ativa</span></div>
-      <h2 style="margin:6px 0 4px">Você é Premium!</h2>
+    const crown = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5l4.2 3.6L12 5l4.3 7.1 4.2-3.6-1.7 9.4H5.2z"/><path d="M5.6 20.5h12.8"/></svg>';
+    return `<div class="card pr-hero"><i class="pr-glow" aria-hidden="true"></i>
+      <div class="pr-top"><span class="pr-seal" aria-hidden="true">${crown}</span><div class="pr-id"><div class="eyebrow">Licença vitalícia</div><b class="pr-plan">PREMIUM</b></div><span class="badge ok pr-tag">✓ Ativa</span></div>
+      <h2 class="pr-ti">Você é Premium!</h2>
       <p class="pr-p" style="margin:0">Aproveite tudo o que o ${BRAND} tem a oferecer. A sua conta tem acesso Premium com licença vitalícia, sem cobrança recorrente.</p>
       ${welcome ? `<p class="pr-p" style="margin:8px 0 0">Obrigado pela confiança no ${BRAND}.</p>` : ''}
-      <div class="chips" style="margin:12px 0 0"><span class="chip good">Sem mensalidade</span><span class="chip">Vinculada à conta Google</span>${dv ? `<span class="chip">${dv} de ${MAX_DEV} aparelhos</span>` : ''}</div></div>`;
+      <div class="pr-tags"><span class="chip good pr-tag">Sem mensalidade</span><span class="chip pr-tag">Vinculada à conta Google</span>${dv ? `<span class="chip pr-tag">${dv} de ${MAX_DEV} aparelhos</span>` : ''}</div></div>`;
   }
   function stale() {
     return licPremiumNow() ? '' : `<div class="banner warn" role="status"><span><b>Validação pendente.</b> O app não conseguiu confirmar a sua licença com o servidor dentro do prazo sem internet (30 dias), então os recursos Premium estão pausados. Conecte-se à internet e toque em “Atualizar”. Seus registros e dados continuam disponíveis.</span></div>`;
@@ -135,7 +137,7 @@
     if (!a && i.model && i.os) lines.push(['Sistema', i.os]); else if (a && i.os) lines.push(['Sistema', i.os]);
     if (d.created_at) lines.push(['Vinculado em', fmt(d.created_at)]);
     if (d.last_seen) lines.push(['Última consulta à licença', fmt(d.last_seen)]);
-    return `<div class="pr-dev${cur ? ' cur' : ''}"><div class="row sp" style="align-items:flex-start"><b class="pr-dt">${esc(title)}</b>${cur ? '<span class="badge ok">Este aparelho</span>' : ''}</div>
+    return `<div class="pr-dev${cur ? ' cur' : ''}"><div class="pr-dh"><b class="pr-dt">${esc(title)}</b>${cur ? '<span class="badge ok pr-tag">Este aparelho</span>' : ''}</div>
       ${lines.map(l => `<div class="pr-ln"><span>${l[0]}</span><span>${esc(l[1])}</span></div>`).join('')}
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="pr-alias" data-id="${esc(d.id)}" ${busy() ? 'disabled' : ''}>Apelido</button>${!cur && curId() ? `<button class="btn sm danger" data-act="pr-rm" data-id="${esc(d.id)}" ${busy() ? 'disabled' : ''}>Desconectar</button>` : ''}</div></div>`;
   }
