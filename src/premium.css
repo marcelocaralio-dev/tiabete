@@ -1,0 +1,21 @@
+/* Central Premium (src/premium.js): só usa as variáveis e o padrão visual já existentes. */
+.pr-dev { border: 1px solid var(--line); background: var(--s2); border-radius: 14px; padding: 12px; margin: 0 0 10px; min-width: 0; }
+.pr-dev.cur { border-color: var(--good-bd); }
+.pr-dt { font-size: 15.5px; min-width: 0; overflow-wrap: anywhere; }
+.pr-ln { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14.5px; color: var(--mut); }
+.pr-ln > span:last-child { color: var(--fg); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.pr-feats { list-style: none; padding-left: 0; }
+.pr-feat { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 6px 0; }
+.pr-feat > span { min-width: 0; }
+.pr-det { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+.pr-det summary { cursor: pointer; font-weight: 600; font-size: 15px; min-height: 32px; display: flex; align-items: center; }
+.pr-det ol { padding-left: 20px; }
+.pr-ul { text-align: left; }
+@media (max-width: 380px) { .pr-ln { flex-direction: column; gap: 0; } .pr-ln > span:last-child { text-align: left; } }
+.pr-p { color: var(--mut); font-size: 15px; margin: 8px 0 0; }
+.pr-p b { color: var(--fg); font-weight: 600; }
+.pr-m { color: var(--mut); font-size: 15px; }
+.pr-det summary { justify-content: space-between; list-style: none; }
+.pr-det summary::-webkit-details-marker { display: none; }
+.pr-det summary::after { content: "+"; font-family: var(--f-mono); color: var(--red-l); font-size: 18px; }
+.pr-det[open] summary::after { content: "–"; }
