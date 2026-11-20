@@ -36,3 +36,6 @@ fechar/abrir com configurações · localStorage perdido (restaurado do banco) �
 - **Filtros de busca do Histórico** (texto, datas) continuam zerando ao abrir, de propósito, para não mostrar lista filtrada sem a pessoa lembrar.
 - **Bolha (alert-center):** já tinha cópia em localStorage + meta e gravação ao sair; sem alteração. A permissão de sobreposição não é usada pelo app.
 - **Módulo de licenciamento intacto** (arquivos idênticos, conferido por hash no `test24`); nenhuma leitura de dados de saúde via licença.
+
+## Correção visual: card "Glicemia mais recente" com fundo verde
+Causa: em `src/metricas.css` a regra genérica `.b-ok { background: var(--mt-ok) }` (feita para as barras da Central de Métricas) também atingia o card do Início, que usa a classe `b-ok` quando a glicemia está na faixa (o mesmo valria para `b-vlow` e `b-vhigh`). Correção: as regras agora valem só para `i.b-*` (as barras/legendas das métricas). Teste de regressão: `tests/test25.js`.

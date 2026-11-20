@@ -146,7 +146,8 @@
 .mt-bd > i { width: 9px; height: 9px; border-radius: 3px; }
 .mt-bd span small { margin-left: 6px; font: 400 10.5px var(--f-mono); color: var(--mt-mut2); }
 .mt-bd b { color: var(--mt-fg); font-weight: 600; font-size: 12.5px; }
-.b-vlow { background: #7D1020; } .b-low1 { background: #E5586A; } .b-ok { background: var(--mt-ok); } .b-high1 { background: var(--mt-warn); } .b-vhigh { background: #FF3B4E; }
+/* só nas barras/legendas das métricas (<i>): sem "i", .b-ok pintava de verde o card "Glicemia mais recente" do Início, que também usa .b-ok */
+i.b-vlow { background: #7D1020; } i.b-low1 { background: #E5586A; } i.b-ok { background: var(--mt-ok); } i.b-high1 { background: var(--mt-warn); } i.b-vhigh { background: #FF3B4E; }
 .mt-bands.wide { margin-top: 2px; }
 .mt-bands.wide .mt-bar { height: 14px; }
 
