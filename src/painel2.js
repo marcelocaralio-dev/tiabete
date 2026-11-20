@@ -11,7 +11,8 @@ function pnlCard() {
   const o = [['cards', 'Cartões', 'Visual novo, em cartões. Toque em um cartão para ver os detalhes.'], ['classic', 'Clássico', 'Visual antigo do Início, completo.']];
   return `<h2 class="sec">Visual do Painel</h2><div class="card" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">Escolha como a tela Início é mostrada. A escolha é aplicada na hora e fica guardada neste aparelho.</p><div class="seg" role="group" aria-label="Visual do Início" style="display:flex">${o.map(([k, t]) => `<button class="grow" data-act="pnl-mode" data-v="${k}" aria-pressed="${pnlMode === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">${esc(o.find(x => x[0] === pnlMode)[2])}</p></div>`;
 }
-function viewPainel() { return (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()); }
+/* Central de Métricas: UM bloco de acesso depois dos cartões (os cartões não mudam). Só aparece quando já há medições, como o resto do Início. */
+function viewPainel() { return (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()) + (S.records.length && typeof mtHomeBlock === 'function' ? mtHomeBlock() : ''); }
 
 const PNI = {
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',

@@ -20,7 +20,7 @@ function d1() {
     vm.runInContext(fs.readFileSync(ROOT + '/src/licensecore.js', 'utf8'), c); vm.runInContext(fs.readFileSync(ROOT + '/src/license.js', 'utf8'), c); c.run = s => vm.runInContext(s, c); return c;
   }
   const prod = bare(false);
-  ok(PREM.length === 6 && PREM.every(f => prod.run(`licAllowed(${JSON.stringify(f)})`) === false), 'PRODUÇÃO sem configuração: nenhum premium é liberado');
+  ok(PREM.length === 7 && PREM.every(f => prod.run(`licAllowed(${JSON.stringify(f)})`) === false), 'PRODUÇÃO sem configuração: nenhum premium é liberado');
   ok(FREE.every(f => prod.run(`licAllowed(${JSON.stringify(f)})`) === true), 'PRODUÇÃO sem configuração: tudo que é gratuito segue livre');
   ok(prod.run('licStatus()') === 'unconfigured' && prod.run('VIEWS.bolus()').includes('premium') && prod.run('VIEWS.historico()') === 'H', 'produção sem configuração: bloqueio informativo só no premium, histórico intacto');
   ok(prod.run('viewLicenca()').includes('Registrar glicemia e insulina'), 'tela Licença explica o que segue gratuito');

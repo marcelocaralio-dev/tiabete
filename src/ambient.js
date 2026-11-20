@@ -52,7 +52,11 @@ try { const v = localStorage.getItem('tb-amb'); if (['ok', 'warn', 'bad'].includ
 function ambState() {
   let st;
   if (typeof window !== 'undefined' && typeof window.TB_CONTROL_STATE === 'function') st = window.TB_CONTROL_STATE(S.records);
-  else st = ambClassify(S.records, Date.now(), ambPrev).state;
+  else {
+    /* Premium vitalício: considera TIR, TBR, TAR, DP e CV (metricas.js). Gratuito/sem licença: devolve null e vale a lógica abaixo, sem mudança. */
+    let pm = null; try { if (typeof mtAmbientState === 'function') pm = mtAmbientState(S.records, Date.now(), ambPrev); } catch (e) { pm = null; }
+    st = pm || ambClassify(S.records, Date.now(), ambPrev).state;
+  }
   if (!['ok', 'warn', 'bad'].includes(st)) st = 'none';
   if (st !== ambPrev) { ambPrev = st; try { localStorage.setItem('tb-amb', st); } catch (e) { } }
   return st;

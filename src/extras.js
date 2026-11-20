@@ -801,6 +801,7 @@ async function insLink() {
 async function applyBackupState(st, replace) {
   if (!st) return;
   try { if (st.profile && typeof st.profile === 'object' && (replace || !S.profile)) { S.profile = pfClean(st.profile); await pfSave(); } } catch (e) { }
+  try { if (st.metricsCfg && typeof st.metricsCfg === 'object' && typeof mtLoadCfg === 'function' && (replace || !mtCfgExport())) { mtLoadCfg(st.metricsCfg); await mtSaveCfg(); } } catch (e) { }
   try { if (st.plan && typeof st.plan === 'object' && (replace || !plHas())) { plLoad(st.plan); await plSave(); } } catch (e) { }
   try { if (st.insRem && typeof st.insRem === 'object' && (replace || !S.ir.items.length)) { const c = irClean(st.insRem, uid); c.state = {}; c.tz = ''; S.ir = c; irReconcile(S.ir, S.plan); await irSave(); irSync(300); } } catch (e) { }
   try { if (st.alertCenter && typeof st.alertCenter === 'object' && (replace || !S.ac.items.length)) { const have = new Set(S.ac.items.map(x => x.id)); const inc = (Array.isArray(st.alertCenter.items) ? st.alertCenter.items : []).filter(x => x && x.id && x.key && !have.has(x.id)); S.ac.items = replace ? inc : S.ac.items.concat(inc); S.ac.items = S.ac.items.slice(0, AC_MAX); acSave(); } } catch (e) { }

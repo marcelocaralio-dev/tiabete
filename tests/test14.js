@@ -97,7 +97,7 @@ function d1() {
   const app_js = fs.readFileSync(__dirname + '/../src/app.js', 'utf8'), ai_js = fs.readFileSync(__dirname + '/../native/ai-core.js', 'utf8');
   ok(/case 'rep-xlsx': el\.disabled/.test(app_js) && !/case 'rep-xlsx'[^\n]*licAllowed/.test(app_js), 'exportação em Excel não passa pelo portão');
   ok(/TB_GATE\('ia'\)/.test(ai_js), 'toda chamada de IA passa pelo portão premium');
-  ok(Object.keys(vm.runInContext('LIC_PREMIUM', vm.createContext({}) && c1)).join() === 'bolus,padroes,exames,analise,rel-pdf,ia', 'apenas os 6 recursos combinados são premium');
+  ok(Object.keys(vm.runInContext('LIC_PREMIUM', vm.createContext({}) && c1)).join() === 'bolus,padroes,exames,analise,rel-pdf,ia,metricas', 'apenas os 6 recursos combinados + a Central de Métricas são premium');
   T.now = Date.UTC(2026, 10, 15, 12);
   T.now += 336 * H; /* continua expirado nos testes seguintes */
 

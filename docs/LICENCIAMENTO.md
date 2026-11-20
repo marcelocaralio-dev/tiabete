@@ -4,7 +4,7 @@
 
 ## Como funciona (resumo)
 - **Gratuito para sempre:** registros de glicemia e insulina, históricos, edição, Início, Hemoglobina glicada, Meu tratamento, hipoglicemia, alertas, perfil, segurança, backup e restauração, Drive, exportação Excel/CSV.
-- **Premium** (teste de 14 dias ou licença vitalícia): cálculo de bolus, Padrões, Exames, Análise, relatório em PDF e IA. A lista está em `LIC_PREMIUM` (`src/license.js`).
+- **Premium** (teste de 14 dias ou licença vitalícia): cálculo de bolus, Padrões, Exames, Análise, relatório em PDF e IA. A lista está em `LIC_PREMIUM` (`src/license.js`). A **Central de Métricas Glicêmicas** (`metricas`) também está nela, mas é exclusiva da licença vitalícia (`LIC_LIFETIME`): o teste de 14 dias não a libera.
 - **Teste:** 336 horas a partir do primeiro login com Google, contadas pelo relógio do **servidor**. Não reinicia ao reinstalar ou trocar de aparelho.
 - **Licença vitalícia:** R$ 29,90 (preço no banco; mudar vale só para vendas novas). Até 2 aparelhos; trocar é gratuito.
 - **Offline:** o app guarda um token assinado e confere a assinatura com a chave pública. Vale 7 dias sem internet no teste e 30 dias na licença vitalícia. Depois disso só o premium pausa; o gratuito nunca para.

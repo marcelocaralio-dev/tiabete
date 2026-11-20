@@ -4,7 +4,9 @@
    Só estes recursos são premium (LIC_PREMIUM). Qualquer outro nome é gratuito por padrão.
    PRODUÇÃO (padrão): sem o endereço do servidor (config/license-api.txt) e a chave pública, o premium fica BLOQUEADO; o gratuito segue normal.
    DESENVOLVIMENTO: só com o modo explícito (npm run build:web:dev → TB_DEV_MODE) e sem servidor configurado o premium é liberado para testes. */
-const LIC_PREMIUM = { bolus: 'Cálculo de bolus', padroes: 'Padrões e observações automáticas', exames: 'Exames laboratoriais', analise: 'Análise e gráficos', 'rel-pdf': 'Relatório em PDF', ia: 'Recursos de inteligência artificial' };
+const LIC_PREMIUM = { bolus: 'Cálculo de bolus', padroes: 'Padrões e observações automáticas', exames: 'Exames laboratoriais', analise: 'Análise e gráficos', 'rel-pdf': 'Relatório em PDF', ia: 'Recursos de inteligência artificial', metricas: 'Central de Métricas Glicêmicas' };
+/* Recursos premium que o teste de 14 dias NÃO libera: só a licença vitalícia paga (payload assinado com st = lifetime_active). Mesmo token, mesma assinatura, mesmo relógio: nenhum estado novo. */
+const LIC_LIFETIME = { metricas: true };
 const LIC_FREE_LIST = ['Registrar glicemias e aplicações de insulina, sem limite', 'Histórico de glicemias e de insulinas', 'Editar e corrigir seus registros', 'Início, Hemoglobina glicada e Meu tratamento', 'Protocolo de hipoglicemia, alertas e lembretes', 'Perfil, segurança, biometria e privacidade', 'Cópia de segurança, restauração e Google Drive', 'Exportar seus dados (Excel e CSV)'];
 const LK = { dev: window.TB_DEV_MODE === true, api: '', pub: null, cfg: false, loaded: false, payload: null, seen: 0, seenSaved: 0, info: null, devices: [], conflict: null, busy: false, msg: '', last: 0 };
 try { LK.api = String(window.TB_LICENSE_API || '').trim().replace(/\/+$/, ''); LK.pub = window.TB_LICENSE_PUBKEY ? JSON.parse(window.TB_LICENSE_PUBKEY) : null; LK.cfg = !!(LK.api && LK.pub); } catch (e) { LK.cfg = false; }
@@ -16,7 +18,8 @@ function licAllowed(f) {
   if (!LIC_PREMIUM[f]) return true;           /* tudo que não é premium é livre */
   if (!LK.cfg) return LK.dev;                 /* sem servidor: só o modo de desenvolvimento libera; produção nunca */
   if (!LK.loaded) return false;               /* ainda lendo o token guardado: o premium espera, o gratuito nunca espera */
-  return licPremiumNow();
+  if (!licPremiumNow()) return false;
+  return LIC_LIFETIME[f] ? !!(LK.payload && LK.payload.st === 'lifetime_active') : true;
 }
 window.TB_GATE = licAllowed;
 if (!LK.cfg) LK.loaded = true;
@@ -157,7 +160,8 @@ function viewLicenca() {
     ${st !== 'dev' && st !== 'unconfigured' && signed ? `<button class="btn full" data-act="lic-refresh" ${LK.busy ? 'disabled' : ''}>${LK.busy ? 'Consultando…' : 'Atualizar situação'}</button>` : ''}</div>
     ${LK.okAt && !LK.busy ? `<p class="hint" style="margin:10px 0 0">Última consulta ao servidor: ${new Date(LK.okAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.</p>` : ''}</div>
     <h2 class="sec">Sempre gratuito</h2><div class="card"><ul class="plain">${LIC_FREE_LIST.map(x => `<li>${x}</li>`).join('')}</ul><p class="hint" style="margin:8px 0 0">Nada disso depende de pagamento, nem depois do teste.</p></div>
-    <h2 class="sec">Premium (teste de 14 dias ou licença vitalícia)</h2><div class="card"><ul class="plain">${Object.values(LIC_PREMIUM).map(x => `<li>${x}</li>`).join('')}</ul><p class="hint" style="margin:8px 0 0">Pagamento único, sem mensalidade, válido em até 2 aparelhos. O preço de novas vendas pode mudar, mas a licença já comprada não muda.</p></div>
+    <h2 class="sec">Premium (teste de 14 dias ou licença vitalícia)</h2><div class="card"><ul class="plain">${Object.entries(LIC_PREMIUM).filter(([k]) => !LIC_LIFETIME[k]).map(([, x]) => `<li>${x}</li>`).join('')}</ul></div>
+    <h2 class="sec">Exclusivo da licença vitalícia</h2><div class="card"><ul class="plain">${Object.entries(LIC_PREMIUM).filter(([k]) => LIC_LIFETIME[k]).map(([, x]) => `<li>${x} <span class="hint">(não faz parte do teste de 14 dias)</span></li>`).join('')}</ul><p class="hint" style="margin:8px 0 0">Pagamento único, sem mensalidade, válido em até 2 aparelhos. O preço de novas vendas pode mudar, mas a licença já comprada não muda.</p></div>
     ${LK.cfg && (LK.devices.length || LK.conflict) ? `<h2 class="sec">Aparelhos</h2><div class="card">${(LK.conflict || LK.devices).map(d => `<div class="row sp" style="margin:6px 0"><span>${esc(d.name || 'Aparelho')}<span class="hint" style="display:block">visto em ${new Date(d.last_seen).toLocaleDateString('pt-BR')}</span></span><button class="btn sm" data-act="lic-dev-rm" data-id="${esc(d.id)}">${LK.conflict ? 'Usar este lugar' : 'Remover'}</button></div>`).join('')}<p class="hint" style="margin:8px 0 0">Remover um aparelho libera uma vaga e não apaga os dados dele.</p></div>` : ''}`;
 }
 document.addEventListener('click', e => {

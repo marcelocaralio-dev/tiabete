@@ -141,7 +141,7 @@ function mealIcon(r) {
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
-const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : 'mais';
+const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : (r === 'metricas' || r === 'metrica') ? 'painel' : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
   try { if (acToast(msg)) return; } catch (e) { }
@@ -906,7 +906,7 @@ function navHTML() {
   const cur = navGroup(S.route), b = (r, i, l) => `<button data-act="go" data-r="${r}" ${cur === r ? 'aria-current="page"' : ''}>${ic(i)}${l}</button>`;
   return `<div class="nav-in">${b('painel', 'home', 'Início')}${b('historico', 'list', 'Histórico')}<button class="fab" data-act="new" aria-label="Nova medição">${ic('plus')}</button>${b('analise', 'chart', 'Análise')}${b('mais', 'menu', 'Mais')}</div>`;
 }
-function backOf(r) { return r === 'alertashist' ? 'lembretes' : r === 'insrem' ? 'lembretes' : r === 'esquemas' ? 'perfil' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
+function backOf(r) { return r === 'metrica' ? 'metricas' : r === 'metricas' ? 'painel' : r === 'alertashist' ? 'lembretes' : r === 'insrem' ? 'lembretes' : r === 'esquemas' ? 'perfil' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
 function go(r) { if (r === 'mais' && S.route !== 'mais' && hubOf(S.route)) S.maisOpen = hubOf(S.route); if (r !== S.route) S.prevRoute = S.route; S.route = r; if (location.hash !== '#' + r) { try { location.hash = r; } catch (e) { } } render(); window.scrollTo(0, 0); }
 function routeFromHash() { const h = location.hash.replace('#', ''); return h === 'exame' ? (S.exams.some(x => x.id === S.ex.id) ? 'exame' : 'exames') : VIEWS[h] ? h : 'painel'; }
 
@@ -1018,7 +1018,7 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, insRem: S.ir && S.ir.items.length ? { ...S.ir, state: {}, tz: '' } : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
+  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { metricsCfg: typeof mtCfgExport === 'function' ? mtCfgExport() : undefined, swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, insRem: S.ir && S.ir.items.length ? { ...S.ir, state: {}, tz: '' } : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
   if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.rw && S.rw.cust && S.rw.cust.length) && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }
