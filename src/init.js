@@ -4,6 +4,9 @@
   S.ana.A = { from: isoDate(new Date(addDays(today, -29))), to: isoDate(new Date(today)) };
   S.ana.B = { from: isoDate(new Date(addDays(today, -59))), to: isoDate(new Date(addDays(today, -30))) };
   await Store.init();
+  /* As configurações salvas precisam ser LIDAS antes de qualquer gravação. Se a leitura falhar, nada em "meta" é gravado por cima (Store.metaOk). */
+  if (Store.persistent) { let ok = false; for (let i = 0; i < 3 && !ok; i++) { try { await Store.all('meta'); ok = true; } catch (e) { await new Promise(r => setTimeout(r, 500 * (i + 1))); } } Store.metaOk = ok; if (!ok) { try { toast('Não consegui ler suas configurações salvas. Feche e abra o app de novo; nada foi apagado.'); } catch (e) { } } }
+  try { await psRestore(); } catch (e) { }
   await loadAll();
   let seeded = false;
   try { const ms = await Store.all('meta'); const lb = ms.find(x => x.id === 'last-backup'), sn = ms.find(x => x.id === 'bk-snooze'); const si = ms.find(x => x.id === 'insulin'); if (si) { const { id, ...rest } = si; Object.assign(S.ins, rest); } if (lb) S.lastBackup = lb.ts; if (sn) S.bkSnooze = sn.ts; } catch (e) { }
@@ -27,6 +30,7 @@
   try { const im = (await Store.all('meta')).find(x => x.id === 'ins-rem'); if (im) irLoad(im.value); const rr = irReconcile(S.ir, S.plan), pr = irPrune(S.ir, Date.now()); if (rr.changed || pr) await irSave(); irTzCheck(); } catch (e) { console.error(e); }
   try { const mc = (await Store.all('meta')).find(x => x.id === 'metrics-cfg'); if (mc && typeof mtLoadCfg === 'function') mtLoadCfg(mc.value); } catch (e) { }
   S.irReady = true;
+  try { if (typeof tbCfgReady === 'function') tbCfgReady(); } catch (e) { }
   try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }
   try { const sv = (await Store.all('meta')).find(x => x.id === 'saved-meals'); if (sv && Array.isArray(sv.value)) S.saved = sv.value; } catch (e) { }

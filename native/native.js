@@ -36,6 +36,10 @@ if (NATIVE) {
       el.innerHTML = `Permissão de notificações: <b>${p === 'granted' ? 'concedida' : p === 'denied' ? 'negada' : 'ainda não pedida'}</b><br>Horários exatos: <b>${ex}</b><br>Notificações agendadas: <b>${n}</b>`;
     } catch (e) { el.textContent = 'Não foi possível verificar.'; }
   }
+  /* As sincronizações abaixo CANCELAM e refazem agendamentos a partir das configurações. Só podem rodar depois de as configurações salvas
+     terem sido lidas do banco (S.irReady) e com o banco real aberto; senão usariam valores padrão e apagariam lembretes da pessoa. */
+  const cfgOk = () => !!(S.irReady && Store.persistent && Store.metaOk);
+  window.tbCfgReady = () => setTimeout(() => { remResync(); postSync(); postClean(); planSync(); hypoSync(); try { caSync(); } catch (e) { } }, 300);
   const REM_ID = { jejum: 101, almoco: 102, jantar: 103, deitar: 104, basal: 105 }, HYPO_ID = 201;
   const remIntro = 'Estes lembretes diários tocam nos horários escolhidos, mesmo com o app fechado.';
   VIEWS.lembretes = function () {
@@ -82,6 +86,7 @@ if (NATIVE) {
     return list.length;
   }
   async function remResync() {
+    if (!cfgOk()) return;
     try {
       const m = (await Store.all('meta')).find(x => x.id === 'rem-active'); if (!m || !m.value || !LN()) return;
       await remSchedule(m.value.items, m.value.adv);
@@ -89,7 +94,7 @@ if (NATIVE) {
   }
   /* Reavaliação após hipoglicemia: se a última medição (de hoje, com horário) foi abaixo de 70, avisa em X minutos. */
   async function hypoSync() {
-    const ln = LN(); if (!ln) return;
+    const ln = LN(); if (!ln || !cfgOk()) return;
     try {
       const c = alCfg(), ep = hypoEpisode(S.records, Date.now()), last = ep && ep.last; // reavalia toda glicemia abaixo de 70 (o episódio só existe com a última medição < 70)
       const low = !!(ep && ep.protocol && Date.now() - last.ts < 60 * 60000);
@@ -109,7 +114,7 @@ if (NATIVE) {
   const expCancel = async id => { try { const x = TBX(); if (x) await x.cancel({ id: String(id) }); } catch (e) { } };
   let postBusy = false;
   async function postSync() {
-    const ln = LN(); if (!ln || postBusy) return; postBusy = true;
+    const ln = LN(); if (!ln || postBusy || !cfgOk()) return; postBusy = true;
     try {
       const c = alCfg(), now = Date.now(), recs = S.records.filter(r => !isEx(r) && !r.noTime && r.ts && r.glucose != null);
       const mm = (await Store.all('meta')).find(x => x.id === 'post-sched'), map = (mm && mm.value) || {};
@@ -142,7 +147,7 @@ if (NATIVE) {
   }
   /* se a notificação já passou dos 10 minutos e o app estava fechado sem o relógio nativo, limpa ao voltar */
   async function postClean() {
-    const ln = LN(); if (!ln) return;
+    const ln = LN(); if (!ln || !cfgOk()) return;
     try {
       const mm = (await Store.all('meta')).find(x => x.id === 'post-sched'), map = (mm && mm.value) || {}, now = Date.now(), old = Object.entries(map).filter(([, v]) => now > v.at + POST_WIN * 60000).map(([id]) => +id);
       if (old.length) await rmDelivered(old);
@@ -152,7 +157,7 @@ if (NATIVE) {
   let planBusy = false;
   const planId = key => { let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 500000 + (h % 400000); };
   async function planSync() {
-    const ln = LN(); if (!ln || planBusy || typeof planAlarms !== 'function') return; planBusy = true;
+    const ln = LN(); if (!ln || planBusy || !cfgOk() || typeof planAlarms !== 'function') return; planBusy = true;
     try {
       const mm = (await Store.all('meta')).find(x => x.id === 'plan-sched'), old = (mm && mm.value) || [];
       if (old.length) { try { await ln.cancel({ notifications: old.map(id => ({ id })) }); } catch (e) { } }
@@ -185,8 +190,10 @@ if (NATIVE) {
   }
   { const _put = Store.put; Store.put = function (st, v) { const r = _put.apply(this, arguments); if (st === 'meta' && v && (v.id === 'plan' || v.id === 'alerts')) setTimeout(planSync, 150); return r; }; }
   window.tbPlanSync = () => setTimeout(planSync, 150); /* chamado quando muda quais insulinas passam a ter lembrete próprio (insrem.js): refaz os alarmes do tratamento sem duplicar */
+  let notifTries = 0;
   async function notifInit() {
     const ln = LN(); if (!ln) return;
+    if (!cfgOk()) { if (++notifTries < 40) setTimeout(notifInit, 3000); return; }
     try {
       const done = (await Store.all('meta')).some(x => x.id === 'perm-asked' && x.value);
       const p = (await ln.checkPermissions()).display;
@@ -197,7 +204,7 @@ if (NATIVE) {
   /* ---- Alertas personalizados: agenda no Android (toca com o app fechado), cancela os que deixaram de valer e abre a tela ao tocar ---- */
   const CA_KEY = 'tb-ca-ids'; let caBusy = false;
   window.caNativeSync = async list => {
-    const ln = LN(); if (!ln || caBusy) return; caBusy = true;
+    const ln = LN(); if (!ln || caBusy || !cfgOk()) return; caBusy = true;
     try {
       const now = Date.now(), fut = (list || []).filter(x => x.at > now + 3000); let old = [];
       try { old = JSON.parse(localStorage.getItem(CA_KEY) || '[]'); } catch (e) { }
@@ -213,7 +220,23 @@ if (NATIVE) {
   try { const l0 = LN(); if (l0 && l0.addListener) l0.addListener('localNotificationActionPerformed', ev => { const x = ev && ev.notification && ev.notification.extra; if (x && x.route === 'alertasp' && typeof go === 'function') go('alertasp'); }); } catch (e) { }
   setTimeout(notifInit, 5000);
   setInterval(() => { postClean(); postSync(); }, 60000);
-  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { postClean(); postSync(); hypoSync(); planSync(); try { caSync(); } catch (e) { } setTimeout(() => { try { if (typeof drvAuto === 'function') drvAuto(); } catch (e) { } }, 1500); });
+  /* Permissão de notificações revogada/devolvida no Android: avisa uma vez por sessão (as configurações continuam salvas) e, quando voltar, refaz os agendamentos sem duplicar (ids fixos). */
+  let permPrev = null, permWarned = false;
+  async function permWatch() {
+    const ln = LN(); if (!ln || !cfgOk()) return;
+    try {
+      const p = (await ln.checkPermissions()).display;
+      if (p === 'granted') { if (permPrev && permPrev !== 'granted') { permWarned = false; window.tbCfgReady(); } }
+      else if (!permWarned) {
+        const rm = (await Store.all('meta')).find(x => x.id === 'rem-active');
+        if ((rm && rm.value) || (S.ir && S.ir.on) || (alCfg().plan && typeof plCollect === 'function' && plCollect(false).length)) { permWarned = true; toast('As notificações do TiaBete estão desligadas no Android. Seus lembretes continuam salvos e voltam a tocar quando você permitir.'); }
+      }
+      permPrev = p;
+    } catch (e) { }
+  }
+  window.tbPermWatch = permWatch;
+  setTimeout(permWatch, 8000);
+  const AP = capP('App'); if (AP && AP.addListener) AP.addListener('resume', () => { permWatch(); postClean(); postSync(); hypoSync(); planSync(); try { caSync(); } catch (e) { } setTimeout(() => { try { if (typeof drvAuto === 'function') drvAuto(); } catch (e) { } }, 1500); });
   /* backup programado no Drive falhou: avisa também com notificação do Android */
   window.addEventListener('tb-drv-fail', async ev => {
     try {

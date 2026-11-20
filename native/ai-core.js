@@ -12,14 +12,19 @@
     const open = () => dbp || (dbp = new Promise((ok, no) => {
       const r = indexedDB.open('tb-secure', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('k');
-      r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
-    }));
+      r.onsuccess = () => { const d = r.result; d.onclose = () => { dbp = null; }; d.onversionchange = () => { try { d.close(); } catch (e) { } dbp = null; }; ok(d); }; r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
+    }).catch(e => { dbp = null; throw e; }));
     const tx = async (mode, f) => { const db = await open(); return new Promise((ok, no) => { const t = db.transaction('k', mode), q = f(t.objectStore('k')); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); };
     const raw = { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)), del: k => tx('readwrite', s => s.delete(k)) };
-    async function master() {
-      let k = await raw.get('master');
-      if (!k) { k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']); await raw.set('master', k); }
-      return k;
+    /* Uma única chave mestra por vez: chamadas simultâneas na primeira abertura não geram chaves diferentes (a última apagaria a anterior e os itens
+       já cifrados, como o login do Google, ficariam ilegíveis). Falha de leitura nunca gera chave nova por cima da existente. */
+    let masterP = null;
+    function master() {
+      return masterP || (masterP = (async () => {
+        let k = await raw.get('master');
+        if (!k) { k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']); k = (await raw.get('master')) || (await raw.set('master', k), k); }
+        return k;
+      })().catch(e => { masterP = null; throw e; }));
     }
     return {
       async set(name, text) {

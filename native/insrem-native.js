@@ -29,7 +29,7 @@ if (typeof NATIVE !== 'undefined' && NATIVE) (function () {
   }
   /* Refaz o que falta, cancela o que sobrou e nunca agenda o mesmo aviso duas vezes (ids estáveis + assinatura) */
   async function syncOnce() {
-    const ln = LN(); if (!ln || !S.irReady) return;
+    const ln = LN(); if (!ln || !S.irReady || !Store.persistent || !Store.metaOk) return; /* sem o banco real, nada é cancelado nem refeito */
     const now = Date.now(), want = S.ir.on ? irNotifPlan(S.ir, S.plan, { quiet: t => plQuietAt(t) }) : [], snz = S.ir.on ? irSnoozes(S.ir, S.plan, now) : [];
     const all = want.map(n => ({ ...n, snooze: false })).concat(snz.map(n => ({ ...n, snooze: true }))), wantIds = new Set(all.map(n => n.nid));
     let pend = []; try { pend = (await ln.getPending()).notifications || []; } catch (e) { }

@@ -1,41 +1,66 @@
 /* ================= Armazenamento local (IndexedDB) ================= */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const Store = {
-  db: null, persistent: false, mem: { records: [], hba1c: [], schemes: [], meta: [], exams: [], events: [], inslog: [] },
+  db: null, persistent: false, metaOk: true, mem: { records: [], hba1c: [], schemes: [], meta: [], exams: [], events: [], inslog: [] },
+  /* Abre o banco com novas tentativas: numa abertura fria (app encerrado à força, aparelho lento) a primeira tentativa pode demorar.
+     Só cai para a memória se todas falharem; nesse caso nada é gravado nem apagado no banco real. */
+  _open(ms) {
+    return new Promise((res, rej) => {
+      const t = setTimeout(() => rej(new Error('timeout')), ms);
+      const rq = indexedDB.open('glicotrack', SCHEMA_VERSION);
+      /* Migrações só ADICIONAM stores. Nunca apagam dados. Próximas versões: novo bloco "if (old < N)". */
+      rq.onupgradeneeded = e => {
+        const db = rq.result, old = e.oldVersion;
+        ['records', 'hba1c', 'schemes', 'meta', 'exams', 'events', 'inslog'].forEach(n => { if (!db.objectStoreNames.contains(n)) db.createObjectStore(n, { keyPath: 'id' }); });
+      };
+      rq.onsuccess = () => { clearTimeout(t); const db = rq.result; db.onversionchange = () => { try { db.close(); } catch (e) { } if (Store.db === db) Store.db = null, Store._reopen = null; }; db.onclose = () => { if (Store.db === db) Store.db = null; }; res(db); };
+      rq.onerror = () => { clearTimeout(t); rej(rq.error); };
+      rq.onblocked = () => { clearTimeout(t); rej(new Error('blocked')); };
+    });
+  },
   async init() {
-    try {
-      this.db = await new Promise((res, rej) => {
-        const t = setTimeout(() => rej(new Error('timeout')), 4000);
-        const rq = indexedDB.open('glicotrack', SCHEMA_VERSION);
-        /* Migrações só ADICIONAM stores. Nunca apagam dados. Próximas versões: novo bloco "if (old < N)". */
-        rq.onupgradeneeded = e => {
-          const db = rq.result, old = e.oldVersion;
-          ['records', 'hba1c', 'schemes', 'meta', 'exams', 'events', 'inslog'].forEach(n => { if (!db.objectStoreNames.contains(n)) db.createObjectStore(n, { keyPath: 'id' }); });
-        };
-        rq.onsuccess = () => { clearTimeout(t); res(rq.result); };
-        rq.onerror = () => { clearTimeout(t); rej(rq.error); };
-        rq.onblocked = () => { clearTimeout(t); rej(new Error('blocked')); };
-      });
-      this.persistent = true;
-      try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
-    } catch (e) { this.db = null; this.persistent = false; }
+    const waits = [6000, 10000, 15000];
+    for (let i = 0; i < waits.length && !this.db; i++) {
+      try { this.db = await this._open(waits[i]); } catch (e) { this.db = null; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
+    }
+    this.persistent = !!this.db;
+    if (this.db) { try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { } }
+    this.metaOk = true;
+  },
+  /* Conexão fechada pelo sistema (pouca memória, atualização): reabre uma vez e usa de novo, em vez de perder a gravação. */
+  async _db() {
+    if (this.db) return this.db;
+    if (!this.persistent) return null;
+    if (!this._reopen) this._reopen = this._open(10000).then(d => { this.db = d; this._reopen = null; return d; }, e => { this._reopen = null; throw e; });
+    return this._reopen;
+  },
+  async _run(store, mode, f) {
+    for (let k = 0; ; k++) {
+      try {
+        const db = await this._db();
+        return await new Promise((res, rej) => {
+          let t; try { t = mode === 'readwrite' ? db.transaction(store, mode, { durability: 'strict' }) : db.transaction(store, mode); } catch (e) { rej(e); return; }
+          const out = f(t.objectStore(store)); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('abort'));
+        });
+      } catch (e) { if (k >= 1) throw e; this.db = null; await new Promise(r => setTimeout(r, 150)); }
+    }
   },
   all(store) {
-    if (!this.db) return Promise.resolve([...this.mem[store]]);
-    return new Promise((res, rej) => { const rq = this.db.transaction(store).objectStore(store).getAll(); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
+    if (!this.persistent) return Promise.resolve([...this.mem[store]]);
+    return this._run(store, 'readonly', s => s.getAll());
   },
   putMany(store, arr) {
-    if (!this.db) { arr.forEach(o => { const i = this.mem[store].findIndex(x => x.id === o.id); if (i >= 0) this.mem[store][i] = o; else this.mem[store].push(o); }); return Promise.resolve(); }
-    return new Promise((res, rej) => { const t = this.db.transaction(store, 'readwrite'), s = t.objectStore(store); arr.forEach(o => s.put(o)); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+    if (!this.persistent) { arr.forEach(o => { const i = this.mem[store].findIndex(x => x.id === o.id); if (i >= 0) this.mem[store][i] = o; else this.mem[store].push(o); }); return Promise.resolve(); }
+    /* Se as configurações salvas não puderam ser lidas na abertura, não grava por cima (evita trocar o que está salvo pelos valores padrão). */
+    if (store === 'meta' && !this.metaOk) return Promise.reject(new Error('meta-unreadable'));
+    return this._run(store, 'readwrite', s => { arr.forEach(o => s.put(o)); return null; });
   },
   put(store, o) { return this.putMany(store, [o]); },
-  del(store, id) {
-    if (!this.db) { this.mem[store] = this.mem[store].filter(x => x.id !== id); return Promise.resolve(); }
-    return new Promise((res, rej) => { const t = this.db.transaction(store, 'readwrite'); t.objectStore(store).delete(id); t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
-  },
+  del(store, id) { return this.delMany(store, [id]); },
   delMany(store, ids) {
-    if (!this.db) { this.mem[store] = this.mem[store].filter(x => !ids.includes(x.id)); return Promise.resolve(); }
-    return new Promise((res, rej) => { const t = this.db.transaction(store, 'readwrite'), s = t.objectStore(store); ids.forEach(i => s.delete(i)); t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
+    if (!this.persistent) { this.mem[store] = this.mem[store].filter(x => !ids.includes(x.id)); return Promise.resolve(); }
+    if (store === 'meta' && !this.metaOk) return Promise.reject(new Error('meta-unreadable'));
+    return this._run(store, 'readwrite', s => { ids.forEach(i => s.delete(i)); return null; });
   }
 };
 
