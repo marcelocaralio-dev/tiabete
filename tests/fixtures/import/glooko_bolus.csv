@@ -1,0 +1,4 @@
+Name:Maria Silva,Date Range:2026-11-01 - 2026-11-05
+timestamp,Insulin Type,Blood Glucose Input,Carbs Input,Carbs Ratio,Insulin Delivered (U),Initial Delivery (U),Extended Delivery (U),Serial number
+2026-11-03 12:30,Novorapid,150,60,10,7.5,7.5,0,AB123
+2026-11-03 19:30,Novorapid,,45,10,4.5,4.5,0,AB123

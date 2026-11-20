@@ -1,0 +1,5 @@
+FreeStyle Libre
+Device,Serial Number,Device Timestamp,Record Type,Historic Glucose mmol/L,Scan Glucose mmol/L,Non-numeric Rapid-Acting Insulin,Rapid-Acting Insulin (units),Notes
+Libre,1,03-11-2026 07:00,1,5.5,,,,
+Libre,1,03-11-2026 07:15,1,5.6,,,,
+Libre,1,03-11-2026 08:10,1,,6.8,,,

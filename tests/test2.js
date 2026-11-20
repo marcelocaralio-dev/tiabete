@@ -3,8 +3,8 @@ const ok=(c,m)=>{ if(!c){fail++;console.log('FALHA',m);} else console.log('ok   
 // data+hora na mesma célula, dia/mês de 1 dígito
 let r=L.parseMySugr('Data,Aferição da Glicemia (mg/dL)\n3/1/2026 7:15,110\n03/01/2026 07:15,111\n"3 de nov. de 2026 21:40",95\n');
 ok(r.items.length===3,'3 linhas lidas'); ok(r.items[0].time==='07:15'&&r.items[1].time==='07:15','hora embutida (7:15 e 07:15)'); ok(r.items[2].time==='21:40'&&r.items[2].date==='2026-11-03','data por extenso com hora');
-// mmol/L
-r=L.parseMySugr('Data,Horário,Aferição da Glicemia (mmol/L)\n03/11/2026,07:00,5.5\n'); ok(!r.ok && /mmol/.test(r.error),'mmol/L recusado com mensagem clara');
+// mmol/L (antes recusado; agora convertido)
+r=L.parseMySugr('Data,Horário,Aferição da Glicemia (mmol/L)\n03/11/2026,07:00,5.5\n'); ok(r.ok && r.items[0].glucose===99.1 && r.converted===1 && /mmol/.test(r.unitNote),'mmol/L agora é convertido para mg/dL (5,5 → 99,1) e avisado');
 // CSV exportado pelo próprio app (ida e volta)
 const exp='﻿Data;Horário;Glicemia (mg/dL);Contexto;Refeição;Carboidratos (g);Insulina rápida (U);Correção (U);Basal (U);Caneta (U);Bomba (U);Atividade (min);Atividade;Etiquetas;Observações;Esquema;Origem\r\n03/11/2026;12:30;185,5;Antes da refeição;Almoço;62,5;5;1;;6;;30;Caminhada;Almoço;"Nota; com ponto e vírgula";Esquema A;manual\r\n';
 r=L.parseMySugr(exp); const i=r.items[0]||{};

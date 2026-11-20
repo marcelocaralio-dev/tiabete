@@ -121,60 +121,81 @@ function parseCSV(text, delim) {
   return { rows, unterminated: q };
 }
 
-/* ---------- mapeamento de colunas do mySugr ---------- */
+/* ---------- Importador universal: mapeamento de colunas (mySugr, Glooko, Libre, Dexcom, Diabetes:M e outros) ---------- */
+const MMOL = 18.0182; /* 1 mmol/L de glicose = 18,0182 mg/dL */
+const SOURCE_NAMES = { mysugr: 'mySugr', glooko: 'Glooko', libre: 'FreeStyle Libre (LibreView)', dexcom: 'Dexcom Clarity', diabetesm: 'Diabetes:M', importado: 'Outro aplicativo (colunas reconhecidas automaticamente)' };
+/* As regras originais do mySugr vêm primeiro e continuam valendo; os sinônimos (inglês, Glooko, Diabetes:M, planilhas e JSON) só ACRESCENTAM reconhecimento. */
 const COLUMN_RULES = [
-  ['date', h => h === 'data' || h === 'date'],
-  ['time', h => h === 'horario' || h === 'hora' || h === 'time'],
-  ['tags', h => h === 'etiquetas' || h === 'tags'],
+  ['date', h => h === 'data' || h === 'date' || /^(data ?\/? ?hora|data e hora|data hora|date ?\/? ?time|date and time|datetime|time stamp|fecha( y hora)?|created at|createdat|datestring|display ?time)$/.test(h) || h.startsWith('timestamp') || h.startsWith('carimbo de data')],
+  ['time', h => h === 'horario' || h === 'hora' || h === 'time' || h === 'hour' || h === 'hora do dia' || h === 'time of day' || h === 'horario da medicao' || h === 'hora da medicao'],
+  ['tags', h => h === 'etiquetas' || h === 'tags' || h === 'tag' || h === 'etiqueta' || h === 'category' || h === 'categoria' || h === 'event' || h === 'evento' || h === 'event tag'],
   ['glucose', h => h.includes('afericao da glicemia') || (h.includes('glicemia') && h.includes('mg')) || h.includes('blood glucose')],
-  ['insPen', h => h.includes('caneta')],
-  ['insBasal', h => h.includes('injecao basal') || h === 'basal (u)'],
-  ['insPump', h => h.includes('bomba') && !h.includes('porcentagem')],
-  ['insMeal', h => h.includes('insulina (refeicao)') || h === 'insulina rapida (u)'],
-  ['insCorr', h => h.includes('insulina (correcao)') || h === 'correcao (u)'],
+  ['insPen', h => h.includes('caneta') || /\bpen\b/.test(h)],
+  ['insBasal', h => h.includes('injecao basal') || h === 'basal (u)' || h.includes('basal insulin') || /long[- ]acting/.test(h) || h.includes('insulina basal') || h.includes('insulina lenta')],
+  ['insPump', h => (h.includes('bomba') && !h.includes('porcentagem')) || (h.includes('pump') && !/(percent|%|duration|rate)/.test(h))],
+  ['insMeal', h => h.includes('insulina (refeicao)') || h === 'insulina rapida (u)' || h.includes('insulin (meal)') || h.includes('meal insulin') || h.includes('bolus insulin') || h.includes('insulina rapida') || /rapid[- ]acting/.test(h) || h.includes('insulin delivered') || (h.includes('bolus') && !h.includes('extended'))],
+  ['insCorr', h => h.includes('insulina (correcao)') || h === 'correcao (u)' || h.includes('insulin (correction)') || h === 'correction (u)' || h === 'correction'],
+  ['insUnk', h => /^(insulin|insulina|insulin \(u\)|insulina \(u\)|insulin units|insulin dose|dose de insulina|insulin \(units\))$/.test(h)],
   ['tbPct', h => h.includes('porcentagem basal')],
   ['tbMin', h => h.includes('duracao basal')],
-  ['carbs', h => h.includes('carboidratos')],
-  ['ctxLabel', h => h === 'contexto'],
-  ['mealLabel', h => h === 'refeicao'],
-  ['mealDesc', h => h.includes('descricoes de refeicoes') || h.includes('descricao de refeicao')],
-  ['actMin', h => h.includes('duracao da atividade') || h === 'atividade (min)'],
-  ['actInt', h => h.includes('intensidade da atividade')],
-  ['actDesc', h => h.includes('descricao da atividade') || h === 'atividade'],
-  ['steps', h => h === 'passos'],
-  ['notes', h => h === 'nota' || h === 'notas' || h === 'observacoes'],
-  ['bp', h => h.includes('pressao')],
-  ['weight', h => h.includes('peso corporal')],
-  ['a1c', h => h.includes('hba1c')],
-  ['ketones', h => h === 'cetonas'],
+  ['carbs', h => (h.includes('carboidrato') || h.includes('carbs') || h.includes('carbohydrate') || h.includes('carb input')) && !/(ratio|razao)/.test(h)],
+  ['ctxLabel', h => h === 'contexto' || h === 'context'],
+  ['mealLabel', h => h === 'refeicao' || h === 'meal' || h === 'meal tag' || h === 'tag de refeicao'],
+  ['mealDesc', h => h.includes('descricoes de refeicoes') || h.includes('descricao de refeicao') || h === 'food' || h === 'meal description' || h === 'alimentos'],
+  ['actMin', h => h.includes('duracao da atividade') || h === 'atividade (min)' || h === 'exercise (min)' || h === 'exercise duration'],
+  ['actInt', h => h.includes('intensidade da atividade') || h === 'exercise intensity'],
+  ['actDesc', h => h.includes('descricao da atividade') || h === 'atividade' || h === 'exercise' || h === 'activity'],
+  ['steps', h => h === 'passos' || h === 'steps'],
+  ['notes', h => h === 'nota' || h === 'notas' || h === 'observacoes' || h === 'observacao' || h === 'note' || h === 'notes' || h === 'comment' || h === 'comments' || h === 'comentario' || h === 'comentarios' || h === 'memo' || h === 'remarks'],
+  ['bp', h => h.includes('pressao') || h.includes('blood pressure')],
+  ['weight', h => h.includes('peso corporal') || h === 'weight' || h === 'peso' || h === 'body weight' || h === 'weight (kg)'],
+  ['a1c', h => h.includes('hba1c') || h === 'a1c'],
+  ['ketones', h => h === 'cetonas' || h === 'ketones' || h === 'ketone'],
   ['foodType', h => h.includes('tipo de alimento')],
-  ['medication', h => h.includes('medicacao')],
+  ['medication', h => h.includes('medicacao') || h === 'medication' || h === 'medications'],
+  ['unit', h => /(^|[. ])(unit|unidade)$/.test(h) || h === 'glucose unit' || h === 'glucose units' || h === 'unidade de glicose' || h === 'unidade da glicemia' || h === 'unidade de medida'],
+  ['rtype', h => h === 'type' || h === 'rectype'],
   /* Localização, fuso horário, latitude e longitude são reconhecidos para serem DESCARTADOS (privacidade) */
-  ['_location', h => h === 'localizacao'],
-  ['_tz', h => h.includes('fuso')],
-  ['_lat', h => h === 'latitude'],
-  ['_lon', h => h === 'longitude']
+  ['_location', h => h === 'localizacao' || h === 'location' || h === 'gps'],
+  ['_tz', h => h.includes('fuso') || h === 'timezone' || h === 'time zone'],
+  ['_lat', h => h === 'latitude' || h === 'lat'],
+  ['_lon', h => h === 'longitude' || h === 'lng' || h === 'lon'],
+  /* Colunas conhecidas que não têm o que importar (identificação do aparelho/arquivo): reconhecidas, sem aviso */
+  ['~origem', h => h === 'origem' || h === 'source' || h === 'fonte'],
+  ['~esquema', h => h === 'esquema' || h === 'scheme'],
+  ['~id', h => h === 'id' || h === '#' || h === 'index'],
+  ['~device', h => h === 'device' || h === 'dispositivo' || h === 'device name' || h === 'model' || h === 'modelo'],
+  ['~serial', h => h === 'serial number' || h === 'numero de serie' || h === 'serial']
 ];
+/* Só se não houver coluna de glicemia pelas regras acima: nomes genéricos (Glucose, Glicose, BG, SGV...). Colunas de sensor (CGM) nunca entram como medição. */
+const GLU_FALLBACK = h => /(^|[^a-z])(glicemia|glicose|glucose|glucosa|blood sugar|bg|sgv|mbg|bloodglucose)([^a-z]|$)/.test(h) && !/(cgm|historic|historico|scan|varredura|sensor|target|alvo|meta|ratio|razao|correct|insulin|carb|media|mean|average|a1c|estimad|unit|unidade)/.test(h);
+const GLU_AUTO = h => /(cgm|historic|historico|sensor)/.test(h) && /(glucose|glicose|glicemia)/.test(h) && !/(unit|unidade)/.test(h);
 function mapColumns(headerRow) {
   const map = {};
-  headerRow.forEach((raw, idx) => {
-    const h = norm(raw);
+  const hs = headerRow.map(raw => norm(raw).replace(/_/g, ' '));
+  hs.forEach((h, idx) => {
     for (const [key, test] of COLUMN_RULES) {
       if (!(key in map) && test(h)) { map[key] = idx; break; }
     }
   });
+  if (!('glucose' in map)) {
+    const used = new Set(Object.values(map));
+    const gi = hs.findIndex((h, i) => !used.has(i) && GLU_FALLBACK(h));
+    if (gi >= 0) { map.glucose = gi; map._fallback = true; }
+    else { const ai = hs.findIndex((h, i) => !used.has(i) && GLU_AUTO(h)); if (ai >= 0) map.glucoseAuto = ai; }
+  }
   return map;
 }
 function inferFromTags(tags) {
   const t = norm(tags); const out = {};
-  if (/cafe da manha|breakfast/.test(t)) out.meal = 'cafe';
-  else if (/almoco|lunch/.test(t)) out.meal = 'almoco';
-  else if (/jantar|dinner/.test(t)) out.meal = 'jantar';
+  if (/cafe da manha|breakfast|desayuno/.test(t)) out.meal = 'cafe';
+  else if (/almoco|lunch|almuerzo/.test(t)) out.meal = 'almoco';
+  else if (/jantar|dinner|supper|cena/.test(t)) out.meal = 'jantar';
   else if (/lanche|snack/.test(t)) out.meal = 'lanche';
-  if (/jejum|fasting/.test(t)) out.context = 'jejum';
-  else if (/antes d[ao]s? (refeicao|cafe|almoco|jantar|lanche)|pre[- ]?(refeicao|prandial)|before meal/.test(t)) out.context = 'antes';
-  else if (/depois d[ao]s? (refeicao|cafe|almoco|jantar|lanche)|pos[- ]?(refeicao|prandial)|after meal/.test(t)) out.context = 'depois';
-  else if (/deitar|dormir|sono|bedtime/.test(t)) out.context = 'deitar';
+  if (/jejum|fasting|ayuno/.test(t)) out.context = 'jejum';
+  else if (/antes d[ao]s? (refeicao|cafe|almoco|jantar|lanche)|pre[- ]?(refeicao|prandial|meal)|before[- ](a )?(meal|breakfast|lunch|dinner|supper|snack)|antes de (comer|la comida)/.test(t)) out.context = 'antes';
+  else if (/depois d[ao]s? (refeicao|cafe|almoco|jantar|lanche)|pos[- ]?(refeicao|prandial|meal)|post[- ]?(meal|prandial)|after[- ](a )?(meal|breakfast|lunch|dinner|supper|snack)|despues de (comer|la comida)/.test(t)) out.context = 'depois';
+  else if (/deitar|dormir|sono|bedtime|before bed|at bed|acostar/.test(t)) out.context = 'deitar';
   return out;
 }
 function labelToKey(obj, label) {
@@ -188,50 +209,131 @@ function compact(o) {
 }
 function dedupKey(r) { return r.date + 'T' + r.time + '|' + r.glucose; }
 
-/* Interpreta um CSV do mySugr. Não grava nada: só devolve o que encontrou. */
-function parseMySugr(text) {
-  text = String(text).replace(/^﻿/, '');
-  const res = { ok: false, error: '', delim: ',', columns: [], ignoredCols: [], items: [], hba: [], ignored: [], reasons: {}, totalRows: 0, emptyRows: 0, withOtherData: 0 };
-  if (!text.trim()) { res.error = 'O arquivo está vazio.'; return res; }
-  const delim = detectDelim(text); res.delim = delim;
-  const { rows, unterminated } = parseCSV(text, delim);
-  if (unterminated) res.warning = 'O arquivo termina com um campo entre aspas sem fechamento. A última linha pode estar incompleta.';
+/* Data/hora em formatos de outros apps: ISO com fuso (Z, -03:00), epoch em segundos ou milissegundos. Vira horário LOCAL do aparelho. */
+function isoLocal(d) { return isoDate(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function normStamp(s) {
+  s = String(s == null ? '' : s).trim();
+  if (/^\d{13}$/.test(s) || /^\d{10}$/.test(s)) { const d = new Date(s.length === 13 ? +s : +s * 1000); return isNaN(d) ? s : isoLocal(d); }
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})$/i);
+  if (m) {
+    let z = m[4].toUpperCase(); if (z !== 'Z' && !z.includes(':')) z = z.slice(0, 3) + ':' + z.slice(3);
+    const d = new Date(m[1] + 'T' + m[2] + ':' + (m[3] || '00') + z); return isNaN(d) ? s : isoLocal(d);
+  }
+  return s;
+}
+const newResult = () => ({ ok: false, error: '', delim: ',', columns: [], ignoredCols: [], unmappedCols: [], items: [], hba: [], ignored: [], reasons: {}, totalRows: 0, emptyRows: 0, withOtherData: 0, format: '', source: '', fileKind: '', converted: 0, unit: 'mg/dL', unitNote: '', skipped: [] });
+const NO_GLU_MSG = 'Não encontrei as colunas de data e de glicemia neste arquivo. Ele precisa ter, no mínimo, uma coluna de data (ou de data e hora) e uma de glicemia, como "Data" e "Glicemia (mg/dL)".';
+const AUTO_ONLY_MSG = 'Este arquivo só tem leituras automáticas de sensor (CGM). O TiaBete importa as medições manuais (dedo, tira, leitura e calibração).';
+
+/* Interpreta um CSV (ou JSON) de qualquer aplicativo suportado. Não grava nada: só devolve o que encontrou.
+   parseMySugr continua existindo com o mesmo nome e o mesmo resultado para os arquivos que já eram aceitos. */
+function parseMySugr(text) { return parseImportText(text); }
+function tablesFromText(text) {
+  text = String(text == null ? '' : text).replace(/^﻿/, '');
+  const t = text.trimStart();
+  if (t[0] === '{' || t[0] === '[') {
+    let j; try { j = JSON.parse(text); } catch (e) { if (t[0] === '{') return { error: 'O arquivo parece ser JSON, mas está com defeito e não pôde ser lido.' }; }
+    if (j !== undefined) { const tb = jsonTables(j); return tb.length ? { tables: tb, kind: 'JSON' } : { error: 'Não encontrei uma lista de registros dentro do JSON.' }; }
+  }
+  let body = text, delim;
+  const sep = body.match(/^sep=(.)\r?\n/i); if (sep) { delim = sep[1]; body = body.slice(sep[0].length); }
+  if (!body.trim()) return { error: 'O arquivo está vazio.' };
+  delim = delim || detectDelim(body);
+  const { rows, unterminated } = parseCSV(body, delim);
+  return { tables: [{ name: '', rows, delim, warning: unterminated ? 'O arquivo termina com um campo entre aspas sem fechamento. A última linha pode estar incompleta.' : '' }], kind: 'CSV' };
+}
+function parseImportText(text) {
+  const tt = tablesFromText(text);
+  if (tt.error) { const r = newResult(); r.error = tt.error; return r; }
+  const r = parseImportTables(tt.tables); r.fileKind = tt.kind; return r;
+}
+function parseImportTables(tables) {
+  const parts = tables.map(t => { const r = parseTable(t.rows, t); r.where = t.name || ''; return r; });
+  if (parts.length === 1) return parts[0];
+  const res = newResult(), good = parts.filter(p => p.ok);
+  if (!good.length) {
+    const r = parts.find(p => p.error && p.error !== NO_GLU_MSG) || parts[0] || res;
+    r.skipped = parts.filter(p => p !== r).map(p => ({ name: p.where, error: p.error })); return r;
+  }
+  const seen = new Set(), hseen = new Set(), names = new Set(), cols = new Set(), icols = new Set(), um = new Set();
+  good.forEach(p => {
+    p.items.forEach(it => { const k = dedupKey(it); if (!seen.has(k)) { seen.add(k); res.items.push(it); } else res.reasons['Repetido dentro do próprio arquivo'] = (res.reasons['Repetido dentro do próprio arquivo'] || 0) + 1; });
+    p.hba.forEach(x => { const k = x.date + '|' + x.value; if (!hseen.has(k)) { hseen.add(k); res.hba.push(x); } });
+    for (const [k, n] of Object.entries(p.reasons)) res.reasons[k] = (res.reasons[k] || 0) + n;
+    p.ignored.forEach(i => { if (res.ignored.length < 200) res.ignored.push({ ...i, extra: i.extra, where: p.where }); });
+    res.totalRows += p.totalRows; res.emptyRows += p.emptyRows; res.withOtherData += p.withOtherData; res.converted += p.converted;
+    if (p.format) names.add(p.format); p.columns.forEach(c => cols.add(c)); p.ignoredCols.forEach(c => icols.add(c)); p.unmappedCols.forEach(c => um.add(c));
+    if (p.warning) res.warning = (res.warning ? res.warning + ' ' : '') + p.warning;
+    if (p.unitNote && !res.unitNote.includes(p.unitNote)) res.unitNote += (res.unitNote ? ' ' : '') + p.unitNote;
+  });
+  res.items.sort((a, b) => a.ts - b.ts);
+  res.format = [...names].join(' + '); res.source = good.length && good.every(p => p.source === good[0].source) ? good[0].source : 'importado';
+  res.columns = [...cols]; res.ignoredCols = [...icols]; res.unmappedCols = [...um].slice(0, 40);
+  res.skipped = parts.filter(p => !p.ok).map(p => ({ name: p.where, error: p.error }));
+  res.ok = true; res.delim = good[0].delim; return res;
+}
+function detectSource(rows, hi, map, strong) {
+  const head = rows.slice(0, hi + 1).map(r => r.map(c => norm(c)).join(' '));
+  const all = head.join(' ');
+  if ((/^name:/.test(norm(rows[0] && rows[0][0] || '')) && /date range/.test(all)) || /glooko/.test(all)) return 'glooko';
+  const hdr = norm((rows[hi] || []).join(' '));
+  if (/serial number/.test(hdr) && /(carbs input|insulin delivered|blood glucose input|insulin type)/.test(hdr)) return 'glooko';
+  if (/diabetes ?: ?m|diabetesm/.test(all)) return 'diabetesm';
+  if (strong) return 'mysugr';
+  return 'importado';
+}
+function parseTable(rows, opt) {
+  opt = opt || {};
+  const res = newResult(); res.delim = opt.delim || ','; if (opt.warning) res.warning = opt.warning;
+  if (!rows || !rows.length || rows.every(r => r.every(c => !String(c).trim()))) { res.error = 'O arquivo está vazio.'; return res; }
+  { const sn = detectSensor(rows); if (sn) return parseSensor(rows, sn, res); }
   let hi = -1, map = null;
-  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+  for (let i = 0; i < Math.min(rows.length, 30); i++) {
     const m = mapColumns(rows[i]);
-    if ('date' in m && ('glucose' in m || 'a1c' in m)) { hi = i; map = m; break; }
+    if ('date' in m && ('glucose' in m || 'a1c' in m || 'glucoseAuto' in m)) { hi = i; map = m; break; }
   }
-  if (hi < 0) { const sn = detectSensor(rows); if (sn) return parseSensor(rows, sn, res); }
-  if (hi < 0) {
-    res.error = 'Não encontrei o cabeçalho do mySugr. O arquivo precisa ter as colunas "Data" e "Aferição da Glicemia (mg/dL)".';
-    return res;
-  }
-  if (!('glucose' in map)) { res.error = 'A coluna de glicemia ("Aferição da Glicemia (mg/dL)") não foi encontrada.'; return res; }
-  if (norm(rows[hi][map.glucose]).includes('mmol')) { res.error = 'Este arquivo está em mmol/L. O TiaBete trabalha em mg/dL. Exporte o CSV do mySugr com a unidade mg/dL e tente de novo.'; return res; }
-  res.columns = Object.keys(map).filter(k => k[0] !== '_');
-  res.ignoredCols = Object.keys(map).filter(k => k[0] === '_');
+  if (hi < 0) { res.error = NO_GLU_MSG; return res; }
+  if ('glucoseAuto' in map) { res.error = AUTO_ONLY_MSG; res.format = SOURCE_NAMES[detectSource(rows, hi, map, false)]; return res; }
+  if (!('glucose' in map)) { res.error = 'A coluna de glicemia não foi encontrada. Ela precisa ter um nome como "Glicemia (mg/dL)" ou "Glucose".'; return res; }
+  const strong = !map._fallback;
+  const src = detectSource(rows, hi, map, strong);
+  res.source = src; res.format = SOURCE_NAMES[src];
+  res.columns = Object.keys(map).filter(k => k[0] !== '_' && k[0] !== '~' && k !== 'rtype' && k !== 'unit');
+  res.ignoredCols = Object.keys(map).filter(k => k[0] === '_' && k !== '_fallback');
   const g = (row, k) => (k in map ? (row[map[k]] ?? '').trim() : '');
   const gn = (row, k) => parseNum(g(row, k));
   const bump = (reason, line, extra) => {
     res.reasons[reason] = (res.reasons[reason] || 0) + 1;
     if (res.ignored.length < 200) res.ignored.push({ line, reason, extra: extra || '' });
   };
-  const seen = new Set();
+  /* Unidade da glicemia: cabeçalho (mmol ou mg), coluna "Unidade" linha a linha, ou, sem nenhuma indicação, os próprios valores. */
+  const gh = norm(rows[hi][map.glucose]).replace(/_/g, ' ');
+  let fileUnit = /mmol/.test(gh) ? 'mmol' : /mg ?\/? ?dl|mgdl/.test(gh) ? 'mgdl' : '';
+  if (!fileUnit && !('unit' in map)) {
+    const vs = []; for (let i = hi + 1; i < rows.length && vs.length < 5000; i++) { const m0 = String(rows[i][map.glucose] ?? '').match(/^\s*([0-9][0-9.,]*)/); const v = m0 ? parseNum(m0[1]) : null; if (v !== null && v > 0) vs.push(v); }
+    if (vs.length && Math.max(...vs) <= 45 && (vs.some(v => v % 1 !== 0) || vs.sort((a, b) => a - b)[vs.length >> 1] <= 30)) { fileUnit = 'mmol'; res.unitNote = 'A unidade não está no arquivo; como todos os valores são pequenos (até 45), foram tratados como mmol/L e convertidos para mg/dL. Confira na prévia.'; }
+  }
+  const startCols = new Set(Object.keys(map).filter(k => k !== '_fallback').map(k => map[k]));
   const data = [];
   for (let i = hi + 1; i < rows.length; i++) {
     const row = rows[i];
     if (row.every(c => !String(c).trim())) { res.emptyRows++; continue; }
     res.totalRows++;
     const line = i + 1;
-    const rawDate = g(row, 'date');
+    const rawDate = normStamp(g(row, 'date'));
     const date = parseDate(rawDate);
     if (!date) { bump('Data não reconhecida', line, rawDate); continue; }
+    if ('rtype' in map && /^(sgv|egv|cgm)/.test(norm(g(row, 'rtype')))) { bump('Leitura automática do sensor (só medições manuais entram)', line); continue; }
     const embedded = rawDate.match(/(?:\s|T)(\d{1,2}[:h.]\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)\s*$/);
     let time = parseTime(g(row, 'time')) || (embedded ? parseTime(embedded[1]) : null);
-    const glucoseRaw = g(row, 'glucose');
-    const glucose = parseNum(glucoseRaw);
+    let glucoseRaw = g(row, 'glucose'), unit = fileUnit;
+    const um = glucoseRaw.match(/^\s*([0-9][0-9.,]*)\s*(mg\/dl|mmol\/l|mg|mmol)\s*$/i);
+    if (um) { glucoseRaw = um[1]; unit = /mmol/i.test(um[2]) ? 'mmol' : 'mgdl'; }
+    else if ('unit' in map) { const ru = norm(g(row, 'unit')); if (/mmol/.test(ru)) unit = 'mmol'; else if (/mg/.test(ru)) unit = 'mgdl'; }
+    let glucose = parseNum(glucoseRaw), origGlu;
+    if (glucose !== null && unit === 'mmol') { origGlu = glucoseRaw + ' mmol/L'; glucose = Math.round(glucose * MMOL * 10) / 10; res.converted++; }
     const a1c = gn(row, 'a1c');
-    const insulinOrCarbs = ['insPen', 'insBasal', 'insPump', 'insMeal', 'insCorr', 'carbs'].some(k => gn(row, k) > 0);
+    const insulinOrCarbs = ['insPen', 'insBasal', 'insPump', 'insMeal', 'insCorr', 'insUnk', 'carbs'].some(k => gn(row, k) > 0);
     if (glucose === null || glucose < GLU_MIN || glucose > GLU_MAX) {
       if (a1c !== null && a1c >= 3 && a1c <= 20) res.hba.push({ date, value: a1c, line });
       if (glucose === null && glucoseRaw) bump('Glicemia não numérica', line, glucoseRaw);
@@ -241,10 +343,12 @@ function parseMySugr(text) {
     }
     if (a1c !== null && a1c >= 3 && a1c <= 20) res.hba.push({ date, value: a1c, line });
     const tags = g(row, 'tags');
-    const inf = inferFromTags(tags);
+    const inf = inferFromTags([tags, g(row, 'ctxLabel'), g(row, 'mealLabel')].join(' '));
+    const unk = gn(row, 'insUnk');
+    const notes = [g(row, 'notes'), unk > 0 ? 'Insulina: ' + unk + ' U (tipo não informado no arquivo)' : ''].filter(Boolean).join(' · ');
     const rec = compact({
       date, time: time || '00:00', noTime: time ? undefined : true,
-      glucose,
+      glucose, origGlu,
       tags, context: labelToKey(CONTEXTS, g(row, 'ctxLabel')) || inf.context, meal: labelToKey(MEALS, g(row, 'mealLabel')) || inf.meal,
       carbs: gn(row, 'carbs'),
       insPen: gn(row, 'insPen'), insPump: gn(row, 'insPump'),
@@ -252,14 +356,20 @@ function parseMySugr(text) {
       tbPct: gn(row, 'tbPct'), tbMin: gn(row, 'tbMin'),
       mealDesc: g(row, 'mealDesc'), foodType: g(row, 'foodType'),
       actMin: gn(row, 'actMin'), actInt: gn(row, 'actInt'), actDesc: g(row, 'actDesc'),
-      steps: gn(row, 'steps'), notes: g(row, 'notes'),
+      steps: gn(row, 'steps'), notes,
       bp: g(row, 'bp'), weight: gn(row, 'weight'), ketones: g(row, 'ketones'), medication: g(row, 'medication'),
-      source: 'mysugr'
+      source: src
     });
     rec.ts = mkTs(rec.date, rec.time);
     rec.key = dedupKey(rec);
     data.push(rec);
   }
+  /* Colunas do arquivo que não têm campo correspondente (e têm conteúdo): avisadas na prévia, nunca em silêncio. */
+  rows[hi].forEach((raw, ci) => {
+    if (startCols.has(ci) || !String(raw).trim() || res.unmappedCols.length >= 40) return;
+    for (let i = hi + 1; i < Math.min(rows.length, hi + 4000); i++) if (String(rows[i][ci] ?? '').trim()) { res.unmappedCols.push(String(raw).trim()); break; }
+  });
+  if (res.converted) res.unitNote = ('Valores em mmol/L foram convertidos para mg/dL (× ' + String(MMOL).replace('.', ',') + ', com 1 casa decimal); o valor original fica guardado no registro. ' + res.unitNote).trim();
   data.sort((a, b) => a.ts - b.ts);
   res.items = data;
   res.ok = true;
@@ -271,25 +381,24 @@ function detectSensor(rows) {
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
     const h = rows[i].map(norm), f = fn2 => h.findIndex(fn2);
     const ts = f(x => x.includes('device timestamp') || x.includes('carimbo de data/hora do dispositivo') || x.includes('carimbo de data e hora do dispositivo'));
-    const hist = f(x => (x.includes('historic glucose') || x.includes('historico de glicose')) && !x.includes('mmol'));
-    const scan = f(x => (x.includes('scan glucose') || x.includes('leitura da glicose') || x.includes('glicose de varredura')) && !x.includes('mmol'));
-    const strip = f(x => (x.includes('strip glucose') || x.includes('glicose da tira')) && !x.includes('mmol'));
+    const isHist = x => x.includes('historic glucose') || x.includes('historico de glicose'), isScan = x => x.includes('scan glucose') || x.includes('leitura da glicose') || x.includes('glicose de varredura'), isStrip = x => x.includes('strip glucose') || x.includes('glicose da tira');
+    let hist = f(x => isHist(x) && !x.includes('mmol')), scan = f(x => isScan(x) && !x.includes('mmol')), strip = f(x => isStrip(x) && !x.includes('mmol')), mmol = false;
+    if (ts >= 0 && hist < 0 && scan < 0 && strip < 0) { hist = f(x => isHist(x) && x.includes('mmol')); scan = f(x => isScan(x) && x.includes('mmol')); strip = f(x => isStrip(x) && x.includes('mmol')); mmol = hist >= 0 || scan >= 0 || strip >= 0; }
     if (ts >= 0 && (hist >= 0 || scan >= 0 || strip >= 0)) {
-      const mm = f(x => (x.includes('historic glucose') || x.includes('scan glucose')) && x.includes('mmol'));
-      return { kind: 'libre', hi: i, ts, hist, scan, strip, mmol: mm >= 0 && hist < 0 && scan < 0, ins: f(x => x.includes('rapid-acting insulin (units)') || x.includes('insulina de acao rapida (unidades)')), carbs: f(x => x.includes('carbohydrates (grams)') || x.includes('carboidratos (gramas)')), notes: f(x => x === 'notes' || x === 'notas') };
+      return { kind: 'libre', hi: i, ts, hist, scan, strip, mmol, ins: f(x => x.includes('rapid-acting insulin (units)') || x.includes('insulina de acao rapida (unidades)')), carbs: f(x => x.includes('carbohydrates (grams)') || x.includes('carboidratos (gramas)')), notes: f(x => x === 'notes' || x === 'notas') };
     }
     const dts = f(x => x.includes('timestamp') || x.includes('carimbo de data'));
     const et = f(x => x === 'event type' || x === 'tipo de evento');
-    const gv = f(x => (x.includes('glucose value') || x.includes('valor de glicose')) && !x.includes('mmol'));
-    if (dts >= 0 && et >= 0 && gv >= 0) return { kind: 'dexcom', hi: i, ts: dts, et, gv, mmol: false, ins: f(x => x.includes('insulin value') || x.includes('valor de insulina')), carbs: f(x => x.includes('carb value') || x.includes('valor de carboidratos')) };
-    if (dts >= 0 && et >= 0 && h.some(x => (x.includes('glucose value') || x.includes('valor de glicose')) && x.includes('mmol'))) return { kind: 'dexcom', hi: i, mmol: true };
+    let gv = f(x => (x.includes('glucose value') || x.includes('valor de glicose')) && !x.includes('mmol')), dm = false;
+    if (gv < 0) { gv = f(x => (x.includes('glucose value') || x.includes('valor de glicose')) && x.includes('mmol')); dm = gv >= 0; }
+    if (dts >= 0 && et >= 0 && gv >= 0) return { kind: 'dexcom', hi: i, ts: dts, et, gv, mmol: dm, ins: f(x => x.includes('insulin value') || x.includes('valor de insulina')), carbs: f(x => x.includes('carb value') || x.includes('valor de carboidratos')) };
   }
   return null;
 }
 function parseSensor(rows, sn, res) {
-  const name = sn.kind === 'libre' ? 'FreeStyle Libre (LibreView)' : 'Dexcom Clarity';
-  if (sn.mmol) { res.error = 'Este arquivo de ' + name + ' está em mmol/L. O TiaBete trabalha em mg/dL. Exporte novamente em mg/dL.'; return res; }
-  res.format = name; res.columns = ['date', 'time', 'glucose'].concat(sn.ins >= 0 ? ['insMeal'] : [], sn.carbs >= 0 ? ['carbs'] : []);
+  const name = sn.kind === 'libre' ? 'FreeStyle Libre (LibreView)' : 'Dexcom Clarity', fac = sn.mmol ? MMOL : 1;
+  res.format = name; res.source = sn.kind; res.columns = ['date', 'time', 'glucose'].concat(sn.ins >= 0 ? ['insMeal'] : [], sn.carbs >= 0 ? ['carbs'] : []);
+  if (sn.mmol) res.unitNote = 'Valores em mmol/L foram convertidos para mg/dL (× ' + String(MMOL).replace('.', ',') + ', com 1 casa decimal); o valor original fica guardado no registro.';
   const bump = (reason, line, extra) => { res.reasons[reason] = (res.reasons[reason] || 0) + 1; if (res.ignored.length < 200) res.ignored.push({ line, reason, extra: extra || '' }); };
   const AUTO = 'Leitura automática do sensor (a cada 5 ou 15 min; só leituras manuais entram)';
   const data = [];
@@ -297,10 +406,10 @@ function parseSensor(rows, sn, res) {
     const row = rows[i];
     if (row.every(c => !String(c).trim())) { res.emptyRows++; continue; }
     res.totalRows++; const line = i + 1, c = k => (row[k] ?? '').trim();
-    const rawTs = c(sn.ts), date = parseDate(rawTs);
+    const rawTs = normStamp(c(sn.ts)), date = parseDate(rawTs);
     if (!date) { bump('Data não reconhecida', line, rawTs); continue; }
     const m = rawTs.match(/(?:\s|T)(\d{1,2}[:h.]\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)\s*$/), time = m ? parseTime(m[1]) : null;
-    let glu = null, auto = false, kind = '';
+    let glu = null, auto = false, kind = '', orig;
     if (sn.kind === 'libre') {
       const sv = sn.strip >= 0 ? parseNum(c(sn.strip)) : null, cv = sn.scan >= 0 ? parseNum(c(sn.scan)) : null, hv = sn.hist >= 0 ? parseNum(c(sn.hist)) : null;
       if (sv !== null) { glu = sv; kind = 'tira'; } else if (cv !== null) { glu = cv; kind = 'leitura do sensor'; } else if (hv !== null) auto = true;
@@ -311,14 +420,195 @@ function parseSensor(rows, sn, res) {
     }
     if (auto) { bump(AUTO, line); continue; }
     if (glu === null) { bump('Sem glicemia', line); if ((sn.ins >= 0 && parseNum(c(sn.ins)) > 0) || (sn.carbs >= 0 && parseNum(c(sn.carbs)) > 0)) res.withOtherData++; continue; }
+    if (fac !== 1) { orig = glu + ' mmol/L'; glu = Math.round(glu * fac * 10) / 10; res.converted++; }
     if (glu < GLU_MIN || glu > GLU_MAX) { bump('Glicemia fora de ' + GLU_MIN + '–' + GLU_MAX + ' mg/dL', line, String(glu)); continue; }
     const insU = sn.ins >= 0 ? parseNum(c(sn.ins)) : null, cb = sn.carbs >= 0 ? parseNum(c(sn.carbs)) : null, nt = sn.notes >= 0 ? c(sn.notes) : '';
-    const rec = compact({ date, time: time || '00:00', noTime: time ? undefined : true, glucose: glu, insMeal: insU > 0 ? insU : undefined, carbs: cb > 0 ? cb : undefined, notes: nt, tags: kind, source: sn.kind === 'libre' ? 'libre' : 'dexcom' });
+    const rec = compact({ date, time: time || '00:00', noTime: time ? undefined : true, glucose: glu, origGlu: orig, insMeal: insU > 0 ? insU : undefined, carbs: cb > 0 ? cb : undefined, notes: nt, tags: kind, source: sn.kind === 'libre' ? 'libre' : 'dexcom' });
     rec.ts = mkTs(rec.date, rec.time); rec.key = dedupKey(rec); data.push(rec);
   }
   data.sort((a, b) => a.ts - b.ts); res.items = data; res.ok = true;
   if (!data.length) { res.ok = false; res.error = 'Este arquivo de ' + name + ' só tem leituras automáticas do sensor. O TiaBete importa as medições manuais (leituras, tira e calibrações).'; }
   return res;
+}
+
+/* ---------- JSON: qualquer lista de registros vira uma tabela (colunas = nomes dos campos) ---------- */
+function flattenRec(o, pre, out, depth) {
+  for (const k of Object.keys(o)) {
+    const v = o[k], key = pre ? pre + '.' + k : k;
+    if (Array.isArray(v)) { if (v.every(x => x === null || typeof x !== 'object')) out[key] = v.join('; '); }
+    else if (v && typeof v === 'object') { if (depth < 2) flattenRec(v, key, out, depth + 1); }
+    else out[key] = v;
+  }
+  return out;
+}
+function objsToRows(arr) {
+  if (arr.length && arr.every(x => Array.isArray(x))) return arr.map(r => r.map(c => c == null ? '' : String(c)));
+  const recs = arr.filter(x => x && typeof x === 'object' && !Array.isArray(x)).slice(0, 500000).map(x => flattenRec(x, '', {}, 0));
+  const cols = []; const seen = new Set();
+  for (const r of recs) for (const k of Object.keys(r)) if (!seen.has(k) && cols.length < 200) { seen.add(k); cols.push(k); }
+  return [cols].concat(recs.map(r => cols.map(k => r[k] == null ? '' : String(r[k]))));
+}
+function jsonTables(j) {
+  const out = [];
+  const isRec = a => Array.isArray(a) && a.length && a.some(x => x && typeof x === 'object');
+  const walk = (v, path, depth) => {
+    if (isRec(v)) { out.push({ name: path || 'JSON', rows: objsToRows(v), delim: ',' }); return; }
+    if (v && typeof v === 'object' && !Array.isArray(v) && depth < 4) for (const k of Object.keys(v)) walk(v[k], path ? path + '.' + k : k, depth + 1);
+  };
+  walk(j, '', 0);
+  if (!out.length && j && typeof j === 'object' && !Array.isArray(j)) out.push({ name: 'JSON', rows: objsToRows([j]), delim: ',' });
+  return out;
+}
+
+/* ---------- Arquivos compactados: ZIP e XLSX (leitura segura, sem biblioteca externa) ---------- */
+const ZIP_MAX_ENTRY = 80 * 1024 * 1024, ZIP_MAX_TOTAL = 200 * 1024 * 1024, ZIP_MAX_FILES = 3000;
+class ImportError extends Error { }
+function zipList(u8) {
+  let e = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 22 - 65535); i--) if (u8[i] === 0x50 && u8[i + 1] === 0x4b && u8[i + 2] === 5 && u8[i + 3] === 6) { e = i; break; }
+  if (e < 0) throw new ImportError('O arquivo compactado está com defeito (não consegui ler o índice).');
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  if (n > ZIP_MAX_FILES) throw new ImportError('O arquivo compactado tem arquivos demais.');
+  const dec = new TextDecoder(), list = []; let total = 0;
+  for (let i = 0; i < n; i++) {
+    if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new ImportError('O arquivo compactado está com defeito.');
+    const flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+    if (name.endsWith('/')) continue;
+    if (usize > ZIP_MAX_ENTRY) throw new ImportError('Um dos arquivos dentro do compactado é grande demais.');
+    total += usize; if (total > ZIP_MAX_TOTAL) throw new ImportError('O conteúdo do arquivo compactado é grande demais.');
+    list.push({ name, flags, method, csize, usize, lho });
+  }
+  return list;
+}
+async function inflateRaw(u8, max) {
+  if (typeof DecompressionStream === 'undefined') throw new ImportError('Este aparelho não consegue abrir arquivos compactados (XLSX/ZIP). Exporte o arquivo como CSV e tente de novo.');
+  const ds = new DecompressionStream('deflate-raw'), w = ds.writable.getWriter();
+  w.write(u8).catch(() => { }); w.close().catch(() => { });
+  const rd = ds.readable.getReader(), chunks = []; let total = 0;
+  for (; ;) {
+    let r; try { r = await rd.read(); } catch (e) { throw new ImportError('O arquivo compactado está com defeito.'); }
+    if (r.done) break; total += r.value.length;
+    if (total > max) { rd.cancel().catch(() => { }); throw new ImportError('O conteúdo do arquivo compactado é maior do que o declarado.'); }
+    chunks.push(r.value);
+  }
+  const out = new Uint8Array(total); let o = 0; chunks.forEach(c => { out.set(c, o); o += c.length; }); return out;
+}
+async function zipRead(u8, ent) {
+  if (ent.flags & 1) throw new ImportError('O arquivo compactado tem senha. Remova a senha e tente de novo.');
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  if (ent.lho + 30 > u8.length || dv.getUint32(ent.lho, true) !== 0x04034b50) throw new ImportError('O arquivo compactado está com defeito.');
+  const st = ent.lho + 30 + dv.getUint16(ent.lho + 26, true) + dv.getUint16(ent.lho + 28, true), raw = u8.subarray(st, st + ent.csize);
+  if (ent.method === 0) return raw;
+  if (ent.method === 8) return inflateRaw(raw, ent.usize + 16);
+  throw new ImportError('O arquivo compactado usa um método de compressão não suportado.');
+}
+const xmlUn = s => String(s).replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const xmlAttr = (tag, a) => { const m = tag.match(new RegExp('(?:^|[\\s])' + a + '="([^"]*)"')); return m ? xmlUn(m[1]) : ''; };
+const xlsxText = x => { const parts = []; String(x).replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').replace(/<t\b[^>]*>([\s\S]*?)<\/t>/g, (_, t) => { parts.push(xmlUn(t)); return ''; }); return parts.join(''); };
+function xlsxSerial(v, d1904) {
+  let tot = Math.round((v + (d1904 ? 1462 : 0)) * 1440); if (!isFinite(tot) || tot < 0) return String(v);
+  const days = Math.floor(tot / 1440), mins = tot - days * 1440, hh = Math.floor(mins / 60), mm = mins % 60, hm = pad(hh) + ':' + pad(mm);
+  if (days === 0) return hm;
+  const d = new Date(Date.UTC(1899, 11, 30) + days * 86400000), ds = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  return mins ? ds + ' ' + hm : ds;
+}
+async function xlsxTables(u8, list, fname) {
+  const byName = {}; list.forEach(e => { byName[e.name.replace(/^\//, '')] = e; });
+  const txt = async n => byName[n] ? new TextDecoder().decode(await zipRead(u8, byName[n])) : '';
+  const wb = await txt('xl/workbook.xml'); if (!wb) throw new ImportError('Não consegui ler a planilha (XLSX sem pasta de trabalho).');
+  const rels = await txt('xl/_rels/workbook.xml.rels'), relMap = {};
+  (rels.match(/<Relationship\b[^>]*>/g) || []).forEach(t => { relMap[xmlAttr(t, 'Id')] = xmlAttr(t, 'Target'); });
+  const shared = []; { const ss = await txt('xl/sharedStrings.xml'); (ss.match(/<si\b[^>]*?(?:\/>|>[\s\S]*?<\/si>)/g) || []).forEach(s => shared.push(xlsxText(s))); }
+  const isDate = []; {
+    const st = await txt('xl/styles.xml'), custom = {};
+    (st.match(/<numFmt\b[^>]*>/g) || []).forEach(t => { custom[xmlAttr(t, 'numFmtId')] = xmlAttr(t, 'formatCode'); });
+    const cx = (st.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/) || [])[1] || '';
+    const builtin = id => (id >= 14 && id <= 22) || (id >= 27 && id <= 36) || (id >= 45 && id <= 47) || (id >= 50 && id <= 58);
+    (cx.match(/<xf\b[^>]*>/g) || []).forEach(t => { const id = +xmlAttr(t, 'numFmtId') || 0; const code = custom[id]; isDate.push(code != null ? (/[dmyhs]/i.test(code.replace(/"[^"]*"|\\.|\[[^\]]*\]/g, '')) && !/[#0?]/.test(code.replace(/"[^"]*"|\\.|\[[^\]]*\]/g, '')) ) : builtin(id)); });
+  }
+  const d1904 = /<workbookPr\b[^>]*date1904="(1|true)"/i.test(wb);
+  const tables = []; let cells = 0;
+  for (const t of (wb.match(/<sheet\b[^>]*>/g) || [])) {
+    const sname = xmlAttr(t, 'name'), rid = xmlAttr(t, 'r:id'); let target = relMap[rid]; if (!target) continue;
+    target = target.startsWith('/') ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '');
+    const xml = await txt(target); if (!xml) continue;
+    const grid = []; let r0 = -1, rowIdx = -1;
+    xml.replace(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g, (_, ra, body) => {
+      const rn = +xmlAttr(ra, 'r'); rowIdx = rn ? rn - 1 : rowIdx + 1; if (!body) return '';
+      let ci = -1;
+      body.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, (_2, ca, cb) => {
+        const ref = xmlAttr(ca, 'r').match(/^([A-Z]+)/); if (ref) { ci = 0; for (const ch of ref[1]) ci = ci * 26 + ch.charCodeAt(0) - 64; ci -= 1; } else ci++;
+        if (cb == null || ++cells > 4000000 || ci > 500) return '';
+        const ty = xmlAttr(ca, 't'), s = +xmlAttr(ca, 's') || 0; let v = '';
+        const vm = cb.match(/<v\b[^>]*>([\s\S]*?)<\/v>/);
+        if (ty === 's') v = shared[+(vm && vm[1])] ?? '';
+        else if (ty === 'inlineStr') v = xlsxText(cb);
+        else if (ty === 'str' || ty === 'd') v = vm ? xmlUn(vm[1]) : '';
+        else if (ty === 'b') v = vm && vm[1] === '1' ? '1' : '0';
+        else if (ty === 'e') v = '';
+        else if (vm) v = isDate[s] && isFinite(+vm[1]) ? xlsxSerial(+vm[1], d1904) : vm[1];
+        if (v === '') return '';
+        (grid[rowIdx] = grid[rowIdx] || [])[ci] = v; return '';
+      });
+      return '';
+    });
+    const rows = []; for (let i = 0; i < grid.length; i++) { const r = grid[i] || []; const w = Array.from({ length: r.length }, (_, k) => r[k] ?? ''); rows.push(w); }
+    if (rows.length) tables.push({ name: (fname ? fname + ' · ' : '') + sname, rows, delim: ',' });
+  }
+  if (!tables.length) throw new ImportError('A planilha está vazia.');
+  return tables;
+}
+function decodeText(u8) {
+  if (u8[0] === 0xFF && u8[1] === 0xFE) return new TextDecoder('utf-16le').decode(u8.subarray(2));
+  if (u8[0] === 0xFE && u8[1] === 0xFF) return new TextDecoder('utf-16be').decode(u8.subarray(2));
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) { return new TextDecoder('windows-1252').decode(u8); }
+}
+function sniffFormat(u8) {
+  if (u8[0] === 0x50 && u8[1] === 0x4b && (u8[2] === 3 || u8[2] === 5)) return 'zip';
+  if (u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0) return 'xls';
+  if (u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46) return 'pdf';
+  if (u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4E) return 'img';
+  if (u8[0] === 0xFF && u8[1] === 0xD8) return 'img';
+  return 'text';
+}
+/* Detecta o formato pelo CONTEÚDO (não pela extensão) e devolve as tabelas encontradas. */
+async function tablesFromBytes(name, u8, depth) {
+  const kind = sniffFormat(u8);
+  if (kind === 'xls') throw new ImportError('Este é um arquivo Excel antigo (.xls), que não dá para ler com segurança aqui. Abra no Excel ou em Planilhas, use "Salvar como" .xlsx ou .csv e escolha o novo arquivo.');
+  if (kind === 'pdf' || kind === 'img') throw new ImportError('Este arquivo é ' + (kind === 'pdf' ? 'um PDF' : 'uma imagem') + ', não uma exportação de dados. Use CSV, XLSX, JSON ou ZIP.');
+  if (kind === 'zip') {
+    const list = zipList(u8);
+    if (list.some(e => e.name.replace(/^\//, '') === 'xl/workbook.xml')) return { tables: await xlsxTables(u8, list, name), kind: 'XLSX' };
+    if (depth > 0) throw new ImportError('Arquivo compactado dentro de outro compactado não é suportado.');
+    const out = [], skipped = [];
+    for (const e of list) {
+      const base = e.name.split('/').pop();
+      if (!base || base.startsWith('.') || /^__MACOSX/.test(e.name)) continue;
+      if (!/\.(csv|tsv|txt|json|xlsx)$/i.test(base)) { skipped.push({ name: base, error: 'Tipo de arquivo não suportado.' }); continue; }
+      try { const r = await tablesFromBytes(base, await zipRead(u8, e), depth + 1); r.tables.forEach(t => out.push({ ...t, name: base + (t.name && t.name !== base ? ' · ' + t.name.replace(base + ' · ', '') : '') })); }
+      catch (err) { if (err instanceof ImportError) skipped.push({ name: base, error: err.message }); else throw err; }
+    }
+    if (!out.length) { const bad = skipped.find(x => x.error !== 'Tipo de arquivo não suportado.'); throw new ImportError(bad ? bad.name + ': ' + bad.error : 'Não encontrei CSV, XLSX ou JSON dentro do arquivo compactado.'); }
+    return { tables: out, kind: 'ZIP', skipped };
+  }
+  const tt = tablesFromText(decodeText(u8)); if (tt.error) throw new ImportError(tt.error);
+  tt.tables.forEach(t => { t.name = depth > 0 ? name : t.name; }); return tt;
+}
+/* Ponto de entrada da tela: recebe o conteúdo do arquivo escolhido, devolve a mesma estrutura de parseMySugr. Nunca grava nada. */
+async function parseImportFile(name, buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (!u8.length) { const r = newResult(); r.error = 'O arquivo está vazio.'; return r; }
+  try {
+    const tt = await tablesFromBytes(name || 'arquivo', u8, 0);
+    const r = parseImportTables(tt.tables); r.fileKind = tt.kind;
+    if (tt.skipped && tt.skipped.length) r.skipped = (r.skipped || []).concat(tt.skipped);
+    if (!r.ok && r.skipped && r.skipped.length && tt.kind === 'ZIP') r.error = r.error || 'Nenhum arquivo dentro do compactado tem medições de glicemia.';
+    return r;
+  } catch (e) {
+    if (e instanceof ImportError) { const r = newResult(); r.error = e.message; return r; }
+    const r = newResult(); r.error = 'Não consegui ler este arquivo. Ele pode estar corrompido ou em um formato que o TiaBete não conhece.'; return r;
+  }
 }
 
 /* ---------- estatísticas ---------- */
@@ -748,5 +1038,5 @@ function patternNotes(records, markLabels, todayIso) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { caClean, caCompute, caMealTimes, caPresets, caHash, CA_MEAL_DEF, HYPO_PROTO, HYPO_TAG, hypoClass, hypoEpisode, hypoStamp, LIM, hypoEpisodes, patternNotes, typicalDay, pctl, rewardEval, RW_STEPS, circMean, wrapDiff, hhmm, insStats, minOfDay, a1cEval, A1C_TARGET_DEFAULT, examFlag, examDev, examScore, examBand, cleanExam, hashText, compareExams, examKey, inferFromTags, targetFor, TIME_RULE, ruleFor, applyRule, undoRule, FAST, highOf, MONTHS, norm, parseMySugr, parseNum, parseDate, parseTime, parseCSV, detectDelim, stats, periodRanges, compareStats, bandOf, mkTs, isoDate, dedupKey, trend, byTimeBlock, estimatedA1c, schemeOf, weekStart, dailyMeans, bandCounts, inRange, addDays, startOfDay, endOfDay };
+  module.exports = { caClean, caCompute, caMealTimes, caPresets, caHash, CA_MEAL_DEF, HYPO_PROTO, HYPO_TAG, hypoClass, hypoEpisode, hypoStamp, LIM, hypoEpisodes, patternNotes, typicalDay, pctl, rewardEval, RW_STEPS, circMean, wrapDiff, hhmm, insStats, minOfDay, a1cEval, A1C_TARGET_DEFAULT, examFlag, examDev, examScore, examBand, cleanExam, hashText, compareExams, examKey, inferFromTags, targetFor, TIME_RULE, ruleFor, applyRule, undoRule, FAST, highOf, MONTHS, norm, parseMySugr, parseImportText, parseImportFile, parseImportTables, jsonTables, normStamp, mapColumns, MMOL, SOURCE_NAMES, parseNum, parseDate, parseTime, parseCSV, detectDelim, stats, periodRanges, compareStats, bandOf, mkTs, isoDate, dedupKey, trend, byTimeBlock, estimatedA1c, schemeOf, weekStart, dailyMeans, bandCounts, inRange, addDays, startOfDay, endOfDay };
 }

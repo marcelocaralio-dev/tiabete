@@ -48,7 +48,7 @@
     ['Meu perfil', MI.perfil], ['Licença', P.ticket], ['Glicemia', ACI.drop], ['Hemoglobina glicada', P.tube], ['Hipoglicemia', P.hypo],
     ['Exames laboratoriais', MI.exames], ['Cálculo de bolus', CALC], ['Insulina', SYR], ['Meu tratamento', PILL], ['Lembretes de insulina', P.alarm],
     ['Refeições', MIC.refeicao], ['Alimentos', P.apple], ['Conquistas', TROPHY], ['Padrões', MI.padroes], ['Relatórios', MI.relatorios],
-    ['Importar do mySugr', MI.importar], ['Cópia de segurança', P.cloudUp], ['Classificar medições', MI.classificar], ['Eventos', MI.eventos],
+    ['Importar de outros aplicativos', MI.importar], ['Cópia de segurança', P.cloudUp], ['Classificar medições', MI.classificar], ['Eventos', MI.eventos],
     ['Perguntar ao Claude', MI.perguntas], ['Inteligência artificial', MI.ia], ['Alertas e lembretes', MI.lembretes], ['Alertas personalizados', MI.alertasp], ['Histórico de alertas', P.bellLines],
     ['Bloqueio e proteção', MI.seguranca], ['Privacidade', P.eyeoff], ['Configurações', GEAR], ['Aparência e tema', P.contrast], ['Sobre o app', MI.sobre], ['Ajuda', DR_IC.help],
     ['Café da manhã', MIC.cafe], ['Almoço', MIC.almoco], ['Lanche', MIC.lanche], ['Jantar', MIC.jantar], ['Ceia', MIC.ceia], ['Jejum', MIC.jejum], ['Ao deitar', MIC.deitar], ['Madrugada', MIC.madrugada], ['Outro horário', MIC.outro],

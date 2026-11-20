@@ -31,7 +31,7 @@ function drItem(r, t, i, sub) {
 function drMore() {
   const used = new Set(DR_MAIN.map(x => x[0]).concat(['config', 'sobre', 'mais'])), seen = new Set(), out = [];
   for (const g of Object.values(menuGroups())) for (const x of g.items) { if (used.has(x[0]) || seen.has(x[0]) || !VIEWS[x[0]]) continue; seen.add(x[0]); out.push([x[0], x[1]]); }
-  for (const [r, t] of [['relatorios', 'Relatórios'], ['importar', 'Importar do mySugr'], ['padroes', 'Padrões'], ['conquistas', 'Conquistas'], ['eventos', 'Eventos'], ['sobre', 'Sobre e limites']]) if (VIEWS[r] && !seen.has(r)) { seen.add(r); out.push([r, t]); }
+  for (const [r, t] of [['relatorios', 'Relatórios'], ['importar', 'Importar de outros aplicativos'], ['padroes', 'Padrões'], ['conquistas', 'Conquistas'], ['eventos', 'Eventos'], ['sobre', 'Sobre e limites']]) if (VIEWS[r] && !seen.has(r)) { seen.add(r); out.push([r, t]); }
   return out;
 }
 function drBody() {

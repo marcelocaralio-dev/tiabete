@@ -165,7 +165,7 @@ function mealIcon(r) {
 }
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar do mySugr', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
+const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar de outros aplicativos', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : (r === 'metricas' || r === 'metrica') ? 'painel' : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function toast(msg) {
@@ -276,8 +276,8 @@ function viewPainelClassic() {
   let h = banners() + labelBanner() + pfInvite();
   const all = S.records;
   if (!all.length) {
-    return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Comece por aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o CSV do mySugr ou registre uma medição. Os dados ficam só neste aparelho.</p>
-    <div class="big-cta"><button class="btn pri full" data-act="go" data-r="importar">Importar CSV do mySugr</button><button class="btn full" data-act="new">Nova medição</button></div></div>`;
+    return h + `<div class="card red"><div class="eyebrow">Bem-vindo</div><div class="hero-n" style="font-size:30px;margin:12px 0 8px">Comece por aqui</div><p class="hint" style="color:var(--fg);margin:0 0 16px">Importe o arquivo de outro aplicativo de glicemia ou registre uma medição. Os dados ficam só neste aparelho.</p>
+    <div class="big-cta"><button class="btn pri full" data-act="go" data-r="importar">Importar de outros aplicativos</button><button class="btn full" data-act="new">Nova medição</button></div></div>`;
   }
   h += prNotice('painel');
   const last = all[all.length - 1];
@@ -361,7 +361,7 @@ function epiHTML(e) {
 }
 function histListHTML() {
   const items = histItems();
-  if (!S.records.length && !(S.inslog || []).length && !(S.bl.meals || []).length) return emptyBlock('Nenhum registro ainda', 'Registre uma medição ou importe o CSV do mySugr.');
+  if (!S.records.length && !(S.inslog || []).length && !(S.bl.meals || []).length) return emptyBlock('Nenhum registro ainda', 'Registre uma medição ou importe o arquivo de outro aplicativo.');
   if (!items.length) return emptyBlock('Nada encontrado', 'Ajuste a busca ou os filtros.');
   iconCutSet();
   const shown = items.slice(0, S.hist.limit), groups = groupBy(shown, i => i.date), nr = itRecs(items).length, ni = items.filter(i => i.t === 'i').length, nm = items.filter(i => i.t === 'm').length;
@@ -474,7 +474,7 @@ function openRecord(id) {
   add('Marcações', markTxt(r).join(', ')); add('Etiquetas', r.tags); add('Pressão', r.bp); add('Peso', r.weight != null ? fn(r.weight) + ' kg' : null); add('Cetonas', r.ketones);
   add('Observações', r.notes);
   const sch = S.schemes.find(s => s.id === schemeOf(r, S.schemes)); add('Esquema', sch ? sch.name : null);
-  add('Origem', { manual: 'Registro manual', mysugr: 'Importado do mySugr', libre: 'Importado do FreeStyle Libre', dexcom: 'Importado do Dexcom Clarity', exemplo: 'Exemplo' }[r.source] || r.source);
+  add('Origem', { manual: 'Registro manual', mysugr: 'Importado do mySugr', glooko: 'Importado do Glooko', diabetesm: 'Importado do Diabetes:M', importado: 'Importado de outro aplicativo', libre: 'Importado do FreeStyle Libre', dexcom: 'Importado do Dexcom Clarity', exemplo: 'Exemplo' }[r.source] || r.source);
   openSheet(`<h2>${badge(r.glucose, r.context)}</h2><dl class="kv">${kv.join('')}</dl><div class="row" style="margin-top:18px"><button class="btn pri grow" data-act="edit" data-id="${r.id}">Editar</button><button class="btn danger" data-act="del-ask" data-id="${r.id}">Excluir</button></div>`);
 }
 
@@ -520,7 +520,7 @@ function compareCardHTML() {
 const fmDMY = ms => fmtDM(ms) + '/' + String(new Date(ms).getFullYear()).slice(2);
 function viewAnalise() {
   let h = banners();
-  if (!S.records.length) return h + emptyBlock('Sem dados para analisar', 'Importe o CSV do mySugr ou registre medições.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar CSV</button>');
+  if (!S.records.length) return h + emptyBlock('Sem dados para analisar', 'Importe o arquivo de outro aplicativo ou registre medições.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar de outros aplicativos</button>');
   const a = S.ana, now = Date.now();
   h += prNotice('analise');
   const recs = a.range === 'all' ? S.records : inRange(S.records, startOfDay(addDays(now, -(+a.range - 1))), endOfDay(now));
@@ -589,7 +589,7 @@ function viewHba() {
   else {
     h += `<div class="card">${lineSimple(S.hba.map(x => ({ ts: mkTs(x.date, '12:00'), value: x.value, tip: `<b>${fn(x.value, 1)}%</b><br><span>${fmtDate(x.date)}${x.lab ? ' · ' + esc(x.lab) : ''}</span>` })), { label: 'Evolução da HbA1c laboratorial' })}`;
     if (S.hba.length > 1) { const a = S.hba[S.hba.length - 2], b = S.hba[S.hba.length - 1]; h += `<p class="hint">Entre os dois últimos exames (${fmtDate(a.date)} e ${fmtDate(b.date)}): <b>${fsign(b.value - a.value)} ponto percentual</b>.</p>`; }
-    h += `</div><div class="stack" style="margin-top:12px">` + [...S.hba].reverse().map(x => `<button class="rec" style="grid-template-columns:1fr auto" data-act="hba-edit" data-id="${x.id}"><span class="info"><span class="num">${fmtDate(x.date)}</span><span class="chips">${a1cBadge(x.value)}${x.lab ? `<span class="tag">${esc(x.lab)}</span>` : ''}${x.source === 'mysugr' ? '<span class="tag">Importado do mySugr</span>' : ''}${x.source === 'exame' ? '<span class="tag">Do exame enviado</span>' : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span>${x.notes ? `<span class="dim" style="font-size:14px">${esc(x.notes)}</span>` : ''}</span><span class="gl num">${fn(x.value, 1)}%<small>laboratório</small></span></button>`).join('') + `</div>`;
+    h += `</div><div class="stack" style="margin-top:12px">` + [...S.hba].reverse().map(x => `<button class="rec" style="grid-template-columns:1fr auto" data-act="hba-edit" data-id="${x.id}"><span class="info"><span class="num">${fmtDate(x.date)}</span><span class="chips">${a1cBadge(x.value)}${x.lab ? `<span class="tag">${esc(x.lab)}</span>` : ''}${(x.source && SOURCE_NAMES[x.source] && x.source !== 'exame') ? '<span class="tag">Importado ' + (x.source === 'importado' ? 'de outro aplicativo' : 'do ' + esc(SOURCE_NAMES[x.source])) + '</span>' : ''}${x.source === 'exame' ? '<span class="tag">Do exame enviado</span>' : ''}${x.example ? '<span class="tag warn">Exemplo</span>' : ''}</span>${x.notes ? `<span class="dim" style="font-size:14px">${esc(x.notes)}</span>` : ''}</span><span class="gl num">${fn(x.value, 1)}%<small>laboratório</small></span></button>`).join('') + `</div>`;
   }
   h += `<h2 class="sec">Estimativa (opcional)</h2><div class="card soft" style="border-style:dashed">`;
   if (!S.est) h += `<p class="hint" style="margin:0 0 12px">Calcula um valor aproximado a partir da média das suas glicemias capilares. <b>Não é um exame</b> e não é o GMI (estimativa de sensor contínuo).</p><button class="btn" data-act="est-on">Mostrar estimativa</button>`;
@@ -637,61 +637,82 @@ function viewEsquemas() {
   return h;
 }
 
-/* ---------- Importação mySugr ---------- */
+/* ---------- Importar de outros aplicativos (mySugr, Glooko, Libre, Dexcom, Diabetes:M, CSV, XLSX, JSON, ZIP) ---------- */
+const COL_LABEL = { date: 'data', time: 'hora', tags: 'etiquetas', glucose: 'glicemia', insPen: 'insulina (caneta)', insBasal: 'insulina basal', insPump: 'insulina (bomba)', insMeal: 'insulina rápida', insCorr: 'insulina de correção', insUnk: 'insulina (tipo não informado)', tbPct: 'basal temporária (%)', tbMin: 'basal temporária (min)', carbs: 'carboidratos', ctxLabel: 'contexto', mealLabel: 'refeição', mealDesc: 'descrição da refeição', actMin: 'atividade (min)', actInt: 'intensidade', actDesc: 'atividade', steps: 'passos', notes: 'notas', bp: 'pressão', weight: 'peso', a1c: 'HbA1c', ketones: 'cetonas', foodType: 'tipo de alimento', medication: 'medicação' };
 function viewImportar() {
   let h = banners();
   const imp = S.imp;
+  if (imp && imp.loading) return h + `<div class="card"><div class="eyebrow">Lendo o arquivo</div><p style="margin:10px 0 0">${esc(imp.name)}. Nada é gravado nesta etapa.</p></div>`;
   if (imp && imp.done) {
     const r = imp.result;
     return h + `<div class="card red"><div class="eyebrow">Importação concluída</div><div class="grid3" style="margin:14px 0 4px"><div class="tile"><div class="lb">Importados</div><div class="v num">${r.added}</div></div><div class="tile"><div class="lb">Duplicados</div><div class="v num">${r.dup}</div></div><div class="tile"><div class="lb">Ignorados</div><div class="v num">${r.ignored}</div></div></div>
-      ${r.hba ? `<p class="hint">${r.hba} resultado(s) de HbA1c também importado(s).</p>` : ''}${r.removedExamples ? '<p class="hint">Dados de exemplo foram removidos.</p>' : ''}</div>
+      ${r.hba ? `<p class="hint">${r.hba} resultado(s) de HbA1c também importado(s).</p>` : ''}${r.removedExamples ? '<p class="hint">Dados de exemplo foram removidos.</p>' : ''}<p class="hint">Os registros que já estavam no aplicativo não foram alterados.</p></div>
       <div class="row" style="margin-top:12px"><button class="btn pri grow" data-act="go" data-r="painel">Ir ao início</button><button class="btn" data-act="imp-reset">Importar outro</button></div>
       <p class="hint">Importar o mesmo arquivo de novo não duplica os registros.</p>`;
   }
   if (imp && imp.parsed) {
     const p = imp.parsed;
-    if (!p.ok) return h + `<div class="card"><div class="eyebrow">Não foi possível importar</div><p style="margin:10px 0 14px">${esc(p.error)}</p><button class="btn" data-act="imp-reset">Escolher outro arquivo</button></div>`;
+    const skipped = (p.skipped || []).filter(x => x.name || x.error);
+    const skipBlock = skipped.length ? `<details class="more" style="margin-top:12px"><summary>Partes do arquivo que não puderam ser importadas (${skipped.length})</summary><ul class="plain" style="margin-bottom:12px">${skipped.slice(0, 30).map(x => `<li>${x.name ? '<b>' + esc(x.name) + '</b>: ' : ''}${esc(x.error)}</li>`).join('')}</ul></details>` : '';
+    if (!p.ok) return h + `<div class="card"><div class="eyebrow">Não foi possível importar</div><p style="margin:10px 0 14px">${esc(p.error)}</p>${skipBlock}<button class="btn" data-act="imp-reset">Escolher outro arquivo</button></div>`;
     const reasons = Object.entries(p.reasons);
     const ign = reasons.reduce((a, [, n]) => a + n, 0);
-    return h + `<div class="card"><div class="eyebrow">Prévia · ${esc(imp.name)}</div><div class="grid3" style="margin:14px 0 6px"><div class="tile"><div class="lb">Novos</div><div class="v num">${imp.newCount}</div></div><div class="tile"><div class="lb">Duplicados</div><div class="v num">${imp.dupCount}</div></div><div class="tile ${ign ? 'alert' : ''}"><div class="lb">Ignorados</div><div class="v num">${ign}</div></div></div>
-      <p class="hint" style="margin-top:4px">${p.totalRows} linhas lidas${p.items.length ? `, de ${fmtDate(p.items[0].date)} a ${fmtDate(p.items[p.items.length - 1].date)}` : ''}. Serão gravadas em ordem cronológica.</p>
-      ${p.warning ? `<p class="err">${esc(p.warning)}</p>` : ''}
-      ${reasons.length ? `<h2 class="sec" style="margin-top:18px">Linhas ignoradas</h2><ul class="plain">${reasons.map(([k, n]) => `<li>${n} · ${esc(k)}</li>`).join('')}</ul>${p.withOtherData ? `<p class="hint">${p.withOtherData} linha(s) sem glicemia tinham dose de insulina ou carboidrato. Elas não são importadas, porque o TiaBete guarda cada registro a partir de uma medição.</p>` : ''}${p.ignored.length ? `<details class="more" style="margin-top:10px"><summary>Ver linhas (${Math.min(p.ignored.length, 200)})</summary><ul class="plain" style="margin-bottom:12px">${p.ignored.slice(0, 60).map(i => `<li>Linha ${i.line}: ${esc(i.reason)}${i.extra ? ' (“' + esc(i.extra.slice(0, 30)) + '”)' : ''}</li>`).join('')}${p.ignored.length > 60 ? `<li>…e mais ${p.ignored.length - 60}</li>` : ''}</ul></details>` : ''}` : ''}
+    const colTxt = p.columns.map(c => COL_LABEL[c] || c).join(', ');
+    return h + `<div class="card"><div class="eyebrow">Prévia · ${esc(imp.name)}</div>
+      <p class="hint" style="margin:8px 0 0">${p.fileKind ? 'Formato do arquivo: <b>' + esc(p.fileKind) + '</b>. ' : ''}Origem reconhecida: <b>${esc(p.format || 'outro aplicativo')}</b>.</p>
+      <div class="grid3" style="margin:14px 0 6px"><div class="tile"><div class="lb">Novos</div><div class="v num">${imp.newCount}</div></div><div class="tile"><div class="lb">Duplicados</div><div class="v num">${imp.dupCount}</div></div><div class="tile ${ign ? 'alert' : ''}"><div class="lb">Ignorados</div><div class="v num">${ign}</div></div></div>
+      <p class="hint" style="margin-top:4px">${p.totalRows} linhas lidas${p.items.length ? `, de ${fmtDate(p.items[0].date)} a ${fmtDate(p.items[p.items.length - 1].date)}` : ''}. Serão gravadas em ordem cronológica, somente como registros novos. Nada que já está no aplicativo é alterado ou apagado.</p>
+      ${p.unitNote ? `<div class="banner warn" style="margin-top:10px;display:block">${esc(p.unitNote)}</div>` : ''}
+      ${p.warning ? `<p class="err">${esc(p.warning)}</p>` : ''}${imp.error ? `<p class="err">${esc(imp.error)}</p>` : ''}
+      ${imp.dups && imp.dups.length ? `<details class="more" style="margin-top:12px"><summary>Ver duplicados (${imp.dupCount})</summary><p class="hint" style="margin:0 0 6px">Mesma data, hora e valor de um registro que já existe (ou repetido no arquivo). Eles não são importados de novo e os existentes não são alterados.</p><ul class="plain" style="margin-bottom:12px">${imp.dups.map(d => `<li>${fmtDate(d.date)} ${d.noTime ? '' : esc(d.time)} · ${d.glucose} mg/dL</li>`).join('')}${imp.dupCount > imp.dups.length ? `<li>…e mais ${imp.dupCount - imp.dups.length}</li>` : ''}</ul></details>` : ''}
+      ${reasons.length ? `<h2 class="sec" style="margin-top:18px">Linhas ignoradas</h2><ul class="plain">${reasons.map(([k, n]) => `<li>${n} · ${esc(k)}</li>`).join('')}</ul>${p.withOtherData ? `<p class="hint">${p.withOtherData} linha(s) sem glicemia tinham dose de insulina ou carboidrato. Elas não são importadas, porque o TiaBete guarda cada registro a partir de uma medição.</p>` : ''}${p.ignored.length ? `<details class="more" style="margin-top:10px"><summary>Ver linhas (${Math.min(p.ignored.length, 200)})</summary><ul class="plain" style="margin-bottom:12px">${p.ignored.slice(0, 60).map(i => `<li>${i.where ? esc(i.where) + ', ' : ''}linha ${i.line}: ${esc(i.reason)}${i.extra ? ' (“' + esc(i.extra.slice(0, 30)) + '”)' : ''}</li>`).join('')}${p.ignored.length > 60 ? `<li>…e mais ${p.ignored.length - 60}</li>` : ''}</ul></details>` : ''}` : ''}
+      ${skipBlock}
       ${p.hba.length ? `<label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-hba" ${imp.includeHba ? 'checked' : ''}><span>Importar também ${p.hba.length} valor(es) de HbA1c encontrados no arquivo, como resultado sem laboratório informado.</span></label>` : ''}
-      <label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-rule" ${imp.timeRule ? 'checked' : ''}><span>Definir jejum, antes e depois da refeição pelo <b>horário</b> da medição (${p.items.filter(i => applyRule(i)).length} de ${p.items.length} serão definidas ou alteradas). As etiquetas originais do mySugr são mantidas.</span></label>
-      <details class="more" style="margin-top:14px"><summary>Colunas reconhecidas (${p.columns.length})</summary><p class="hint" style="margin:0 0 12px">${p.columns.join(', ')}.${p.ignoredCols.length ? ' Localização, fuso horário, latitude e longitude são descartados por privacidade.' : ''}</p></details>
+      <label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-rule" ${imp.timeRule ? 'checked' : ''}><span>Definir jejum, antes e depois da refeição pelo <b>horário</b> da medição (${p.items.filter(i => applyRule(i)).length} de ${p.items.length} serão definidas ou alteradas). As etiquetas originais do arquivo são mantidas.</span></label>
+      <details class="more" style="margin-top:14px"><summary>Colunas reconhecidas (${p.columns.length})</summary><p class="hint" style="margin:0 0 12px">${esc(colTxt)}.${p.ignoredCols.length ? ' Localização, fuso horário, latitude e longitude são descartados por privacidade.' : ''}</p></details>
+      ${p.unmappedCols && p.unmappedCols.length ? `<details class="more" style="margin-top:10px"><summary>Colunas sem campo correspondente, não importadas (${p.unmappedCols.length})</summary><p class="hint" style="margin:0 0 12px">${p.unmappedCols.map(esc).join(', ')}.</p></details>` : ''}
       <p class="hint">Etiquetas como “Almoço” ou “Antes da refeição” preenchem refeição e contexto. O texto original é mantido. Doses de caneta, bomba, refeição, correção e basal ficam separadas e nunca são somadas.</p>
       <div class="row" style="margin-top:16px"><button class="btn pri grow" data-act="imp-commit" ${imp.newCount || (imp.includeHba && p.hba.length) ? '' : 'disabled'}>Importar ${imp.newCount} registro${imp.newCount === 1 ? '' : 's'}</button><button class="btn" data-act="imp-reset">Cancelar</button></div></div>`;
   }
-  return h + `<div class="card red"><div class="eyebrow">CSV do mySugr, FreeStyle Libre (LibreView) ou Dexcom Clarity</div><p style="margin:10px 0 16px;color:var(--fg)">Escolha o arquivo no aparelho. Ele é lido aqui mesmo, sem enviar nada pela internet.</p>
-    <input type="file" id="imp-file" accept=".csv,.txt,text/csv,text/plain" hidden><button class="btn pri full" data-act="pick-csv">Escolher arquivo CSV</button></div>
+  return h + `<div class="card red"><div class="eyebrow">Importar de outros aplicativos</div><p style="margin:10px 0 16px;color:var(--fg)">Traga o histórico de outro aplicativo de glicemia. Escolha o arquivo exportado no aparelho. Ele é lido aqui mesmo, sem enviar nada pela internet.</p>
+    <input type="file" id="imp-file" accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.zip,text/csv,text/plain,application/json,application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden><button class="btn pri full" data-act="pick-csv">Escolher arquivo</button></div>
+    <h2 class="sec">Aplicativos e formatos</h2><div class="card"><ul class="plain" style="margin:0">
+    <li><b>Aplicativos:</b> mySugr, Glooko, FreeStyle Libre (LibreView), Dexcom Clarity, Diabetes:M e outros que exportem data e glicemia.</li><li><b>Formatos:</b> CSV, XLSX, JSON e ZIP com esses arquivos. O formato é reconhecido pelo conteúdo. Arquivo .xls antigo: salve como .xlsx ou .csv.</li><li>Valores em mmol/L são convertidos para mg/dL, e você é avisado.</li></ul></div>
     <h2 class="sec">Como funciona</h2><div class="card"><ul class="plain" style="margin:0">
-    <li>Datas como 31/12/2026; números com vírgula ou ponto.</li><li>Você vê uma prévia antes de gravar qualquer coisa.</li><li>Registros com mesma data, hora e valor são duplicados.</li><li>Linhas sem glicemia válida ou sem data são ignoradas.</li><li>Localização e coordenadas não são guardadas.</li></ul></div>`;
+    <li>Datas como 31/12/2026 ou 2026-12-31; números com vírgula ou ponto.</li><li>Você vê uma prévia antes de gravar qualquer coisa.</li><li>Registros com mesma data, hora e valor são duplicados e não são importados de novo.</li><li>Nada que já está no aplicativo é alterado ou apagado.</li><li>Linhas sem glicemia válida ou sem data são ignoradas, e a prévia mostra quais.</li><li>Localização e coordenadas não são guardadas.</li></ul></div>`;
 }
-async function handleCsvFile(file) {
+async function handleImportFile(file) {
   if (!file) return;
   if (file.size > 25 * 1024 * 1024) { toast('Arquivo grande demais (máx. 25 MB).'); return; }
-  let text; try { const buf = await file.arrayBuffer(); try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder('windows-1252').decode(buf); } } catch (e) { toast('Não consegui ler o arquivo.'); return; }
-  const p = parseMySugr(text);
-  const have = new Set(S.records.filter(r => !isEx(r)).map(dedupKey)); let newCount = 0, dupCount = 0;
-  if (p.ok) p.items.forEach(it => { const k = dedupKey(it); if (have.has(k)) dupCount++; else { have.add(k); newCount++; } });
-  S.imp = { name: file.name, parsed: p, newCount, dupCount, includeHba: true, timeRule: false }; render();
+  let buf; try { buf = await file.arrayBuffer(); } catch (e) { toast('Não consegui ler o arquivo.'); return; }
+  S.imp = { name: file.name, loading: true }; render();
+  let p; try { p = await parseImportFile(file.name, buf); } catch (e) { p = { ok: false, error: 'Não consegui ler este arquivo.', reasons: {}, items: [], hba: [], ignored: [], columns: [], ignoredCols: [] }; }
+  const have = new Set(S.records.filter(r => !isEx(r)).map(dedupKey)); let newCount = 0, dupCount = 0; const dups = [];
+  if (p.ok) p.items.forEach(it => { const k = dedupKey(it); if (have.has(k)) { dupCount++; if (dups.length < 30) dups.push({ date: it.date, time: it.time, noTime: it.noTime, glucose: it.glucose }); } else { have.add(k); newCount++; } });
+  S.imp = { name: file.name, parsed: p, newCount, dupCount, dups, includeHba: true, timeRule: false }; render();
 }
+/* Gravação à prova de falha: só ACRESCENTA registros novos (nunca regrava, apaga nem altera os existentes). Cada gravação é uma transação única; se a segunda falhar, a primeira é desfeita. */
 async function commitImport() {
   const imp = S.imp, p = imp.parsed; const real = S.records.filter(r => !isEx(r));
   const have = new Set(real.map(dedupKey)); const add = []; let dup = 0;
   for (const it of p.items) { const k = dedupKey(it); if (have.has(k)) { dup++; continue; } have.add(k); let rec = { ...it, id: uid() }; delete rec.key; if (imp.timeRule) rec = applyRule(rec) || rec; add.push(rec); }
-  const hadEx = hasExamples(); if (hadEx) await removeExamples();
-  await Store.putMany('records', add);
-  let hbaAdded = 0;
-  if (imp.includeHba) {
-    const seen = new Set(S.hba.filter(x => !isEx(x)).map(x => x.date + '|' + x.value)); const nh = [];
-    p.hba.forEach(x => { const k = x.date + '|' + x.value; if (!seen.has(k)) { seen.add(k); nh.push({ id: uid(), date: x.date, value: x.value, lab: '', notes: 'Importado do mySugr (laboratório não informado).', source: 'mysugr' }); } });
-    await Store.putMany('hba1c', nh); hbaAdded = nh.length;
+  try {
+    await Store.putMany('records', add);
+    let hbaAdded = 0;
+    if (imp.includeHba) {
+      const seen = new Set(S.hba.filter(x => !isEx(x)).map(x => x.date + '|' + x.value)); const nh = [];
+      p.hba.forEach(x => { const k = x.date + '|' + x.value; if (!seen.has(k)) { seen.add(k); nh.push({ id: uid(), date: x.date, value: x.value, lab: '', notes: 'Importado de ' + (p.format || 'outro aplicativo') + ' (laboratório não informado).', source: p.source || 'importado' }); } });
+      try { await Store.putMany('hba1c', nh); } catch (e) { try { await Store.delMany('records', add.map(x => x.id)); } catch (e2) { } throw e; }
+      hbaAdded = nh.length;
+    }
+    let hadEx = false; try { hadEx = hasExamples(); if (hadEx) await removeExamples(); } catch (e) { hadEx = false; }
+    await loadAll();
+    S.imp = { done: true, result: { added: add.length, dup, ignored: Object.values(p.reasons).reduce((a, b) => a + b, 0), hba: hbaAdded, removedExamples: hadEx } };
+    render();
+  } catch (e) {
+    try { await loadAll(); } catch (e2) { }
+    S.imp = { ...imp, error: 'A importação não foi concluída e nenhum registro foi alterado. Tente de novo.' }; render(); toast('Falha ao importar. Nada foi alterado.');
   }
-  await loadAll();
-  S.imp = { done: true, result: { added: add.length, dup, ignored: Object.values(p.reasons).reduce((a, b) => a + b, 0), hba: hbaAdded, removedExamples: hadEx } };
-  render();
 }
 
 /* ---------- Aviso: últimas medições sem antes/depois ---------- */
@@ -704,7 +725,7 @@ function labelBanner() {
 }
 
 /* ---------- Classificação (horário ou etiquetas) ---------- */
-const RULE_MODES = { horario: 'Pelo horário', etiquetas: 'Pelas etiquetas do mySugr' };
+const RULE_MODES = { horario: 'Pelo horário', etiquetas: 'Pelas etiquetas do aplicativo de origem' };
 const tgtKey = t => t.context + '/' + (t.meal || '');
 const tgtLabel = t => CONTEXTS[t.context] + (t.meal ? ' · ' + MEALS[t.meal] : '');
 const TGT_ORDER = ['jejum/', 'antes/cafe', 'depois/cafe', 'antes/almoco', 'depois/almoco', 'antes/jantar', 'depois/jantar', 'antes/lanche', 'depois/lanche', 'deitar/', 'antes/', 'depois/'];
@@ -727,16 +748,16 @@ function ruleSummary() {
 }
 function viewClassificar() {
   const R = ruleSummary();
-  if (!R.recs.length) return banners() + `<div class="card">${emptyBlock('Sem medições', 'Importe o CSV do mySugr ou registre medições para classificar.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar CSV</button>')}</div>`;
-  let h = banners() + `<p class="hint" style="margin:0 0 12px">Define o contexto (jejum, antes ou depois da refeição) e a refeição de cada medição. As etiquetas do mySugr são mantidas e dá para desfazer.</p>`;
+  if (!R.recs.length) return banners() + `<div class="card">${emptyBlock('Sem medições', 'Importe o arquivo de outro aplicativo ou registre medições para classificar.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar de outros aplicativos</button>')}</div>`;
+  let h = banners() + `<p class="hint" style="margin:0 0 12px">Define o contexto (jejum, antes ou depois da refeição) e a refeição de cada medição. As etiquetas originais do arquivo importado são mantidas e dá para desfazer.</p>`;
   h += `<div class="card"><div class="row sp"><div class="field" style="width:130px"><label class="fl" for="rule-n">Últimas medições</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN}"></div><p class="hint grow" style="margin:0">Só as <b class="num">${R.scope.length}</b> mais recentes, de <span class="num">${fmtDate(R.scope[0].date)}</span> a <span class="num">${fmtDate(R.scope[R.scope.length - 1].date)}</span>. As mais antigas não são alteradas.</p></div>
     <div style="margin-top:14px"><div class="fl">Critério</div><div class="seg" role="group" aria-label="Critério" style="display:flex">${Object.entries(RULE_MODES).map(([k, l]) => `<button style="flex:1" data-act="rule-mode" data-v="${k}" aria-pressed="${R.mode === k}">${l}</button>`).join('')}</div>
-    <p class="hint">${R.mode === 'horario' ? '04h–08h jejum · 08h–10h depois do café · 10h–12h antes do almoço · 12h–16h depois do almoço · 16h–19h antes do jantar · 19h–00h depois do jantar. Entre 00h e 04h não há regra.' : 'Usa Antes da refeição, Depois da refeição, Jejum e a refeição marcados no mySugr. Quando a etiqueta não traz a refeição ou o pré/pós, o horário completa.'}</p></div></div><div style="height:12px"></div>`;
+    <p class="hint">${R.mode === 'horario' ? '04h–08h jejum · 08h–10h depois do café · 10h–12h antes do almoço · 12h–16h depois do almoço · 16h–19h antes do jantar · 19h–00h depois do jantar. Entre 00h e 04h não há regra.' : 'Usa Antes da refeição, Depois da refeição, Jejum e a refeição marcados no arquivo importado (mySugr, Glooko e outros). Quando a etiqueta não traz a refeição ou o pré/pós, o horário completa.'}</p></div></div><div style="height:12px"></div>`;
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Classificação</th><th>Medições</th><th>Mudam</th></tr></thead><tbody>${R.rows.map(x => `<tr><td style="text-align:left;white-space:normal">${tgtLabel(x.t)}</td><td>${x.n}</td><td>${x.ch}</td></tr>`).join('')}</tbody></table></div>
     <p class="hint">${R.none ? R.none + ' medições não entram em nenhuma classificação e ficam como estão.' : 'Todas as medições deste grupo entram em alguma classificação.'}</p></div>`;
   if (R.conflicts.length) {
     const ex = R.conflicts.slice(0, 3).map(c => `${fmtDate(c.r.date).slice(0, 5)} ${c.r.time}: etiqueta "${esc(c.r.tags)}" → ${tgtLabel(c.te)}; horário → ${tgtLabel(c.th)}`).join('<br>');
-    h += `<div class="banner warn" style="margin-top:12px;display:block"><b>${R.conflicts.length} medições</b> têm etiqueta do mySugr diferente da regra de horários. Exemplos:<br><span class="dim">${ex}</span></div>`;
+    h += `<div class="banner warn" style="margin-top:12px;display:block"><b>${R.conflicts.length} medições</b> têm etiqueta do aplicativo de origem diferente da regra de horários. Exemplos:<br><span class="dim">${ex}</span></div>`;
   }
   h += `<h2 class="sec">Efeito nas contagens</h2><div class="card"><div class="grid2"><div class="tile"><div class="lb">Acima da faixa hoje</div><div class="v num" style="font-size:28px">${R.before.hyper}</div></div><div class="tile ${R.after.hyper > R.before.hyper ? 'alert' : ''}"><div class="lb">Depois de aplicar</div><div class="v num" style="font-size:28px">${R.after.hyper}</div></div></div>
     <p class="hint">Medições de jejum usam 70 a 130 mg/dL como faixa normal. Valores entre 131 e 180 classificados como jejum passam a contar como acima da faixa.</p></div>`;
@@ -831,7 +852,7 @@ function menuGroups() {
     'g-saude': { t: 'Saúde e diabetes', d: 'Hemoglobina glicada, exames e hipoglicemia', items: [['hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico'], HAS_CLAUDE ? ['exames', 'Exames laboratoriais', 'Enviar exames, ver notas e comparar'] : null, ['hypo', 'Protocolo de hipoglicemia', 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', 'hypo-open']] },
     'g-trat': { t: 'Tratamento e insulina', d: 'Medicamentos, horários e doses de insulina', items: [['esquemas', 'Meu tratamento', 'Diabetes, insulinas, medicamentos e histórico'], ['insrem', 'Lembretes de insulina', 'Avisos de basal e rápida, com confirmação da aplicação'], ['insulinas', 'Histórico de insulinas', 'Horários, média e variação das insulinas']] },
     'g-bolus': { t: 'Cálculo de bolus', d: 'Razão insulina/carboidratos, alimentos e refeições', items: [['bolus', 'Cálculo de bolus', 'Razão insulina/carboidratos, alimentos e refeições']] },
-    'g-hist': { t: 'Histórico e registros', d: 'Classificar medições, eventos e importação do mySugr', items: [['classificar', 'Classificar medições', 'Jejum, antes e depois da refeição'], ['eventos', 'Eventos', 'Marcar doença, viagem ou rotina nos gráficos'], ['importar', 'Importar do mySugr', 'Enviar o CSV, com prévia']] },
+    'g-hist': { t: 'Histórico e registros', d: 'Classificar medições, eventos e importação de outros aplicativos', items: [['classificar', 'Classificar medições', 'Jejum, antes e depois da refeição'], ['eventos', 'Eventos', 'Marcar doença, viagem ou rotina nos gráficos'], ['importar', 'Importar de outros aplicativos', 'mySugr, Glooko, Libre, Dexcom, Diabetes:M e outros (CSV, XLSX, JSON), com prévia']] },
     'g-relat': { t: 'Relatórios e estatísticas', d: 'Relatórios para o médico, padrões e conquistas', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['padroes', 'Padrões', 'Observações automáticas dos seus registros'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses']] },
     'g-ia': { t: 'Inteligência artificial', d: 'Pergunte sobre seus registros e configure a IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Pergunte sobre seus registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor, o modelo e a chave'] : null] },
     'g-dados': { t: 'Cópia de segurança', d: 'Exportar, restaurar, Google Drive e CSV', items: [['backup', 'Cópia de segurança', 'Exportar, restaurar, Google Drive e CSV']] },
@@ -846,7 +867,7 @@ function menuGroups() {
 }
 const hubOf = r => { if (r === 'perguntas' || r === 'ia') return 'g-ia'; const G = menuGroups(); for (const [k, g] of Object.entries(G)) if (g.items.some(x => x[0] === r)) return k; return null; };
 const hubView = k => () => { const g = menuGroups()[k]; return banners() + `<div class="stack">${g.items.map(x => menuItem(x[0], x[1], x[2])).join('')}</div>`; };
-const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr csv arquivo', backup: 'exportar restaurar nuvem drive salvar dados apagar backup copia seguranca', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'perfil foto nome idade nascimento tipo diabetes equipe medico privacidade seguranca conta dados avatar', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
+const MAIS_KW = { bolus: 'razao relacao insulina carboidrato carboidratos i:c ic tutorial refeicao refeicoes alimentos calculo rapida', hba1c: 'a1c hemoglobina glicosilada laboratorio', esquemas: 'tratamento remedio medicamento bomba insulina metformina alarme horario', insulinas: 'basal rapida dose horario caneta', exames: 'laboratorio pdf resultado', perguntas: 'ia claude pergunta assistente', ia: 'chave api openai gemini provedor', relatorios: 'pdf excel medico imprimir enviar compartilhar whatsapp email medico', importar: 'mysugr glooko libre freestyle librelink librelinkup libreview dexcom clarity diabetes:m diabetesm outros aplicativos app csv xlsx excel planilha json zip arquivo migrar trazer historico mmol', backup: 'exportar restaurar nuvem drive salvar dados apagar backup copia seguranca', config: 'tamanho texto fonte escala tema meta alvo', lembretes: 'notificacao alarme aviso silencio', perfil: 'perfil foto nome idade nascimento tipo diabetes equipe medico privacidade seguranca conta dados avatar', aparencia: 'tema escuro claro tamanho texto escala', sobre: 'versao privacidade desenvolvedor compilacao', padroes: 'horario jejum etiqueta', conquistas: 'metas dias sem hipoglicemia', classificar: 'jejum pre pos prandial etiqueta', eventos: 'doenca viagem rotina' };
 Object.assign(MAIS_KW, { insrem: 'lembrete lembretes insulina basal rapida notificacao aviso alarme confirmar aplicacao adiar', seguranca: 'pin senha bloqueio bloquear biometria digital rosto cifrar criptografia backup copia protegido drive', privacidade: 'dados armazenamento persistente apagar perfil lgpd rastreamento', alertashist: 'historico avisos bolha lidos dispensados', hypo: 'hipoglicemia glicose baixa 15 minutos protocolo reavaliar', sobre: (MAIS_KW.sobre || '') + ' versao ajuda atualizacao tutorial' });
 const pfMenuDesc = () => S.profile && (S.profile.name || S.profile.photo) ? 'Foto, dados pessoais, diabetes e privacidade' : 'Crie seu perfil';
 function maisIndex() {
@@ -1021,7 +1042,7 @@ document.addEventListener('change', async e => {
   if (map[id]) { S.hist[map[id]] = t.value; S.hist.limit = 60; $('#h-list').innerHTML = histListHTML(); const sm = $('details.more summary'); const n = [S.hist.from, S.hist.to, S.hist.band, S.hist.ctx, S.hist.meal].filter(Boolean).length; if (sm) sm.textContent = 'Filtros' + (n ? ` · ${n} ativo${n > 1 ? 's' : ''}` : ''); }
   else if (['a-from', 'a-to', 'b-from', 'b-to'].includes(id)) { S.ana[id[0].toUpperCase()][id.slice(2)] = t.value; $('#cmp').innerHTML = compareCardHTML(); }
   else if (id === 'r-from' || id === 'r-to') { S.rep[id.slice(2)] = t.value; if (S.rep.from && S.rep.to && S.rep.from > S.rep.to) { S.rep.to = S.rep.from; } render(); }
-  else if (id === 'imp-file') { await handleCsvFile(t.files[0]); t.value = ''; }
+  else if (id === 'imp-file') { await handleImportFile(t.files[0]); t.value = ''; }
   else if (id === 'imp-hba') { S.imp.includeHba = t.checked; render(); }
   else if (id === 'imp-rule') { S.imp.timeRule = t.checked; render(); }
   else if (id === 'rule-n') { const n = parseInt(t.value, 10); S.ruleN = n > 0 ? Math.min(n, 100000) : 180; render(); }

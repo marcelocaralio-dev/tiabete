@@ -17,7 +17,7 @@ Aplicativo gratuito e de código aberto para acompanhar **glicemia, insulina e h
 - Conquistas (sequências de dias dentro da meta).
 - **Cálculo de bolus**: alimentos, refeições e registro por dia. A conta usa **somente a razão de gramas de carboidrato por unidade que você mesmo definir** com a sua equipe de saúde. Não há valores pré-definidos, não há correção pela glicemia e o resultado deve ser conferido antes de aplicar.
 - Alertas e notificações: lembretes de horário, reavaliação após hipoglicemia e silêncio noturno.
-- Importação de CSV do mySugr, relatórios em PDF e Excel, backup e restauração em arquivo JSON.
+- Importação de dados de outros aplicativos (mySugr, Glooko, FreeStyle Libre, Dexcom Clarity, Diabetes:M e outros; CSV, XLSX, JSON e ZIP), relatórios em PDF e Excel, backup e restauração em arquivo JSON.
 
 ## Instalar o APK
 
