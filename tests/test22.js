@@ -118,9 +118,11 @@ ok(['tir', 'tbr', 'tar', 'dp', 'cv'].every(k => { vm.runInContext(`S.mt.sel='${k
   const ctx2 = await chromium.launchPersistentContext(dir, Object.assign({}, devices['Pixel 7'])), pg = ctx2.pages()[0] || await ctx2.newPage(); const errs = []; pg.on('pageerror', e => errs.push(e.message));
   await pg.goto('file://' + FH); await sleep(1200); try { await pg.getByText('Continuar sem conta').click({ timeout: 2000 }); } catch (e) { }
   await seed(pg); await sleep(300);
-  const cards = await pg.evaluate(() => [...document.querySelectorAll('.pn-grid > .pn-c')].map(e => e.dataset.pm).join(','));
+  /* Início 0.26: "Glicemia mais recente" virou o painel de situação geral (mesma janela de detalhes, data-pm="ult"); os demais cartões continuam, na mesma ordem relativa, com cartões novos intercalados. */
+  const cards = await pg.evaluate(() => [...document.querySelectorAll('.in-hero [data-pm="ult"], .pn-grid > .pn-c')].map(e => e.dataset.pm).join(','));
   const blocks = await pg.evaluate(() => document.querySelectorAll('.mt-blk').length);
-  ok(blocks === 1 && /^ult,dia,hba,evo,trat,med,cmp,min,max,n,hipo,hiper,dist$/.test(cards), 'tela inicial: UM bloco novo e os cartões existentes intactos e na mesma ordem (' + cards + ')');
+  const orig = ['ult', 'dia', 'hba', 'evo', 'trat', 'med', 'cmp', 'min', 'max', 'n', 'hipo', 'hiper', 'dist'], got = cards.split(',').filter(k => orig.includes(k));
+  ok(blocks === 1 && got.join() === orig.join(), 'tela inicial: UM bloco de métricas e os cartões existentes intactos e na mesma ordem relativa (' + cards + ')');
   const lockedBlk = await pg.evaluate(() => document.querySelector('.mt-blk').classList.contains('locked'));
   ok(lockedBlk, 'sem licença: o bloco aparece bloqueado');
   const grid = await pg.evaluate(() => { const g = document.querySelector('.pn-grid'), b = document.querySelector('.mt-blk'); return g.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0; });

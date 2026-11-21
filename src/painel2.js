@@ -70,49 +70,51 @@ function pnTrat() {
   return { big, unit, sub: lines.join(' · '), st };
 }
 
-/* ---------- Painel (cards compactos) ---------- */
+/* ---------- Painel (Início) ----------
+   Situação geral, atalhos e acontecimentos (inicio.js) + cartões personalizáveis. Todos os cartões e janelas de detalhe de antes continuam existindo:
+   "Glicemia mais recente" agora é o painel de situação geral (mesma janela de detalhes) e o seletor de período passou para dentro dele. */
 function viewPainelCards() {
   const d = pnData(), { all, last, sc, cmp, rc, sd, rs } = d;
   if (!all.length) return viewPainelClassic(); // boas-vindas
+  const M = inModel();
   let h = banners() + labelBanner() + pfInvite() + prNotice('painel');
-  const bnd = bandOf(last.glucose, last.context), gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
   const gl = (v, a, lbl, k) => `<div class="pn-gauge">${gaugeSvg(v, a, lbl, k)}</div>`;
   const dKey = d.iso + '|' + (rs.length ? sd.mean : ''), dAnim = S.gaugeKeyD !== dKey; S.gaugeKeyD = dKey;
-  const cards = [];
-  cards.push(pnCard('ult', `b-${bnd.k}${(last.glucose < LIM.low || last.glucose > LIM.high) ? ' oor' : ''}`, 'drop', 'Glicemia mais recente',
-    `${gl(last.glucose, gAnim, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}.`, 'ult')}<span class="pn-mid">${badge(last.glucose, last.context, true)}</span><span class="pn-sub num">${last.noTime ? '' : 'Última medição: ' + last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}</span>`,
-    `Glicemia mais recente: ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}`, bnd.k === 'ok'));
-  cards.push(pnCard('dia', '', 'bars', 'Média do dia',
+  const C = {};
+  C.hoje = inDayCard(d);
+  C.dia = pnCard('dia', '', 'bars', 'Média do dia',
     rs.length ? `${gl(sd.mean, dAnim, 'Média do dia: ' + fn(sd.mean, 1) + ' mg/dL.', 'dia')}<span class="pn-mid">${badge(sd.mean)}</span><span class="pn-sub num">Medições: ${sd.n} · ${pnDayLab(d.iso, d.isToday)}</span>`
       : `<span class="pn-big num">—</span><span class="pn-sub">${d.isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia'}</span>`,
-    rs.length ? `Média do dia: ${fn(sd.mean, 1)} mg/dL, ${sd.n} medições` : 'Média do dia: sem medições', rs.length ? bandOf(sd.mean).k === 'ok' : null));
+    rs.length ? `Média do dia: ${fn(sd.mean, 1)} mg/dL, ${sd.n} medições` : 'Média do dia: sem medições', rs.length ? bandOf(sd.mean).k === 'ok' : null);
   const e = est90();
-  cards.push(pnCard('hba', 'wide', 'hb', 'Hemoglobina glicada (HbA1c)',
+  C.hba = pnCard('hba', 'wide', 'hb', 'Hemoglobina glicada (HbA1c)',
     e.ok ? `<span class="pn-row"><span class="pn-big num">≈ ${fn(e.value, 1)}<small>%</small></span>${a1cBadge(e.value)}<span class="pn-sub pn-r">Estimativa: 90 dias</span></span>`
       : `<span class="pn-row"><span class="pn-big num">—</span><span class="pn-sub pn-r">Estimativa indisponível: ${e.st.n} medições em ${e.days} dias</span></span>`,
-    e.ok ? `HbA1c estimada: aproximadamente ${fn(e.value, 1)} por cento` : 'HbA1c estimada indisponível', e.ok ? a1cEval(e.value, S.a1cT).k === 'ok' : null));
-  cards.push(pnCard('evo', '', 'trend', 'Evolução da glicemia',
+    e.ok ? `HbA1c estimada: aproximadamente ${fn(e.value, 1)} por cento` : 'HbA1c estimada indisponível', e.ok ? a1cEval(e.value, S.a1cT).k === 'ok' : null);
+  C.exa = inExamCard();
+  C.evo = pnCard('evo', '', 'trend',  'Evolução da glicemia',
     `<span class="pn-spark">${rc.length > 1 ? sparkline(rc) : ''}</span><span class="pn-sub">${rc.length ? `${rc.length} medi${rc.length > 1 ? 'ções' : 'ção'} · ${S.period} dias` : 'Sem medições em ' + S.period + ' dias'}</span>`,
-    'Evolução da glicemia', sc.n ? bandOf(sc.mean).k === 'ok' : null));
+    'Evolução da glicemia', sc.n ? bandOf(sc.mean).k === 'ok' : null);
   const tr = pnTrat();
-  cards.push(pnCard('trat', '', 'syringe', 'Meu tratamento', `<span class="pn-big num">${tr.big}</span>${tr.unit ? `<span class="pn-unit">${tr.unit}</span>` : ''}<span class="pn-sub">${esc(tr.sub)}</span>`, 'Meu tratamento', tr.st));
-  cards.push(`<div class="pn-per"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow">${fmtDM(d.cur[0])} – ${fmtDM(d.cur[1])}</span></div>`);
-  cards.push(pnCard('med', '', 'bars', 'Média no período', `<span class="pn-big num">${fm(sc.mean)}<small>mg/dL</small></span><span class="pn-sub">${sc.n ? (cmp.diff != null ? `${fsign(cmp.diff)} mg/dL em relação aos ${S.period} dias anteriores` : 'Sem média anterior para comparar') : 'Sem medições neste período'}</span>`, 'Média no período', sc.n ? bandOf(sc.mean).k === 'ok' : null));
-  cards.push(pnCard('cmp', '', 'cmp', 'Comparação', `<span class="pn-big num">${cmp.pct == null ? '—' : fsign(cmp.pct, 0)}<small>%</small></span><span class="pn-sub">em relação ao período anterior</span>`, 'Comparação com o período anterior'));
-  cards.push(pnCard('min', 'mini', 'down', 'Menor', `<span class="pn-big num">${f0(sc.min)}</span><span class="pn-unit">mg/dL</span>`, 'Menor glicemia do período', sc.n ? bandOf(sc.min).k === 'ok' : null));
-  cards.push(pnCard('max', 'mini', 'up', 'Maior', `<span class="pn-big num">${f0(sc.max)}</span><span class="pn-unit">mg/dL</span>`, 'Maior glicemia do período', sc.n ? bandOf(sc.max).k === 'ok' : null));
-  cards.push(pnCard('n', 'mini', 'bars', 'Medições', `<span class="pn-big num">${sc.n}</span><span class="pn-unit">no período</span>`, 'Quantidade de medições no período'));
-  cards.push(pnCard('hipo', '', 'warn', 'Episódios &lt; 70', `<span class="pn-big num">${sc.hypo}<small>medições</small></span><span class="pn-sub">${sc.n ? (sc.hypo / sc.n * 100).toFixed(0) + '% das medições' : '—'}</span>`, 'Episódios abaixo de 70', sc.n ? sc.hypo === 0 : null));
-  cards.push(pnCard('hiper', '', 'warn', 'Acima da faixa', `<span class="pn-big num">${sc.hyper}<small>medições</small></span><span class="pn-sub">${sc.n ? (sc.hyper / sc.n * 100).toFixed(0) + '% das medições' : '—'}</span>`, 'Medições acima da faixa', sc.n ? sc.hyper === 0 : null));
+  C.trat = pnCard('trat', '', 'syringe', 'Meu tratamento', `<span class="pn-big num">${tr.big}</span>${tr.unit ? `<span class="pn-unit">${tr.unit}</span>` : ''}<span class="pn-sub">${esc(tr.sub)}</span>`, 'Meu tratamento', tr.st);
+  C.var = inVarCard(M);
+  C.med = pnCard('med', '', 'bars', 'Média no período', `<span class="pn-big num">${fm(sc.mean)}<small>mg/dL</small></span><span class="pn-sub">${sc.n ? (cmp.diff != null ? `${fsign(cmp.diff)} mg/dL em relação aos ${S.period} dias anteriores` : 'Sem média anterior para comparar') : 'Sem medições neste período'}</span>`, 'Média no período', sc.n ? bandOf(sc.mean).k === 'ok' : null);
+  C.cmp = pnCard('cmp', '', 'cmp', 'Comparação', `<span class="pn-big num">${cmp.pct == null ? '—' : fsign(cmp.pct, 0)}<small>%</small></span>${inCmpBars(d.sc.mean, d.sp.mean)}<span class="pn-sub">em relação ao período anterior</span>`, 'Comparação com o período anterior');
+  C.min = pnCard('min', 'mini', 'down', 'Menor', `<span class="pn-big num">${f0(sc.min)}</span><span class="pn-unit">mg/dL</span>`, 'Menor glicemia do período', sc.n ? bandOf(sc.min).k === 'ok' : null);
+  C.max = pnCard('max', 'mini', 'up', 'Maior', `<span class="pn-big num">${f0(sc.max)}</span><span class="pn-unit">mg/dL</span>`, 'Maior glicemia do período', sc.n ? bandOf(sc.max).k === 'ok' : null);
+  C.n = pnCard('n', 'mini', 'bars', 'Medições', `<span class="pn-big num">${sc.n}</span><span class="pn-unit">no período</span>`, 'Quantidade de medições no período');
+  C.hipo = pnCard('hipo', '', 'warn', 'Episódios &lt; 70', `<span class="pn-big num">${sc.hypo}<small>medições</small></span>${inMiniBar(sc.hypo, sc.n, 'bad')}<span class="pn-sub">${sc.n ? (sc.hypo / sc.n * 100).toFixed(0) + '% das medições' : '—'}</span>`, 'Episódios abaixo de 70', sc.n ? sc.hypo === 0 : null);
+  C.hiper = pnCard('hiper', '', 'warn', 'Acima da faixa', `<span class="pn-big num">${sc.hyper}<small>medições</small></span>${inMiniBar(sc.hyper, sc.n, 'warn')}<span class="pn-sub">${sc.n ? (sc.hyper / sc.n * 100).toFixed(0) + '% das medições' : '—'}</span>`, 'Medições acima da faixa', sc.n ? sc.hyper === 0 : null);
   const bc = bandCounts(rc), n = rc.length;
-  cards.push(pnCard('dist', 'wide pn-dist-c', 'pie', 'Distribuição por faixa',
+  C.dist = pnCard('dist', 'wide pn-dist-c', 'pie', 'Distribuição por faixa',
     n ? `<span class="pn-bar" aria-hidden="true">${BAND_LIST.filter(b => bc[b.k]).map(b => `<i class="d-${b.k}" style="flex:${bc[b.k]}"></i>`).join('')}</span><span class="pn-leg">${BAND_LIST.filter(b => bc[b.k]).map(b => `<span><i class="d-${b.k}"></i><b class="num">${(bc[b.k] / n * 100).toFixed(0)}%</b> ${b.name.toLowerCase()}</span>`).join('')}</span>` : '<span class="pn-sub">Sem medições neste período.</span>',
-    'Distribuição por faixa'));
-  return h + `<div class="pn-grid">${cards.join('')}</div>`;
+    'Distribuição por faixa');
+  const cards = inVisible(inPrefs()).map(k => C[k] || '').join('');
+  return h + inHero(M, d) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid">${cards}</div>` + `<div class="in-cust-w"><button type="button" class="btn sm in-cust" data-act="in-cust">${pnIc('sliders')}Personalizar tela</button></div>`;
 }
 
 /* ---------- Janela flutuante (detalhes) ---------- */
-const PM_TITLES = { ult: 'Glicemia mais recente', dia: 'Média do dia', hba: 'Hemoglobina glicada (HbA1c)', evo: 'Evolução da glicemia', trat: 'Meu tratamento', med: 'Média no período', cmp: 'Comparação com o período anterior', min: 'Menor glicemia', max: 'Maior glicemia', n: 'Medições', hipo: 'Episódios abaixo de 70', hiper: 'Acima da faixa', dist: 'Distribuição por faixa' };
+const PM_TITLES = { var: 'Variabilidade', ult: 'Glicemia mais recente', dia: 'Média do dia', hba: 'Hemoglobina glicada (HbA1c)', evo: 'Evolução da glicemia', trat: 'Meu tratamento', med: 'Média no período', cmp: 'Comparação com o período anterior', min: 'Menor glicemia', max: 'Maior glicemia', n: 'Medições', hipo: 'Episódios abaixo de 70', hiper: 'Acima da faixa', dist: 'Distribuição por faixa' };
 const pmBig = (v, u, sub) => `<div class="pm-big"><span class="num">${v}</span>${u ? `<small>${u}</small>` : ''}</div>${sub ? `<p class="pm-sub">${sub}</p>` : ''}`;
 const pmRow = (a, b) => `<div class="row sp pm-r"><span class="dim">${a}</span><b class="num">${b}</b></div>`;
 const pmRecLine = r => r ? `${fn(r.glucose, 0)} mg/dL em ${fmtDate(r.date).slice(0, 5)}${r.noTime ? '' : ' às ' + r.time}` : 'nenhuma registrada';
@@ -161,6 +163,12 @@ function pmDetail(key) {
     case 'hipo': case 'hiper': {
       const lo = key === 'hipo', arr = rc.filter(r => lo ? r.glucose < LIM.low : r.glucose > highOf(r)), v = lo ? sc.hypo : sc.hyper;
       return pmBig(v, 'medições', per) + pmRow('Parte das medições', sc.n ? (v / sc.n * 100).toFixed(0) + '%' : '—') + pmRow('Período anterior', lo ? sp.hypo : sp.hyper) + pmRecList(arr);
+    }
+    case 'var': {
+      const v = d.sc.n >= 5 ? inSituation(S.records, Date.now(), S.period, null).vari : null;
+      if (!v) return `<p class="pm-sub">${per}</p><p class="pm-sub">Para calcular a variabilidade são necessárias pelo menos 5 medições no período. Há ${sc.n}.</p>`;
+      const cvOk = typeof mtAllowed === 'function' && mtAllowed() && v.cv != null;
+      return pmBig(f0(v.sd), 'mg/dL de desvio-padrão', per) + pmRow('Amplitude (maior − menor)', f0(v.amp) + ' mg/dL') + pmRow('Menor · maior', f0(sc.min) + ' · ' + f0(sc.max) + ' mg/dL') + pmRow('Média', fm(sc.mean) + ' mg/dL') + (cvOk ? pmRow('Coeficiente de variação', fn(v.cv, 0) + '%') : '') + pmRow('Desvio-padrão no período anterior', v.prevSd != null ? f0(v.prevSd) + ' mg/dL' : '—') + '<p class="hint">O desvio-padrão mostra o quanto as medições se afastam da média. Valores maiores indicam medições mais espalhadas. É uma descrição dos seus registros, não um diagnóstico.</p>';
     }
     case 'dist': return distBars(rc);
   }

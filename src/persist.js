@@ -6,7 +6,7 @@
    2) Escolhas de visualização (período do painel, intervalo/agrupamento da análise, critério de rótulo) agora sobrevivem ao fechamento.
    3) Gravação imediata ao sair da tela (visibilitychange/pagehide) e `tbCfgReady`: as sincronizações nativas só rodam depois de as
       configurações serem lidas do banco (antes, rodavam com valores padrão e podiam cancelar lembretes que a pessoa tinha configurado). */
-const PS_LS = ['tb-pnl', 'tb-mt-period', 'tb-pr-off', 'tb-hypo-off', 'tb-hyper-off', 'tb-hypo-alert', 'tb-lock'];
+const PS_LS = ['tb-pnl', 'tb-inicio', 'tb-mt-period', 'tb-pr-off', 'tb-hypo-off', 'tb-hyper-off', 'tb-hypo-alert', 'tb-lock'];
 const PS_ID = 'ls-mirror';
 let psReady = false, psTimer = null;
 const psSel = () => ({ period: S.period, anaRange: S.ana && S.ana.range, anaAgg: S.ana && S.ana.agg, ruleMode: S.ruleMode, ruleN: S.ruleN });
