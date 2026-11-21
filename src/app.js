@@ -505,74 +505,9 @@ function statsBlock(label, rs) {
   const s = stats(rs);
   return { s, html: `<tr><td>${label}</td><td>${fm(s.mean)}</td><td>${s.n ? f0(s.min) + '–' + f0(s.max) : '—'}</td><td>${s.n}</td><td>${s.hypo}<small>${s.n ? (s.hypo / s.n * 100).toFixed(0) + '%' : '—'}</small></td><td>${s.hyper}<small>${s.n ? (s.hyper / s.n * 100).toFixed(0) + '%' : '—'}</small></td></tr>` };
 }
-function compareCardHTML() {
-  const { A, B } = S.ana;
-  const rng = p => p.from && p.to && p.from <= p.to ? [mkTs(p.from, '00:00'), endOfDay(mkTs(p.to, '00:00'))] : null;
-  const ra = rng(A), rb = rng(B);
-  let h = `<div class="form-grid"><div class="field"><label class="fl" for="a-from">Período A · de</label><input class="in" type="date" id="a-from" value="${A.from}"></div><div class="field"><label class="fl" for="a-to">até</label><input class="in" type="date" id="a-to" value="${A.to}"></div>
-  <div class="field"><label class="fl" for="b-from">Período B · de</label><input class="in" type="date" id="b-from" value="${B.from}"></div><div class="field"><label class="fl" for="b-to">até</label><input class="in" type="date" id="b-to" value="${B.to}"></div></div>`;
-  if (!ra || !rb) return h + '<p class="hint">Informe as duas datas de cada período.</p>';
-  const sa = stats(inRange(S.records, ra[0], ra[1])), sb = stats(inRange(S.records, rb[0], rb[1])), c = compareStats(sa, sb);
-  const row = (lb, a, b, d) => `<tr><td>${lb}</td><td>${a}</td><td>${b}</td><td>${d}</td></tr>`;
-  h += `<div class="tbl-wrap" style="margin-top:12px"><table class="t"><thead><tr><th></th><th>Período A</th><th>Período B</th><th>A − B</th></tr></thead><tbody>
-  ${row('Média', fm(sa.mean), fm(sb.mean), fsign(c.diff))}${row('Variação (%)', '', '', c.pct == null ? '—' : fsign(c.pct) + '%')}
-  ${row('Desvio-padrão', fm(sa.sd), fm(sb.sd), sa.sd != null && sb.sd != null ? fsign(sa.sd - sb.sd) : '—')}
-  ${row('Menor–maior', sa.n ? f0(sa.min) + '–' + f0(sa.max) : '—', sb.n ? f0(sb.min) + '–' + f0(sb.max) : '—', '')}
-  ${row('Nº de medições', sa.n, sb.n, fsign(sa.n - sb.n, 0))}${row('Abaixo de 70', `${sa.hypo}<small>${sa.n ? (sa.hypo / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hypo}<small>${sb.n ? (sb.hypo / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hypo - sb.hypo, 0))}
-  ${row('Acima da faixa', `${sa.hyper}<small>${sa.n ? (sa.hyper / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hyper}<small>${sb.n ? (sb.hyper / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hyper - sb.hyper, 0))}</tbody></table></div>`;
-  h += `<p class="hint"><b>A − B:</b> diferença entre o período A e o período B; sinal + significa que A ficou maior. <b>Variação (%):</b> quanto a média de A mudou em relação à de B, em porcentagem. <b>Desvio-padrão:</b> o quanto as glicemias oscilam em torno da média. <b>Nº de medições:</b> quantidade de glicemias. <b>Abaixo de 70</b> e <b>Acima da faixa</b>: quantidade (e porcentagem) de glicemias fora da faixa de referência (${LIM.low} a ${LIM.high} mg/dL; em jejum, até ${FAST.high}). Valores em mg/dL.</p>`;
-  if (sa.n < 10 || sb.n < 10) h += '<p class="hint"><b>Poucas medições</b> em um dos períodos (menos de 10). A comparação pode não representar a rotina.</p>';
-  return h;
-}
+/* compareCardHTML() agora está em analise.js (comparação com atalhos, avisos e visual novo). */
 const fmDMY = ms => fmtDM(ms) + '/' + String(new Date(ms).getFullYear()).slice(2);
-function viewAnalise() {
-  let h = banners();
-  if (!S.records.length) return h + emptyBlock('Sem dados para analisar', 'Importe o arquivo de outro aplicativo ou registre medições.', '<br><br><button class="btn pri" data-act="go" data-r="importar">Importar de outros aplicativos</button>');
-  const a = S.ana, now = Date.now();
-  h += prNotice('analise');
-  const recs = a.range === 'all' ? S.records : inRange(S.records, startOfDay(addDays(now, -(+a.range - 1))), endOfDay(now));
-  const st = stats(recs);
-  const rl = a.range === 'all' ? 'todo o histórico' : 'últimos ' + a.range + ' dias';
-  const tag = k => ({ int: `<span class="atag">Intervalo: ${rl}</span>`, agg: `<span class="atag">Intervalo: ${rl} · Agrupamento</span>`, ind: '<span class="atag ind">Não muda com o filtro</span>' }[k]);
-  const span = recs.length ? (() => { const t = recs.map(r => r.ts); return fmtDM(Math.min(...t)) + '/' + new Date(Math.min(...t)).getFullYear() + ' a ' + fmtDM(Math.max(...t)) + '/' + new Date(Math.max(...t)).getFullYear(); })() : '';
-  h += `<div class="card anaf"><div class="fl">Intervalo de dias</div><div class="seg" role="group" aria-label="Intervalo de dias">${[['all', 'Tudo'], ['30', '30 d'], ['90', '90 d'], ['180', '180 d']].map(([k, l]) => `<button data-act="ana-range" data-v="${k}" aria-pressed="${a.range === k}">${l}</button>`).join('')}</div><p class="hint" id="ana-span">${recs.length ? `Mostrando <b>${span}</b> · ${st.n} medições.` : 'Sem medições neste intervalo.'} Vale para os cartões marcados com “Intervalo”.</p></div>`;
-  if (!recs.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Sem medições', 'Não há medições neste intervalo. Escolha “Tudo” para ver todo o histórico.')}</div>`;
-  const days = new Set(recs.map(r => r.date)).size;
-  const tr = trend(recs);
-  h += `<h2 class="sec">Resumo geral</h2><div class="card">${tag('int')}<div class="grid3" style="gap:14px 10px">
-    <div class="tile"><div class="lb">Média</div><div class="v num" style="font-size:27px">${fm(st.mean)}</div></div>
-    <div class="tile"><div class="lb">Desvio-padrão</div><div class="v num" style="font-size:27px">${fm(st.sd)}</div></div>
-    <div class="tile"><div class="lb">Medições</div><div class="v num" style="font-size:27px">${st.n}</div></div>
-    <div class="tile"><div class="lb">Menor glicemia</div><div class="v num" style="font-size:27px">${f0(st.min)}</div></div>
-    <div class="tile"><div class="lb">Maior glicemia</div><div class="v num" style="font-size:27px">${f0(st.max)}</div></div>
-    <div class="tile"><div class="lb">Dias com medição</div><div class="v num" style="font-size:27px">${days}</div></div></div>
-    <p class="hint">Valores em <b>mg/dL</b> (miligramas por decilitro).</p>
-    <p class="hint"><b>Média:</b> soma de todas as glicemias dividida pela quantidade de medições. <b>Desvio-padrão:</b> mostra o quanto as glicemias variam em torno da média; quanto maior, mais elas oscilam. <b>Medições:</b> quantidade de glicemias registradas no intervalo. <b>Dias com medição:</b> dias em que houve ao menos um registro.</p>
-    <p class="hint">${tr ? `<b>Tendência aproximada:</b> ${fsign(tr.perWeek)} mg/dL por semana, calculada sobre ${tr.days} dias com medição. Descreve o passado e não prevê o futuro.` : '<b>Tendência:</b> dados insuficientes (precisa de ao menos 10 dias e 20 medições).'}</p></div>`;
-  /* evolução: intervalo + agrupamento */
-  const wk = a.agg === 'week', g = groupBy(recs, r => wk ? weekStart(r.ts) : monthStart(r.ts));
-  const all = [...g.entries()].sort((x, y) => x[0] - y[0]).map(([t, rs]) => ({ t, ...stats(rs) }));
-  const total = all.length, buckets = all.slice(-12);
-  const lbl = t => wk ? fmDMY(t) : new Date(t).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
-  h += `<h2 class="sec">Evolução</h2><div class="card">${tag('agg')}<div class="row sp" style="margin:0 0 10px"><span class="fl" style="margin:0">Agrupar por</span><div class="seg" role="group" aria-label="Agrupamento temporal"><button data-act="ana-agg" data-v="week" aria-pressed="${wk}">Semana</button><button data-act="ana-agg" data-v="month" aria-pressed="${!wk}">Mês</button></div></div>`;
-  h += barChart(buckets.map(b => ({ label: wk ? fmtDM(b.t) : lbl(b.t), value: b.mean, n: b.n, sub: `Menor ${f0(b.min)} · maior ${f0(b.max)}` })), { label: 'Média de glicemia por ' + (wk ? 'semana' : 'mês') });
-  h += barLegend(wk ? 'cada barra é uma <b>semana</b>; a data embaixo (dia/mês, como 03/11) é a <b>segunda-feira em que a semana começa</b>.' : 'cada barra é um <b>mês</b> (por exemplo, nov 26 = novembro de 2026).');
-  h += `<p class="hint">Média por ${wk ? 'semana (início na segunda)' : 'mês'}, em mg/dL. ${total > 12 ? `Gráfico: últimos 12 de ${total}; a tabela abaixo traz todos. ` : ''}Barras com menos de ${MIN_BUCKET} medições não mostram média.</p>`;
-  h += `<details class="allper"><summary>Ver ${wk ? 'todas as semanas' : 'todos os meses'} (${total})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>${wk ? 'Semana começando em' : 'Mês'}</th><th>Média (mg/dL)</th><th>Menor–maior</th><th>Nº de medições</th></tr></thead><tbody>${all.slice().reverse().map(b => `<tr><td>${wk ? fmDMY(b.t) : lbl(b.t)}</td><td>${b.n >= MIN_BUCKET ? fm(b.mean) : '<span class="dim">insuficiente</span>'}</td><td>${f0(b.min)}–${f0(b.max)}</td><td>${b.n}</td></tr>`).join('')}</tbody></table></div></details></div>`;
-  h += `<h2 class="sec">Distribuição por faixa</h2><div class="card">${tag('int')}<div class="chips"><span class="chip ${st.hypo ? 'alert' : ''}">Abaixo de 70 mg/dL: <b>${st.hypo}</b> (${(st.hypo / st.n * 100).toFixed(0)}%)</span><span class="chip ${st.hyper ? 'alert' : ''}">Acima da faixa: <b>${st.hyper}</b> (${(st.hyper / st.n * 100).toFixed(0)}%)</span></div>${distBars(recs, true, true)}</div>`;
-  const td = typicalDay(recs);
-  h += `<h2 class="sec">Perfil do dia</h2><div class="card">${tag('int')}<h3 class="sub">Dia típico</h3>${typicalDayChart(recs)}${td.ok >= 6 ? '<p class="hint" style="margin:8px 0 0">Reúne todos os dias do período em um só dia de 24 horas. A linha é a mediana por horário e as faixas mostram onde ficou a maioria das medições. Só mostra o que aconteceu: não orienta tratamento.</p>' : ''}<h3 class="sub">Média por faixa horária (blocos de 4 horas)</h3>${barChart(byTimeBlock(recs).map(b => ({ label: b.label, value: b.mean, n: b.n })), { label: 'Média de glicemia por faixa horária' })}${barLegend('cada barra é um período de <b>4 horas</b> do dia (00–04h = da meia-noite às 4 da manhã; 12–16h = do meio-dia às 4 da tarde).')}<p class="hint">Medições sem horário (importadas sem hora) ficam de fora.</p></div>`;
-  h += heatmapCard(recs).replace('<div class="card">', '<div class="card">' + tag('int'));
-  const ctxRows = Object.entries(CONTEXTS).map(([k, l]) => ({ label: l, hi: k === 'jejum' ? FAST.high : LIM.high, ...stats(recs.filter(r => r.context === k)) })).filter(r => r.n);
-  const none = stats(recs.filter(r => !r.context));
-  h += `<h2 class="sec">Antes e depois das refeições</h2><div class="card">${tag('int')}${ctxRows.length ? meanBars(ctxRows.map(r => ({ ...r, label: r.label }))) : '<div class="empty">Nenhuma medição com contexto informado.</div>'}${none.n ? `<p class="hint">${none.n} medições sem contexto não entram nesta lista.</p>` : ''}</div>`;
-  const mealRows = Object.entries(MEALS).map(([k, l]) => { const ar = recs.filter(r => r.meal === k); return { l, all: stats(ar), antes: stats(ar.filter(r => r.context === 'antes')), depois: stats(ar.filter(r => r.context === 'depois')) }; });
-  const cell = s => s.n >= MIN_BUCKET ? `${fm(s.mean)}<small>n=${s.n}</small>` : `<span class="dim">${s.n ? 'n=' + s.n : '—'}</span>`;
-  h += `<h2 class="sec">Por refeição</h2><div class="card">${tag('int')}<h3 class="sub">Média por tipo de refeição</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>Refeição</th><th>Antes</th><th>Depois</th><th>Todas</th></tr></thead><tbody>${mealRows.map(m => `<tr><td>${m.l}</td><td>${cell(m.antes)}</td><td>${cell(m.depois)}</td><td>${cell(m.all)}</td></tr>`).join('')}</tbody></table></div><p class="hint">Médias em mg/dL. Mostradas só com ${MIN_BUCKET} ou mais medições. <b>Antes</b>: glicemia medida antes de comer. <b>Depois</b>: glicemia medida depois de comer. <b>Todas</b>: todas as medições daquela refeição. <b>n=18</b> (número pequeno abaixo da média) é a quantidade de medições usadas; n=18 significa 18 medições. <b>—</b> indica que não há medições.</p><h3 class="sub">Variação (depois − antes, no mesmo dia)</h3>${mealDeltaCard(recs, true)}<p class="hint"><b>Como ler a variação:</b> sinal <b>+</b> significa que a glicemia depois da refeição ficou mais alta que antes; sinal <b>−</b>, mais baixa. O valor está em mg/dL.</p></div>`;
-  h += `<h2 class="sec">Janelas fixas · 7, 30, 90 e 180 dias</h2><div class="card">${tag('ind')}<div class="tbl-wrap tw-hint" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal"><table class="t wide-t"><thead><tr><th>Período</th><th>Média (mg/dL)</th><th>Menor–maior</th><th>Nº de medições</th><th>Abaixo de 70</th><th>Acima da faixa</th></tr></thead><tbody>${[7, 30, 90, 180].map(d => statsBlock(d + ' dias', inRange(S.records, startOfDay(addDays(now, -(d - 1))), endOfDay(now))).html).join('')}</tbody></table></div><p class="hint">Sempre contam a partir de hoje, com todos os registros, qualquer que seja o intervalo escolhido acima. <b>Nº de medições</b>: quantidade de glicemias no período. <b>Abaixo de 70</b>: glicemias menores que ${LIM.low} mg/dL (hipoglicemia). <b>Acima da faixa</b>: glicemias acima de ${LIM.high} mg/dL (acima de ${FAST.high} quando medidas em jejum). O número menor embaixo é a porcentagem sobre as medições do período.</p></div>`;
-  h += `<h2 class="sec">Comparar dois períodos</h2><div class="card">${tag('ind')}<div id="cmp">${compareCardHTML()}</div></div>`;
-  return h;
-}
+/* viewAnalise() agora está em analise.js (seções temáticas). Os cálculos de meanBars/statsBlock/mealDeltaCard/heatmapCard continuam aqui e em extras.js. */
 
 /* ---------- HbA1c ---------- */
 function hbaForm(x) {
