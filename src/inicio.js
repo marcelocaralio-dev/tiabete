@@ -2,7 +2,7 @@
    Centro de acompanhamento. A lógica (sem DOM) está em inicio-core.js; aqui só há montagem de HTML e eventos.
    Estrutura da tela (de cima para baixo):
    1. avisos e lembretes (banners existentes, intactos)
-   2. Situação geral (essencial): última glicemia, resumo em texto, indicadores prioritários, período
+   2. Situação geral (essencial): Resumo glicêmico (última glicemia + barra de faixa + média do dia), resumo em texto, indicadores prioritários, período
    3. Atalhos contextuais (discretos; nunca registram nada sozinhos)
    4. Acontecimentos importantes (só aparece quando há algo relevante)
    5. Cartões personalizáveis (ordem e visibilidade escolhidas pela pessoa)
@@ -51,9 +51,40 @@ const inTone = t => t === 'bad' ? ' st-bad' : t === 'warn' ? ' st-warn' : t === 
 const inBand = k => k === 'ok' ? 'ok' : (k === 'low' || k === 'vlow') ? 'low' : 'high';
 
 /* ---------- 2. Situação geral ---------- */
+/* Barra de faixa glicêmica: mesmas faixas, cores e escala (30–600) do glicosímetro (GZ, GZ_ZONES, gzFrac em charts.js).
+   `pv` = {f, v, st} da última barra desenhada: a animação do marcador (e da cor) parte dali. */
+let inRsMem = null;
+function inRangeBar(g, anim, pv) {
+  const C = GZ.ult, hi = g > 600, st = gzState(g), act = hi ? 'xhigh' : st, f = hi ? 1 : gzFrac('ult', g), p0 = pv || { f: 0, st };
+  inRsMem = { f, v: g, st };
+  const pc = x => (x * 100).toFixed(2);
+  const segs = GZ_ZONES.map(z => {
+    const a = Math.max(z.from, C.min), b = Math.min(z.to, C.max); if (b <= a) return '';
+    return `<i class="in-rb-z${z.k === act ? ' on' : ''}${z.dash ? ' dash' : ''}" style="left:${pc(gzFrac('ult', a))}%;width:${pc(gzFrac('ult', b) - gzFrac('ult', a))}%;--zc:${z.c}"></i>`;
+  }).join('');
+  const ticks = C.ticks.filter(t => t > C.min && t < C.max).map(t => `<span style="left:${pc(gzFrac('ult', t))}%">${t}</span>`).join('');
+  return `<span class="in-rb s-${st}${anim ? ' in-rb-anim' : ''}" style="--p:${pc(f)}%;--pf:${pc(p0.f)}%;--gc:${GZ_COL[st]};--gc0:${GZ_COL[p0.st]}" aria-hidden="true"><span class="in-rb-bar">${segs}<i class="in-rb-mk"></i></span><span class="in-rb-t">${ticks}</span></span>`;
+}
+/* Resumo glicêmico: glicemia mais recente em destaque (abre os detalhes), barra de faixa e, em segundo plano, a média do dia selecionado. */
+function inResumo(M, d) {
+  const last = M.last, bnd = M.lastBand, g = last.glucose, hi = g > 600;
+  const gKey = last.id + '|' + g, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
+  const pv = inRsMem, bar = inRangeBar(g, gAnim, pv), from = pv ? pv.v : GZ.ult.min;
+  const dl = pnDayLab(d.iso, d.isToday), dayTxt = dl.indexOf('/') >= 0 ? dl : dl + ' · ' + fmtDate(d.iso).slice(0, 5);
+  const ctx = last.context && CONTEXTS[last.context] ? `<span class="tag">${esc(CONTEXTS[last.context])}</span>` : '';
+  const sd = d.sd, has = d.rs.length > 0, dTone = has && bandOf(sd.mean).k === 'ok' ? ' st-ok' : has ? ' st-bad' : '';
+  const when = `${last.noTime ? '' : last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}`;
+  const avg = has
+    ? `<button type="button" class="in-rs-m${dTone}" data-pm="dia" aria-haspopup="dialog" aria-label="Média do dia: ${fn(sd.mean, 1)} mg/dL, ${bandOf(sd.mean).txt}, ${sd.n} medi${sd.n === 1 ? 'ção' : 'ções'}. Toque para ver os detalhes."><span class="in-rs-c"><span class="in-rs-k">Média do dia</span><span class="in-rs-mv num"><b>${fn(sd.mean, 1)}</b><small>mg/dL</small></span>${badge(sd.mean)}</span><span class="in-rs-c"><span class="in-rs-k">Medições</span><span class="in-rs-mv num"><b>${sd.n}</b></span><span class="in-rs-s">usadas na média</span></span></button>`
+    : `<button type="button" class="in-rs-m" data-pm="dia" aria-haspopup="dialog" aria-label="Média do dia: sem medições. Toque para ver os detalhes."><span class="in-rs-c"><span class="in-rs-k">Média do dia</span><span class="in-rs-mv num"><b>—</b></span><span class="in-rs-s">${d.isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia'}</span></span></button>`;
+  return `<header class="in-rs-h"><h2 class="in-rs-t">Resumo glicêmico</h2><span class="in-rs-d num">${esc(dayTxt)}</span></header>
+    <button type="button" class="in-last${gAnim ? ' in-rs-anim' : ''}" data-pm="ult" aria-haspopup="dialog" aria-label="Glicemia mais recente: ${hi ? 'HI, acima de 600' : fn(g, 1)} mg/dL, ${bnd.txt}, ${esc(when)}. Escala de ${GZ.ult.min} a ${GZ.ult.max} mg/dL. Toque para ver os detalhes.">
+      <span class="in-last-top"><span class="in-last-v num"><span class="in-rs-num" data-to="${hi ? '' : g}" data-from="${from}">${hi ? 'HI' : fn(g, 1)}</span><small>${hi ? 'acima de 600 mg/dL' : 'mg/dL'}</small></span>${badge(g, last.context, true)}</span>
+      <span class="in-when num">${when}${ctx}</span>${bar}
+    </button>${avg}`;
+}
 function inHero(M, d) {
   const last = M.last, bnd = M.lastBand, oor = last.glucose < LIM.low || last.glucose > LIM.high;
-  const gKey = last.id + '|' + last.glucose, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
   const pri = inPrefs().pri.map(k => inIndicator(k, M));
   const chip = x => {
     const bar = x.k === 'faixa' && x.pct != null ? `<i class="in-bar" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, x.pct)).toFixed(0)}%"></i></i>` : '';
@@ -62,10 +93,7 @@ function inHero(M, d) {
   };
   const stale = M.stale ? `<div class="in-stale" role="status"><span>Sem medições há ${Math.round(M.ageMs / 86400e3)} dias.</span><button type="button" class="btn sm" data-act="new">Nova medição</button></div>` : '';
   return `<section class="in-hero b-${bnd.k}${oor ? ' oor' : ''}" aria-label="Situação geral">
-    <button type="button" class="in-last" data-pm="ult" aria-haspopup="dialog" aria-label="Glicemia mais recente: ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}. Toque para ver os detalhes.">
-      <span class="in-last-g"><span class="pn-gauge">${gaugeSvg(last.glucose, gAnim, `Glicemia de ${fn(last.glucose, 1)} mg/dL, ${bnd.txt}.`, 'ult')}</span></span>
-      <span class="in-last-t"><span class="eyebrow">Glicemia mais recente</span><span class="in-last-v num">${fn(last.glucose, 1)}<small>mg/dL</small></span><span>${badge(last.glucose, last.context, true)}</span><span class="in-when num">${last.noTime ? '' : last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}</span></span>
-    </button>
+    ${inResumo(M, d)}
     ${stale}<p class="in-sum">${esc(M.summary)}</p>
     <div class="in-inds" style="--n:${pri.length}">${pri.map(chip).join('')}</div>
     <div class="in-per"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow num">${fmtDM(M.cur[0])} – ${fmtDM(M.cur[1])}</span></div>

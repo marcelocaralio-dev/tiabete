@@ -183,9 +183,9 @@ function distBars(recs, note, wide) {
 
 /* Interação: cursor/toque mostra a medição mais próxima, com o valor real. Gráficos com rolagem mantêm o eixo fixo. */
 function attachCharts(root) {
-  /* glicosímetros: o número sobe até o valor (só quando o mostrador está animado e o movimento não foi reduzido) */
+  /* glicosímetros e Resumo glicêmico: o número sobe até o valor (só quando está animado e o movimento não foi reduzido) */
   try {
-    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) root.querySelectorAll('.gz-anim .gz-num[data-to]').forEach(el => {
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) root.querySelectorAll('.gz-anim .gz-num[data-to], .in-rs-anim .in-rs-num[data-to]').forEach(el => {
       if (el._gz || el.dataset.to === '') return; el._gz = true;
       const a = +el.dataset.from, b = +el.dataset.to, t0 = performance.now(), D = 1000;
       if (!isFinite(a) || !isFinite(b) || a === b) return;
@@ -285,6 +285,8 @@ const GZ_ZONES = [
   { k: 'vhigh', from: 250, to: 400, c: 'var(--red)', n: 'Glicemia muito elevada' },
   { k: 'xhigh', from: 400, to: 600, c: 'var(--red)', n: 'Glicemia extremamente elevada', dash: 1 }
 ];
+/* Posição (0–1) de um valor na escala linear do glicosímetro. Única fonte: o mostrador circular e a barra do Início usam a mesma conta. */
+const gzFrac = (kind, v) => { const C = GZ[kind === 'dia' ? 'dia' : 'ult']; return Math.max(0, Math.min(1, (v - C.min) / (C.max - C.min))); };
 function gzState(v) { return v > 600 ? 'hi' : v < 70 ? 'low' : v <= 180 ? 'ok' : v <= 250 ? 'high' : v <= 400 ? 'vhigh' : 'xhigh'; }
 const GZ_COL = { low: 'var(--red-l)', ok: 'var(--good-fill)', high: 'var(--red-t)', vhigh: 'var(--red)', xhigh: 'var(--red)', hi: 'var(--red)' };
 const GZ_NAME = { low: 'Hipoglicemia', ok: 'Faixa desejada', high: 'Glicemia elevada', vhigh: 'Glicemia muito elevada', xhigh: 'Glicemia extremamente elevada', hi: 'HI, acima de 600 mg/dL' };
@@ -292,7 +294,7 @@ const gzMem = {}; let gzSeq = 0;
 function gaugeSvg(g, anim, label, kind) {
   const K = kind === 'dia' ? 'dia' : 'ult', C = GZ[K];
   const CX = 160, CY = 134, R = 114, SW = 13, A0 = 135, SWEEP = 270;
-  const fr = v => Math.max(0, Math.min(1, (v - C.min) / (C.max - C.min)));
+  const fr = v => gzFrac(K, v);
   const ang = f => (A0 + SWEEP * f) * Math.PI / 180;
   const P = (r, f) => { const a = ang(f); return [CX + r * Math.cos(a), CY + r * Math.sin(a)]; };
   const r1 = n => Math.round(n * 100) / 100;

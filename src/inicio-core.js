@@ -14,7 +14,6 @@ const INC = (typeof module !== 'undefined' && typeof require === 'function') ? r
    importantes, atalhos, avisos/lembretes (banners) e a navegação. */
 const IN_CARDS = [
   { k: 'hoje', t: 'Evolução do dia' },
-  { k: 'dia', t: 'Média do dia' },
   { k: 'hba', t: 'Hemoglobina glicada (estimativa)' },
   { k: 'exa', t: 'Exames e HbA1c de laboratório' },
   { k: 'evo', t: 'Evolução da glicemia' },

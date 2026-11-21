@@ -72,20 +72,14 @@ function pnTrat() {
 
 /* ---------- Painel (Início) ----------
    Situação geral, atalhos e acontecimentos (inicio.js) + cartões personalizáveis. Todos os cartões e janelas de detalhe de antes continuam existindo:
-   "Glicemia mais recente" agora é o painel de situação geral (mesma janela de detalhes) e o seletor de período passou para dentro dele. */
+   "Glicemia mais recente" e "Média do dia" agora formam o Resumo glicêmico (inicio.js), dentro do painel de situação geral; cada parte abre a sua janela de detalhes e o seletor de período fica no mesmo painel. */
 function viewPainelCards() {
-  const d = pnData(), { all, last, sc, cmp, rc, sd, rs } = d;
+  const d = pnData(), { all, sc, cmp, rc } = d;
   if (!all.length) return viewPainelClassic(); // boas-vindas
   const M = inModel();
   let h = banners() + labelBanner() + pfInvite() + prNotice('painel');
-  const gl = (v, a, lbl, k) => `<div class="pn-gauge">${gaugeSvg(v, a, lbl, k)}</div>`;
-  const dKey = d.iso + '|' + (rs.length ? sd.mean : ''), dAnim = S.gaugeKeyD !== dKey; S.gaugeKeyD = dKey;
   const C = {};
   C.hoje = inDayCard(d);
-  C.dia = pnCard('dia', '', 'bars', 'Média do dia',
-    rs.length ? `${gl(sd.mean, dAnim, 'Média do dia: ' + fn(sd.mean, 1) + ' mg/dL.', 'dia')}<span class="pn-mid">${badge(sd.mean)}</span><span class="pn-sub num">Medições: ${sd.n} · ${pnDayLab(d.iso, d.isToday)}</span>`
-      : `<span class="pn-big num">—</span><span class="pn-sub">${d.isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia'}</span>`,
-    rs.length ? `Média do dia: ${fn(sd.mean, 1)} mg/dL, ${sd.n} medições` : 'Média do dia: sem medições', rs.length ? bandOf(sd.mean).k === 'ok' : null);
   const e = est90();
   C.hba = pnCard('hba', 'wide', 'hb', 'Hemoglobina glicada (HbA1c)',
     e.ok ? `<span class="pn-row"><span class="pn-big num">≈ ${fn(e.value, 1)}<small>%</small></span>${a1cBadge(e.value)}<span class="pn-sub pn-r">Estimativa: 90 dias</span></span>`

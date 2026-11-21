@@ -10,8 +10,8 @@ p = C.inCleanPrefs({ order: ['dist', 'xx', 'dist', 'hoje'], hidden: ['hoje', 'li
 ok(p.order[0] === 'dist' && p.order[1] === 'hoje' && p.order.length === C.IN_CARDS.length && new Set(p.order).size === p.order.length, 'prefs: chaves inválidas somem, duplicadas colapsam, as que faltam voltam ao fim');
 ok(p.hidden.join() === 'hoje' && p.pri.length === C.IN_PRI_MAX && !p.pri.includes('zzz'), 'prefs: ocultos e prioritários higienizados (máx. ' + C.IN_PRI_MAX + ')');
 ok(C.inCleanPrefs({ pri: [] }).pri.join() === C.IN_PRI_DEF.join() && C.inParsePrefs('{quebrado').order.length === C.IN_CARDS.length, 'prefs: vazio/lixo volta ao padrão sem erro');
-let q = C.inMove(C.inCleanPrefs(null), 'dia', -1); ok(q.order[0] === 'dia' && q.order[1] === 'hoje', 'prefs: subir');
-ok(C.inMove(q, 'dia', -1).order[0] === 'dia' && C.inMove(C.inCleanPrefs(null), 'dist', 1).order.at(-1) === 'dist', 'prefs: limites do mover não quebram');
+let q = C.inMove(C.inCleanPrefs(null), 'hba', -1); ok(q.order[0] === 'hba' && q.order[1] === 'hoje', 'prefs: subir');
+ok(C.inMove(q, 'hba', -1).order[0] === 'hba' && C.inMove(C.inCleanPrefs(null), 'dist', 1).order.at(-1) === 'dist', 'prefs: limites do mover não quebram');
 q = C.inToggleHidden(C.inCleanPrefs(null), 'min'); ok(q.hidden.includes('min') && !C.inVisible(q).includes('min') && C.inVisible(q).length === C.IN_CARDS.length - 1, 'prefs: ocultar');
 ok(!C.inToggleHidden(q, 'min').hidden.includes('min') && C.inToggleHidden(q, 'ult').hidden.length === 1, 'prefs: reexibir; "ult"/essenciais não são ocultáveis');
 let r = C.inTogglePri(C.inCleanPrefs({ pri: ['media'] }), 'media'); ok(r.prefs.pri.length === 1 && /pelo menos um/.test(r.msg), 'prefs: não deixa zerar os indicadores');
@@ -108,17 +108,17 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     await Store.putMany('records', recs); await loadAll(); S.route = 'painel'; render(); })()`;
   await run('muitos registros', seedBase, async pg => {
     const q = s => pg.evaluate(s => document.querySelectorAll(s).length, s), txt = s => pg.evaluate(s => (document.querySelector(s) || {}).textContent || '', s);
-    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 4 && await q('.in-hero [data-pm="ult"]') === 1, 'ui: situação geral com 4 indicadores prioritários e a janela da última glicemia');
+    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 4 && await q('.in-hero [data-pm="ult"]') === 1 && await q('.in-hero [data-pm="dia"]') === 1 && await q('.pn-dia') === 0, 'ui: situação geral com 4 indicadores prioritários e a janela da última glicemia');
     ok(await q('.in-ev .in-evi') >= 1 && /Hipoglicemia/.test(await txt('.in-ev')), 'ui: card de acontecimentos mostra a hipoglicemia recente');
     ok(await q('.in-day') === 1 && await q('.in-day .in-pt') >= 0, 'ui: evolução do dia presente');
-    ok(await q('.pn-grid > *') >= 14 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: cartões, bloco de métricas e navegação preservados');
+    ok(await q('.pn-grid > *') >= 13 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: cartões, bloco de métricas e navegação preservados');
     await pg.click('.in-ev .in-evi'); await sleep(250); ok(await q('#sheet-bg') === 1 || /Registro|Medição|Editar/i.test(await txt('#sheet-bg')) || await q('.sheet') >= 1, 'ui: acontecimento abre o registro relacionado');
     await pg.evaluate(() => closeSheet()); await sleep(100);
     await pg.click('.in-ind[data-pm="med"], .in-ind'); await sleep(250); ok(await q('#pm-bg') === 1, 'ui: indicador abre os detalhes'); await pg.evaluate(() => pmClose(true));
     /* personalização: mover, ocultar, indicador, persistir, restaurar */
     const keys = () => pg.evaluate(() => [...document.querySelectorAll('.pn-grid > *')].map(e => e.dataset.pm || (e.classList.contains('in-day') ? 'hoje' : e.classList.contains('in-exa') ? 'exa' : '')).join(','));
     const before = await keys(); await pg.click('[data-act="in-cust"]'); await sleep(200);
-    ok(await q('#sheet-bg .in-cr') === 15 && await q('#sheet-bg .in-pill') === 8, 'ui: folha de personalização lista cartões e indicadores');
+    ok(await q('#sheet-bg .in-cr') === 14 && await q('#sheet-bg .in-pill') === 8, 'ui: folha de personalização lista cartões e indicadores');
     await pg.click('[data-act="in-mv"][data-k="dist"][data-d="-1"]'); await pg.click('[data-act="in-vis"][data-k="min"]'); await sleep(200);
     const after = await keys(); ok(after !== before && !/\bmin\b/.test(after) && after.indexOf('dist') < before.indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
     ok(await q('#sheet-bg') === 1, 'ui: a folha continua aberta depois de cada alteração');
@@ -134,7 +134,7 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
       const lum = await pg.evaluate(() => { const c = getComputedStyle(document.querySelector('.in-sum')).color.match(/\d+/g).map(Number), b = getComputedStyle(document.querySelector('.in-hero')).backgroundColor.match(/\d+/g).map(Number); const L = a => (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]) / 255; return Math.abs(L(c) - L(b)); }); ok(lum > 0.5, 'ui: tema ' + th + ': contraste do texto do resumo (' + lum.toFixed(2) + ')'); }
     await pg.evaluate(() => setTheme('dark'));
     /* atualização após novo registro: a última glicemia e o resumo mudam */
-    const b0 = await txt('.in-last-v'); await pg.evaluate(async () => { const d = isoDate(new Date()), t = new Date(); const hm = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); await Store.put('records', { id: 'new1', date: d, time: hm, ts: mkTs(d, hm), glucose: 233, context: 'antes', meal: 'almoco', source: 'manual' }); await loadAll(); render(); }); await sleep(300);
+    const b0 = await txt('.in-last-v'); await pg.evaluate(async () => { const d = isoDate(new Date()), t = new Date(); const hm = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); await Store.put('records', { id: 'new1', date: d, time: hm, ts: mkTs(d, hm), glucose: 233, context: 'antes', meal: 'almoco', source: 'manual' }); await loadAll(); render(); }); await sleep(1300); /* o número do Resumo glicêmico sobe até o valor em 1 s */
     ok(/233/.test(await txt('.in-last-v')) && await txt('.in-last-v') !== b0 && /233/.test(await txt('.in-sum')), 'ui: indicadores atualizam depois de um novo registro');
     ok(await q('.in-sc [data-act="in-hist"]') === 1 && await q('.in-sc [data-act="new"][data-ctx="depois"]') === 1, 'ui: atalhos contextuais aparecem depois do registro (histórico e acompanhamento da refeição)');
     await pg.click('.in-sc [data-act="in-hist"]'); await sleep(400); ok(await pg.evaluate(() => S.route) === 'historico', 'ui: atalho leva ao histórico');
