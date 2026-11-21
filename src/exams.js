@@ -175,9 +175,15 @@ function queueHTML() {
   if (!S.ex.queue.length) return '';
   return `<div class="stack" style="margin-top:12px" aria-live="polite">${S.ex.queue.map(q => `<div class="card soft" style="padding:12px 14px"><div class="row sp" style="gap:10px"><span style="min-width:0;overflow-wrap:anywhere"><b>${QST[q.st] || ''} ${esc(q.name)}</b><br><span class="dim" style="font-size:14px">${esc(q.msg || '')}${q.warn ? ' ' + esc(q.warn) : ''}</span></span>${q.exId ? `<button class="btn sm" data-act="ex-open" data-id="${q.exId}">Abrir</button>` : ''}</div></div>`).join('')}</div>`;
 }
+function examTone(k) { return k === 'a' || k === 'b' ? 'pos' : k === 'c' ? 'warn' : k === 'd' ? 'neg' : 'neu'; }
+/* Modelo C (categorizado, barra pela faixa da nota) + anel E + distribuição dentro/fora/sem faixa */
 function examCard(e) {
-  const sc = examScore(e.items), bd = examBand(sc && sc.score), out = e.items.filter(i => i.flag === 'alto' || i.flag === 'baixo').length;
-  return `<button class="rec" style="grid-template-columns:1fr auto" data-act="ex-open" data-id="${e.id}"><span class="info"><span class="num">${e.date ? fmtDate(e.date) : 'Sem data'}</span><span style="font-weight:700;overflow-wrap:anywhere">${esc(exLabel(e))}</span><span class="chips">${e.date ? '' : '<span class="tag warn">Informe a data</span>'}<span class="tag">${e.items.length} itens</span>${out ? `<span class="tag warn">${out} fora da referência</span>` : '<span class="tag">nenhum fora da referência</span>'}</span></span><span class="gl num">${scoreTxt(sc)}<small>${sc ? 'de 10' : 'sem nota'}</small></span></button>`;
+  const sc = examScore(e.items), bd = examBand(sc && sc.score), tn = examTone(bd.k), out = e.items.filter(i => i.flag === 'alto' || i.flag === 'baixo').length;
+  const okN = e.items.filter(i => i.flag === 'normal').length, nfN = e.items.length - okN - out;
+  const seg = TBCards.seg([{ v: okN, tone: 'pos', label: 'dentro' }, { v: out, tone: 'warn', label: 'fora' }, { v: nfN, tone: 'neu', label: 'sem faixa' }], { thin: true, label: `${okN} dentro da referência, ${out} fora, ${nfN} sem faixa` });
+  return TBCards.c({ el: 'button', cls: 'gx-ex', tone: tn, attrs: `data-act="ex-open" data-id="${e.id}"`, eyebrow: e.date ? fmtDate(e.date) : 'Sem data', title: exLabel(e),
+    chipsHtml: `${e.date ? '' : TBCards.tag('Informe a data', 'warn')}<span class="tag">${e.items.length} itens</span>${out ? `<span class="tag warn">${out} fora da referência</span>` : '<span class="tag">nenhum fora da referência</span>'}`,
+    metaHtml: seg, right: { html: TBCards.ring(sc ? sc.score * 10 : 0, { tone: tn, text: scoreTxt(sc), sub: sc ? 'de 10' : 'sem nota' }) } });
 }
 function exMatch(e, q) {
   if (!q) return true;
@@ -212,10 +218,19 @@ function viewExames() {
   return h;
 }
 
+/* Modelo F: valor do item com faixa de referência e barra lateral pelo estado */
 function itemRow(it) {
   const val = it.value != null ? `<b class="num">${fnum(it.value)}</b> <span class="dim">${esc(it.unit)}</span>` : `<b>${esc(it.text || '—')}</b>`;
   const ref = it.refText || (it.refLow != null || it.refHigh != null ? `${it.refLow != null ? fnum(it.refLow) : ''}–${it.refHigh != null ? fnum(it.refHigh) : ''}` : '');
-  return `<div class="exi"><div class="row sp" style="gap:10px;align-items:flex-start"><span style="min-width:0;overflow-wrap:anywhere"><span style="font-weight:700">${esc(it.name)}</span><br>${val}</span>${flagBadge(it.flag)}</div>${ref ? `<div class="dim" style="font-size:13.5px;margin-top:4px">Referência do laudo: ${esc(ref)}</div>` : ''}${it.note ? `<div class="exn">${esc(it.note)}</div>` : ''}</div>`;
+  const tn = it.flag === 'normal' ? 'pos' : (it.flag === 'alto' || it.flag === 'baixo') ? 'warn' : 'neu';
+  let rg = '';
+  if (it.value != null && (it.refLow != null || it.refHigh != null)) {
+    const lo = it.refLow, hi = it.refHigh; let mn, mx;
+    if (lo != null && hi != null) { const sp = (hi - lo) || Math.abs(hi) || 1; mn = lo - sp * .6; mx = hi + sp * .6; if (lo >= 0 && mn < 0) mn = 0; } else if (hi != null) { mn = 0; mx = hi * 1.6 || 1; } else { mn = 0; mx = lo * 2 || 1; }
+    mn = Math.min(mn, it.value); mx = Math.max(mx, it.value);
+    rg = TBCards.range(it.value, { min: mn, max: mx, lo, hi, tone: tn, label: `${it.name}: ${fnum(it.value)}, referência ${ref}` });
+  }
+  return `<div class="gx-card gx-bar gx-exi exi"${tn ? ` data-tone="${tn}"` : ''}><div class="gx-exi-h"><span><span style="font-weight:700">${esc(it.name)}</span><br>${val}</span>${flagBadge(it.flag)}</div>${rg}${ref ? `<div class="gx-sub">Referência do laudo: ${esc(ref)}</div>` : ''}${it.note ? `<div class="exn">${esc(it.note)}</div>` : ''}</div>`;
 }
 function viewExame() {
   const e = S.exams.find(x => x.id === S.ex.id);
@@ -228,11 +243,12 @@ function viewExame() {
     <p class="hint" style="margin:6px 0 0">${sc ? `${sc.ok} de ${sc.n} itens avaliados estão dentro da referência do laudo${sc.out ? `; ${sc.out} fora` : ''}.` : 'São necessários ao menos 3 itens com referência para calcular a nota.'}</p>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="ex-edit" data-id="${e.id}">${e.date ? 'Editar dados' : 'Informar a data'}</button><button class="btn sm" data-act="go" data-r="comparar">Comparar</button></div></div>
   <details class="more" style="margin-top:10px"><summary>Como a nota é calculada</summary><p class="hint" style="margin:0 0 14px">Cada item com número e referência no laudo vale de 0 a 1: dentro da faixa vale 1; fora, perde pontos conforme a distância do limite (um item 30% acima vale 0,7). A nota é a média disso vezes 10. Itens sem faixa numérica entram só se o laudo os marcou como normais (1) ou alterados (0,5). É um resumo prático, não uma nota clínica: as faixas variam entre laboratórios e pessoas.</p></details>`;
+  h += `<div style="height:12px"></div>` + TBCards.j({ stats: [{ label: 'Itens', value: e.items.length }, { label: 'Dentro', value: good.length, tone: 'pos' }, { label: 'Fora', value: bad.length, tone: bad.length ? 'warn' : 'neu' }, { label: 'Sem faixa', value: nf.length, tone: 'neu' }], footHtml: TBCards.seg([{ v: good.length, tone: 'pos', label: 'dentro' }, { v: bad.length, tone: 'warn', label: 'fora' }, { v: nf.length, tone: 'neu', label: 'sem faixa' }], { thin: true }) });
   if (e.summary) h += `<h2 class="sec">Leitura geral</h2><div class="card"><p style="margin:0;overflow-wrap:anywhere">${esc(e.summary)}</p><p class="hint" style="margin:10px 0 0">Texto gerado pelo Claude a partir do laudo. Pode conter erros: confira com o original.</p></div>`;
-  if (e.attention && e.attention.length) h += `<h2 class="sec">Pontos para conversar com o médico</h2><div class="card"><ul class="plain" style="margin:0">${e.attention.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>`;
-  if (bad.length) h += `<h2 class="sec">Fora da referência (${bad.length})</h2><div class="card"><div class="exl">${bad.map(itemRow).join('')}</div></div>`;
-  if (good.length) h += `<h2 class="sec">Dentro da referência (${good.length})</h2><div class="card"><div class="exl">${good.map(itemRow).join('')}</div></div>`;
-  if (nf.length) h += `<h2 class="sec">Sem faixa para comparar (${nf.length})</h2><div class="card"><div class="exl">${nf.map(itemRow).join('')}</div></div>`;
+  if (e.attention && e.attention.length) h += `<div style="height:16px"></div>` + TBCards.i({ tone: 'warn', title: 'Pontos para conversar com o médico', tagText: String(e.attention.length), textHtml: `<ul class="plain" style="margin:6px 0 0">${e.attention.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` });
+  if (bad.length) h += `<h2 class="sec">Fora da referência (${bad.length})</h2><div class="gx-exi-list">${bad.map(itemRow).join('')}</div>`;
+  if (good.length) h += `<div style="height:16px"></div>` + TBCards.g({ title: 'Dentro da referência', sub: `${good.length} ${good.length === 1 ? 'item' : 'itens'}`, tone: 'pos', open: good.length <= 4 }, `<div class="gx-exi-list">${good.map(itemRow).join('')}</div>`);
+  if (nf.length) h += `<div style="height:10px"></div>` + TBCards.g({ title: 'Sem faixa para comparar', sub: `${nf.length} ${nf.length === 1 ? 'item' : 'itens'}`, tone: 'neu' }, `<div class="gx-exi-list">${nf.map(itemRow).join('')}</div>`);
   if (e.questions && e.questions.length) h += `<h2 class="sec">Perguntas para levar à consulta</h2><div class="card"><ul class="plain" style="margin:0">${e.questions.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>`;
   h += `<p class="hint" style="margin-top:16px">Arquivo: ${esc(e.fileName || '')}. Análise educativa, não é diagnóstico nem indicação de tratamento.</p>`;
   return h;
