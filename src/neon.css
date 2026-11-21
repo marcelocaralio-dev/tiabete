@@ -1,11 +1,14 @@
-/* ================= Iluminação neon suave (Dark Tech) =================
+/* ================= Iluminação neon suave (Dark Tech) · um só conjunto de regras para os dois temas =================
    Camada puramente visual. Nada aqui altera tamanho, posição, margem, espaçamento ou fluxo:
    só box-shadow, gradientes, drop-shadow em ícones pequenos e pseudoelemento fixo atrás da página.
-   Os blocos ":root:not([data-theme=\"light\"])" valem no tema escuro; a seção 6 (final) traz a correspondência exata no tema claro (mesmos estados, mesma lógica de ambient.js, só cores/transparências adaptadas).
+
+   0.30.0: as regras deixaram de existir em duas cópias (uma para o escuro, outra para o claro). Agora há UMA regra por efeito e
+   a diferença entre os temas está só nos TOKENS "--amb-*", "--nh-*", "--g-*" abaixo (escuro em :root, claro em :root[data-theme="light"]).
+   Para ajustar a intensidade de um efeito em um tema, mude o token; para criar um efeito novo, ele passa a existir nos dois temas ao mesmo tempo.
    Para desligar tudo: remova "src/neon.css" da lista em scripts/build-web.js (e, se quiser, src/ambient.js).
 
    Cores funcionais
-   · verde   → mesmo verde do app (--good-fill)         · vermelho → #FF5264 (vermelho luminoso)
+   · verde   → mesmo verde do app (--good-fill)         · vermelho → luminoso no escuro, vermelho GLUXO no claro
    · âmbar   → tom discreto, só onde já existir classificação amarela
    Os cards NÃO ganham regra nova de classificação: o halo segue as classes que o app já aplica
    (.st-ok = verde, .st-bad = vermelho, sem classe = neutro).                                      */
@@ -13,11 +16,56 @@
 /* Cor do fundo ambiente: registrada para poder animar a troca de estado (300–500 ms). */
 @property --amb-c { syntax: '<color>'; inherits: false; initial-value: rgba(0, 0, 0, 0); }
 
+/* ---------- Tokens de efeito · TEMA ESCURO (padrão) ---------- */
+:root {
+  /* fundo ambiente do indicador geral (ambient.js → data-amb) */
+  --amb-ok: rgba(24, 128, 74, .30); --amb-warn: rgba(200, 138, 28, .25); --amb-bad: rgba(198, 40, 57, .34);
+  /* halo dos cards: repouso (--nh) e toque/hover (--nh2) */
+  --nh-ok: rgba(54, 201, 120, .34); --nh2-ok: rgba(54, 201, 120, .55);
+  --nh-bad: rgba(255, 82, 100, .30); --nh2-bad: rgba(255, 82, 100, .52);
+  --nh-warn: rgba(232, 163, 58, .30); --nh2-warn: rgba(232, 163, 58, .50);
+  --warn-line: #C98A1E;
+  /* sombra externa e brilho de borda interno que acompanham o halo */
+  --nh-tail: 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  /* cartão principal "Clássico" classificado por .b-* */
+  --hero-ok-glow: rgba(54, 201, 120, .34); --hero-bad-glow: rgba(255, 82, 100, .30);
+  /* selos / indicadores */
+  --g-ok-b: rgba(54, 201, 120, .55); --g-bad-b: rgba(255, 82, 100, .50); --g-vh-b: rgba(255, 82, 100, .55); --g-vh-ring: var(--red-d);
+  --g-prog: rgba(255, 82, 100, .55); --g-nav-t: rgba(255, 82, 100, .38);
+  --g-spark-p: 55%;
+  /* ícone ativo da navegação e mostradores (gauge.css) */
+  --g-navic: drop-shadow(0 0 6px rgba(var(--red-rgb), .7));
+  --g-gz-num-p: 42%; --g-gz-lit-p: 38%;
+  /* botões principais: sombra base, brilho ao tocar (a) e ao passar o mouse (h) */
+  --g-btn-sh: rgba(var(--red-rgb), .32); --g-btn-a: rgba(255, 82, 100, .50); --g-btn-h: rgba(255, 82, 100, .38);
+  --g-fab-sh: rgba(var(--red-rgb), .5); --g-fab-sh-h: rgba(var(--red-rgb), .5); --g-fab-a: rgba(255, 82, 100, .55); --g-fab-h: rgba(255, 82, 100, .40);
+  --g-rw-sh: rgba(22, 163, 74, .4); --g-rw-sh-h: rgba(22, 163, 74, .4); --g-rw-a: rgba(54, 201, 120, .5); --g-rw-h: rgba(54, 201, 120, .4);
+}
+/* ---------- Tokens de efeito · TEMA CLARO ----------
+   Mesmos efeitos, mesma lógica; tons e intensidades adaptados a superfícies claras (sombras discretas, vermelho GLUXO #D4162A). */
+:root[data-theme="light"] {
+  --amb-ok: rgba(31, 154, 88, .34); --amb-warn: rgba(208, 138, 18, .32); --amb-bad: rgba(212, 22, 42, .30);
+  --nh-ok: rgba(31, 154, 88, .36); --nh2-ok: rgba(31, 154, 88, .55);
+  --nh-bad: rgba(212, 22, 42, .32); --nh2-bad: rgba(212, 22, 42, .52);
+  --nh-warn: rgba(208, 138, 18, .34); --nh2-warn: rgba(208, 138, 18, .52);
+  --warn-line: #D9A144;
+  --nh-tail: 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent);
+  --hero-ok-glow: rgba(31, 154, 88, .38); --hero-bad-glow: rgba(212, 22, 42, .34);
+  --g-ok-b: rgba(31, 154, 88, .55); --g-bad-b: rgba(212, 22, 42, .50); --g-vh-b: rgba(212, 22, 42, .55); --g-vh-ring: #F6B9C0;
+  --g-prog: rgba(212, 22, 42, .5); --g-nav-t: rgba(212, 22, 42, .28);
+  --g-spark-p: 45%;
+  --g-navic: drop-shadow(0 0 5px rgba(212, 22, 42, .42));
+  --g-gz-num-p: 24%; --g-gz-lit-p: 22%;
+  --g-btn-sh: rgba(212, 22, 42, .34); --g-btn-a: rgba(212, 22, 42, .38); --g-btn-h: rgba(212, 22, 42, .32);
+  --g-fab-sh: rgba(212, 22, 42, .5); --g-fab-sh-h: rgba(212, 22, 42, .45); --g-fab-a: rgba(212, 22, 42, .4); --g-fab-h: rgba(212, 22, 42, .32);
+  --g-rw-sh: rgba(22, 163, 74, .4); --g-rw-sh-h: rgba(22, 163, 74, .38); --g-rw-a: rgba(31, 154, 88, .45); --g-rw-h: rgba(31, 154, 88, .38);
+}
+
 /* ---------- 1) Fundo ambiente (só na tela inicial; o estado vem de ambient.js) ---------- */
 /* O corpo fica transparente apenas para a camada aparecer; o fundo de <html> continua o mesmo (--bg). */
-:root:not([data-theme="light"]) body { background: transparent; }
+:root:root body { background: transparent; }
 
-:root:not([data-theme="light"])::before {
+:root:root::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
@@ -27,133 +75,61 @@
   transition: --amb-c .45s ease;
 }
 /* O topo da página é uma faixa opaca fixa; ela recebe o mesmo brilho dos cantos para a luz não ser cortada. */
-:root:not([data-theme="light"]) .top {
+:root:root .top {
   background:
     radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
     radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
     var(--bg);
   transition: --amb-c .45s ease;
 }
-/* Estados. Sem data-amb (ou "none") = fundo preto original, sem cor. */
-:root[data-amb="ok"]::before, :root[data-amb="ok"] .top { --amb-c: rgba(24, 128, 74, .30); }
-:root[data-amb="warn"]::before, :root[data-amb="warn"] .top { --amb-c: rgba(200, 138, 28, .25); }
-:root[data-amb="bad"]::before, :root[data-amb="bad"] .top { --amb-c: rgba(198, 40, 57, .34); }
+/* Estados. Sem data-amb (ou "none") = fundo original, sem cor. */
+:root[data-amb="ok"]::before, :root[data-amb="ok"] .top { --amb-c: var(--amb-ok); }
+:root[data-amb="warn"]::before, :root[data-amb="warn"] .top { --amb-c: var(--amb-warn); }
+:root[data-amb="bad"]::before, :root[data-amb="bad"] .top { --amb-c: var(--amb-bad); }
 
 /* ---------- 2) Halo dos cards da tela inicial ---------- */
-:root:not([data-theme="light"]) .pn-c.st-ok { --nh: rgba(54, 201, 120, .34); --nh2: rgba(54, 201, 120, .55); }
-:root:not([data-theme="light"]) .pn-c.st-bad { --nh: rgba(255, 82, 100, .30); --nh2: rgba(255, 82, 100, .52); }
-:root:not([data-theme="light"]) .pn-c.st-warn { --nh: rgba(232, 163, 58, .30); --nh2: rgba(232, 163, 58, .50); }
-:root:not([data-theme="light"]) .pn-c.st-ok,
-:root:not([data-theme="light"]) .pn-c.st-bad,
-:root:not([data-theme="light"]) .pn-c.st-warn {
+:root:root .pn-c.st-ok { --nh: var(--nh-ok); --nh2: var(--nh2-ok); }
+:root:root .pn-c.st-bad { --nh: var(--nh-bad); --nh2: var(--nh2-bad); }
+:root:root .pn-c.st-warn { --nh: var(--nh-warn); --nh2: var(--nh2-warn); }
+:root:root .pn-c:is(.st-ok, .st-bad, .st-warn) {
   /* mantém as duas sombras originais do card e acrescenta halo externo + brilho de borda interno */
-  box-shadow: 0 0 12px -2px var(--nh), inset 0 0 12px -8px var(--nh),
-    0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  box-shadow: 0 0 12px -2px var(--nh), inset 0 0 12px -8px var(--nh), var(--nh-tail);
   transition: transform .12s ease, border-color .15s ease, background-color .2s ease, box-shadow .4s ease;
 }
-:root:not([data-theme="light"]) .pn-c.st-ok:active,
-:root:not([data-theme="light"]) .pn-c.st-bad:active,
-:root:not([data-theme="light"]) .pn-c.st-warn:active {
-  box-shadow: 0 0 16px -1px var(--nh2), inset 0 0 14px -7px var(--nh2),
-    0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+:root:root .pn-c:is(.st-ok, .st-bad, .st-warn):active {
+  box-shadow: 0 0 16px -1px var(--nh2), inset 0 0 14px -7px var(--nh2), var(--nh-tail);
 }
 /* Borda âmbar apenas para o gancho .st-warn (o app ainda não usa classificação amarela nos cards). */
-:root:not([data-theme="light"]) .pn-c.st-warn { border-color: #C98A1E; }
+:root:root .pn-c.st-warn { border-color: var(--warn-line); }
 
 /* Visual "Clássico": cartão principal já classificado por .b-* (o muted .oor continua neutro). */
-:root:not([data-theme="light"]) .card.red.hero.b-ok:not(.oor) { box-shadow: 0 0 12px -2px rgba(54, 201, 120, .34), inset 0 0 12px -8px rgba(54, 201, 120, .34); }
-:root:not([data-theme="light"]) .card.red.hero:is(.b-low, .b-vlow, .b-high, .b-vhigh):not(.oor) { box-shadow: 0 0 12px -2px rgba(255, 82, 100, .30), inset 0 0 12px -8px rgba(255, 82, 100, .30); }
+:root:root .card.red.hero.b-ok:not(.oor) { box-shadow: 0 0 12px -2px var(--hero-ok-glow), inset 0 0 12px -8px var(--hero-ok-glow); }
+:root:root .card.red.hero:is(.b-low, .b-vlow, .b-high, .b-vhigh):not(.oor) { box-shadow: 0 0 12px -2px var(--hero-bad-glow), inset 0 0 12px -8px var(--hero-bad-glow); }
 
 /* ---------- 3) Ícones e indicadores selecionados (cor funcional do próprio card) ---------- */
-:root:not([data-theme="light"]) .pn-c:is(.st-ok, .st-bad, .st-warn) .pn-ic { filter: drop-shadow(0 0 3px var(--nh)); }
-:root:not([data-theme="light"]) .pn-c.st-ok .badge.ok { box-shadow: 0 0 10px -3px rgba(54, 201, 120, .55); }
-:root:not([data-theme="light"]) :is(.pn-c, .hr-state) .badge:is(.low, .vlow, .high) { box-shadow: 0 0 10px -3px rgba(255, 82, 100, .50); }
-:root:not([data-theme="light"]) :is(.pn-c, .hr-state) .badge.vhigh { box-shadow: 0 0 0 2px var(--red-d), 0 0 10px -2px rgba(255, 82, 100, .55); }
-:root:not([data-theme="light"]) .hr-state .badge.ok { box-shadow: 0 0 10px -3px rgba(54, 201, 120, .55); }
+:root:root .pn-c:is(.st-ok, .st-bad, .st-warn) .pn-ic { filter: drop-shadow(0 0 3px var(--nh)); }
+:root:root .pn-c.st-ok .badge.ok, :root:root .hr-state .badge.ok { box-shadow: 0 0 10px -3px var(--g-ok-b); }
+:root:root :is(.pn-c, .hr-state) .badge:is(.low, .vlow, .high) { box-shadow: 0 0 10px -3px var(--g-bad-b); }
+:root:root :is(.pn-c, .hr-state) .badge.vhigh { box-shadow: 0 0 0 2px var(--g-vh-ring), 0 0 10px -2px var(--g-vh-b); }
 /* marcador do gráfico de evolução e barra de progresso */
-:root:not([data-theme="light"]) .pn-spark .spark { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp, var(--red-l)) 55%, transparent)); }
-:root:not([data-theme="light"]) .pr-prog i { box-shadow: 0 0 8px -1px rgba(255, 82, 100, .55); }
-/* item de navegação selecionado (o ícone já tinha brilho; aqui só o rótulo acompanha) */
-:root:not([data-theme="light"]) .nav button[aria-current="page"] { text-shadow: 0 0 10px rgba(255, 82, 100, .38); }
+:root:root .pn-spark .spark { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp, var(--red-l)) var(--g-spark-p), transparent)); }
+:root:root .pr-prog i { box-shadow: 0 0 8px -1px var(--g-prog); }
+/* item de navegação selecionado: o ícone (style.css, token --g-navic) e o rótulo acompanham */
+:root:root .nav button[aria-current="page"] { text-shadow: 0 0 10px var(--g-nav-t); }
 
 /* ---------- 4) Botões importantes: brilho ao tocar/passar o mouse, volta suave ao soltar ---------- */
-:root:not([data-theme="light"]) .btn.pri, :root:not([data-theme="light"]) .nav .fab { transition: box-shadow .4s ease, transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease; }
-:root:not([data-theme="light"]) .btn.pri:active { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 20px 0 rgba(255, 82, 100, .50); transition-duration: .12s; }
-:root:not([data-theme="light"]) .nav .fab:active { box-shadow: 0 8px 28px rgba(var(--red-rgb), .5), 0 0 22px 2px rgba(255, 82, 100, .55), 0 0 0 5px var(--bg); transition-duration: .12s; }
-:root:not([data-theme="light"]) .rw-card .btn.pri:active { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 20px 0 rgba(54, 201, 120, .5); }
+:root:root .btn.pri, :root:root .nav .fab { transition: box-shadow .4s ease, transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease; }
+:root:root .btn.pri:active { box-shadow: 0 6px 22px var(--g-btn-sh), 0 0 20px 0 var(--g-btn-a); transition-duration: .12s; }
+:root:root .nav .fab:active { box-shadow: 0 8px 28px var(--g-fab-sh), 0 0 22px 2px var(--g-fab-a), 0 0 0 5px var(--bg); transition-duration: .12s; }
+:root:root .rw-card .btn.pri:active { box-shadow: 0 6px 18px var(--g-rw-sh), 0 0 20px 0 var(--g-rw-a); }
 @media (hover: hover) {
-  :root:not([data-theme="light"]) .btn.pri:hover { box-shadow: 0 6px 22px rgba(var(--red-rgb), .32), 0 0 16px -2px rgba(255, 82, 100, .38); }
-  :root:not([data-theme="light"]) .nav .fab:hover { box-shadow: 0 8px 28px rgba(var(--red-rgb), .5), 0 0 18px 0 rgba(255, 82, 100, .40), 0 0 0 5px var(--bg); }
-  :root:not([data-theme="light"]) .rw-card .btn.pri:hover { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 16px -2px rgba(54, 201, 120, .4); }
-  :root:not([data-theme="light"]) .pn-c.st-ok:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
-  :root:not([data-theme="light"]) .pn-c.st-bad:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
-  :root:not([data-theme="light"]) .pn-c.st-warn:hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #000 22%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent); }
+  :root:root .btn.pri:hover { box-shadow: 0 6px 22px var(--g-btn-sh), 0 0 16px -2px var(--g-btn-h); }
+  :root:root .nav .fab:hover { box-shadow: 0 8px 28px var(--g-fab-sh-h), 0 0 18px 0 var(--g-fab-h), 0 0 0 5px var(--bg); }
+  :root:root .rw-card .btn.pri:hover { box-shadow: 0 6px 18px var(--g-rw-sh-h), 0 0 16px -2px var(--g-rw-h); }
+  :root:root .pn-c:is(.st-ok, .st-bad, .st-warn):hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), var(--nh-tail); }
 }
 
 /* ---------- 5) Movimento reduzido: as cores continuam, as transições somem ---------- */
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-theme="light"])::before, :root:not([data-theme="light"]) .top,
-  :root:not([data-theme="light"]) .pn-c, :root:not([data-theme="light"]) .btn.pri, :root:not([data-theme="light"]) .nav .fab { transition: none !important; }
-}
-
-/* ================= 6) PARIDADE · TEMA CLARO =================
-   Mesmos efeitos do tema escuro, com tonalidades e intensidades adaptadas a superfícies claras.
-   O estado continua vindo de ambient.js (data-amb): nenhuma lógica nova. */
-:root[data-theme="light"] body { background: transparent; }
-:root[data-theme="light"]::before {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
-    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
-    radial-gradient(ellipse 150px 360px at 0% 40%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%),
-    radial-gradient(ellipse 150px 360px at 100% 52%, color-mix(in srgb, var(--amb-c) 62%, transparent) 0%, transparent 100%);
-  transition: --amb-c .45s ease;
-}
-:root[data-theme="light"] .top {
-  background:
-    radial-gradient(ellipse 62% 280px at 0% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
-    radial-gradient(ellipse 62% 280px at 100% 0%, var(--amb-c) 0%, color-mix(in srgb, var(--amb-c) 38%, transparent) 42%, transparent 100%),
-    var(--bg);
-  transition: --amb-c .45s ease;
-}
-:root[data-theme="light"][data-amb="ok"]::before, :root[data-theme="light"][data-amb="ok"] .top { --amb-c: rgba(31, 154, 88, .34); }
-:root[data-theme="light"][data-amb="warn"]::before, :root[data-theme="light"][data-amb="warn"] .top { --amb-c: rgba(208, 138, 18, .32); }
-:root[data-theme="light"][data-amb="bad"]::before, :root[data-theme="light"][data-amb="bad"] .top { --amb-c: rgba(212, 22, 42, .30); }
-
-/* halo dos cards */
-:root[data-theme="light"] .pn-c.st-ok { --nh: rgba(31, 154, 88, .36); --nh2: rgba(31, 154, 88, .55); }
-:root[data-theme="light"] .pn-c.st-bad { --nh: rgba(212, 22, 42, .32); --nh2: rgba(212, 22, 42, .52); }
-:root[data-theme="light"] .pn-c.st-warn { --nh: rgba(208, 138, 18, .34); --nh2: rgba(208, 138, 18, .52); border-color: #D9A144; }
-:root[data-theme="light"] .pn-c.st-ok, :root[data-theme="light"] .pn-c.st-bad, :root[data-theme="light"] .pn-c.st-warn {
-  box-shadow: 0 0 12px -2px var(--nh), inset 0 0 12px -8px var(--nh), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent);
-  transition: transform .12s ease, border-color .15s ease, background-color .2s ease, box-shadow .4s ease;
-}
-:root[data-theme="light"] .pn-c.st-ok:active, :root[data-theme="light"] .pn-c.st-bad:active, :root[data-theme="light"] .pn-c.st-warn:active {
-  box-shadow: 0 0 16px -1px var(--nh2), inset 0 0 14px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent);
-}
-:root[data-theme="light"] .card.red.hero.b-ok:not(.oor) { box-shadow: 0 0 12px -2px rgba(31, 154, 88, .38), inset 0 0 12px -8px rgba(31, 154, 88, .38); }
-:root[data-theme="light"] .card.red.hero:is(.b-low, .b-vlow, .b-high, .b-vhigh):not(.oor) { box-shadow: 0 0 12px -2px rgba(212, 22, 42, .34), inset 0 0 12px -8px rgba(212, 22, 42, .34); }
-
-/* ícones e indicadores */
-:root[data-theme="light"] .pn-c:is(.st-ok, .st-bad, .st-warn) .pn-ic { filter: drop-shadow(0 0 3px var(--nh)); }
-:root[data-theme="light"] .pn-c.st-ok .badge.ok, :root[data-theme="light"] .hr-state .badge.ok { box-shadow: 0 0 10px -3px rgba(31, 154, 88, .55); }
-:root[data-theme="light"] :is(.pn-c, .hr-state) .badge:is(.low, .vlow, .high) { box-shadow: 0 0 10px -3px rgba(212, 22, 42, .50); }
-:root[data-theme="light"] :is(.pn-c, .hr-state) .badge.vhigh { box-shadow: 0 0 0 2px #F6B9C0, 0 0 10px -2px rgba(212, 22, 42, .55); }
-:root[data-theme="light"] .pn-spark .spark { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sp, var(--red-l)) 45%, transparent)); }
-:root[data-theme="light"] .pr-prog i { box-shadow: 0 0 8px -1px rgba(212, 22, 42, .5); }
-:root[data-theme="light"] .nav button[aria-current="page"] { text-shadow: 0 0 10px rgba(212, 22, 42, .28); }
-
-/* botões importantes */
-:root[data-theme="light"] .btn.pri, :root[data-theme="light"] .nav .fab { transition: box-shadow .4s ease, transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease; }
-:root[data-theme="light"] .btn.pri:active { box-shadow: 0 6px 22px rgba(212, 22, 42, .34), 0 0 20px 0 rgba(212, 22, 42, .38); transition-duration: .12s; }
-:root[data-theme="light"] .nav .fab:active { box-shadow: 0 8px 28px rgba(212, 22, 42, .5), 0 0 22px 2px rgba(212, 22, 42, .4), 0 0 0 5px var(--bg); transition-duration: .12s; }
-:root[data-theme="light"] .rw-card .btn.pri:active { box-shadow: 0 6px 18px rgba(22, 163, 74, .4), 0 0 20px 0 rgba(31, 154, 88, .45); }
-@media (hover: hover) {
-  :root[data-theme="light"] .btn.pri:hover { box-shadow: 0 6px 22px rgba(212, 22, 42, .32), 0 0 16px -2px rgba(212, 22, 42, .32); }
-  :root[data-theme="light"] .nav .fab:hover { box-shadow: 0 8px 28px rgba(212, 22, 42, .45), 0 0 18px 0 rgba(212, 22, 42, .32), 0 0 0 5px var(--bg); }
-  :root[data-theme="light"] .rw-card .btn.pri:hover { box-shadow: 0 6px 18px rgba(22, 163, 74, .38), 0 0 16px -2px rgba(31, 154, 88, .38); }
-  :root[data-theme="light"] .pn-c:is(.st-ok, .st-bad, .st-warn):hover { box-shadow: 0 0 15px -1px var(--nh2), inset 0 0 13px -7px var(--nh2), 0 6px 22px color-mix(in srgb, #3C282D 14%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) {
-  :root[data-theme="light"]::before, :root[data-theme="light"] .top, :root[data-theme="light"] .pn-c, :root[data-theme="light"] .btn.pri, :root[data-theme="light"] .nav .fab { transition: none !important; }
+  :root:root::before, :root:root .top, :root:root .pn-c, :root:root .btn.pri, :root:root .nav .fab { transition: none !important; }
 }

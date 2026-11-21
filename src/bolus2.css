@@ -1,8 +1,8 @@
 /* Cálculo de bolus: menus, etiquetas nutricionais, alimentos frequentes */
 :root { --amb: #F0B04A; --amb-d: #3A2A0C; --amb-l: #FFD58A; --amb-ink: #1C1305; }
-:root[data-theme="light"] { --amb: #B7720B; --amb-d: #FBEBCB; --amb-l: #8A5300; --amb-ink: #fff; }
+:root[data-theme="light"] { --amb: #9A6000; --amb-d: #FBEBCB; --amb-l: #8A5300; --amb-ink: #fff; }
 /* menus: Razão (vermelho do TiaBete) e Alimentos (âmbar); mesmo tamanho dos demais */
-.bl-tabs .seg-b.bl-t-rz { border-color: var(--red); background: color-mix(in srgb, var(--red) 16%, var(--s2)); color: var(--red-l); }
+.bl-tabs .seg-b.bl-t-rz { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--s2)); color: var(--red-l); }
 .bl-tabs .seg-b.bl-t-rz.on { background: var(--red); border-color: var(--red); color: #fff; }
 .bl-tabs .seg-b.bl-t-al { border-color: var(--amb); background: var(--amb-d); color: var(--amb-l); }
 .bl-tabs .seg-b.bl-t-al.on { background: var(--amb); border-color: var(--amb); color: var(--amb-ink); }

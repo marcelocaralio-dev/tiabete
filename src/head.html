@@ -1,4 +1,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>
+/* Tema antes da primeira pintura: sem "flash" escuro para quem escolheu o tema claro. Mesma regra de applyTheme() (extras.js): preferência salva em tb-theme; padrão escuro; "auto" segue o sistema. */
+(function () { try { var v = localStorage.getItem('tb-theme'), l = v === 'light' || (v === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches), d = document.documentElement; d.setAttribute('data-theme', l ? 'light' : 'dark'); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', l ? '#F6F2F0' : '#08070A'); } catch (e) { } })();
+</script>
 <title>TiaBete</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>

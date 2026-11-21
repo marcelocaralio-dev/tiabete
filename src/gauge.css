@@ -12,8 +12,9 @@
 .gz-dot { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gc) 70%, transparent)); }
 .gz-ring { opacity: 0; }
 .gz-knob { transform-origin: 160px 134px; transform: rotate(var(--r)); }
-:root:not([data-theme="light"]) .gz-num { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--gc) 42%, transparent)); }
-:root:not([data-theme="light"]) .gz-lit { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gc) 38%, transparent)); }
+/* brilho do número e do arco aceso: um só par de regras; a intensidade de cada tema vem dos tokens --g-gz-* (neon.css) */
+.gz-num { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--gc) var(--g-gz-num-p, 42%), transparent)); }
+.gz-lit { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gc) var(--g-gz-lit-p, 38%), transparent)); }
 
 /* Tamanho do mostrador nas janelas de detalhe e no Início clássico (o desenho tem sempre o mesmo viewBox). */
 .gauge-box { max-width: 506px; }

@@ -124,7 +124,7 @@ button.gx-c:focus-visible { outline: 2px solid var(--red-l, #f55); outline-offse
 .day-h.gx-dh .gx-seg { grid-column: 1 / -1; }
 /* Conquistas */
 .gx-cw-sum { margin-bottom: 12px; }
-.cw-card .rw-bd:not(.on) { opacity: .62; }
+.cw-card .rw-bd:not(.on) { opacity: .78; }
 /* Alertas (histórico): barra por prioridade */
 .ac-it { padding-left: var(--gx-bar-pad); }
 .ac-it[data-tone] { border-color: color-mix(in srgb, var(--tone) 26%, var(--line)); }

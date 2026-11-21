@@ -462,6 +462,7 @@ const sysLight = () => { try { return window.matchMedia('(prefers-color-scheme: 
 const themeEff = () => S.theme === 'auto' ? (sysLight() ? 'light' : 'dark') : S.theme;
 function applyTheme() {
   const t = themeEff(); document.documentElement.setAttribute('data-theme', t);
+  try { const mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', t === 'light' ? '#F6F2F0' : '#08070A'); } catch (e) { }
   const b = document.getElementById('thm');
   if (b) { b.innerHTML = t === 'light' ? MOON : SUN; b.setAttribute('aria-label', t === 'light' ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'); b.title = b.getAttribute('aria-label'); }
 }

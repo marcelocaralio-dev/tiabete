@@ -354,7 +354,7 @@ i.b-vlow { background: #7D1020; } i.b-low1 { background: #E5586A; } i.b-ok { bac
 :root[data-theme="light"] {
   --mt-0: #FBF3F2; --mt-1: #FFFFFF; --mt-2: #FFF1F2; --mt-3: #FBE4E7;
   --mt-line: #EBD9DC; --mt-line2: #DDB8BE;
-  --mt-fg: #1C1719; --mt-mut: #4B4247; --mt-mut2: #62575C;
+  --mt-fg: #1C1719; --mt-mut: #4B4247; --mt-mut2: #584E53;
   --mt-red: #D4162A; --mt-redl: #B3101F; --mt-redt: #C4132A;
   --mt-ok: #1F9A58; --mt-okl: #14693A; --mt-warn: #C9860E; --mt-warnl: #7A4B00; --mt-bad: #D4162A;
   --mt-gl: rgba(28,23,25,.045); --mt-gl2: rgba(28,23,25,.08);
