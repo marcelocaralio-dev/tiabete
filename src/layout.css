@@ -1,0 +1,97 @@
+/* 0.29.0 — Aproveitamento horizontal (PROMPT 5). Só apresentação: dados, cálculos e ações não mudam.
+   Os pontos de quebra usam a largura REAL do conteúdo (#view, já com a escala do APK), não a da janela. */
+#view { container: vw / inline-size; }
+
+/* ---- avisos (banners) ---- */
+.banners { display: block; }
+@container vw (min-width: 640px) {
+  .banners { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: stretch; }
+  .banners > .banner.hypo, .banners > .banner.hyper, .banners > .banner:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* ---- Alimentos: categorias recolhíveis e cards compactos ---- */
+.bl-rzl { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; margin-bottom: 12px; padding: 12px 14px; }
+.bl-rzl .btn { flex: none; }
+.bl-svh { display: flex; flex-direction: column; gap: 10px; }
+.bl-sv { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
+.bl-sv .menu-item { padding: 10px 12px; border-radius: 14px; font-size: 14.5px; }
+.bl-sv .menu-item span { font-size: 13px; overflow-wrap: anywhere; }
+.bl-more > summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: var(--red-l); padding: 10px 2px 2px; }
+.bl-gctl { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.bl-flist { gap: 8px; }
+.bl-grp { background: var(--s1); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.bl-grp[hidden] { display: none; }
+.bl-gs { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 10px 14px; cursor: pointer; list-style: none; font-weight: 700; font-size: 15px; }
+.bl-gs::-webkit-details-marker { display: none; }
+.bl-gs::after { content: "▾"; color: var(--red-l); margin-left: 4px; transition: transform .18s; }
+.bl-grp[open] > .bl-gs::after { transform: rotate(180deg); }
+.bl-gs .bl-gn { flex: 1 1 auto; min-width: 0; }
+.bl-gc { font-family: var(--f-mono); font-size: 12.5px; font-weight: 500; color: var(--mut); border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; }
+.bl-gb { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0 10px 10px; }
+.bl-grp .bl-food { padding: 10px 12px; gap: 8px; border-radius: 14px; background: var(--bg); }
+.bl-fhd { display: flex; align-items: flex-start; gap: 8px; justify-content: space-between; }
+.bl-fhd .bl-fh { font-size: 15px; }
+.bl-fhd .bl-fv { display: block; font-size: 13px; color: var(--mut); margin-top: 1px; }
+.bl-fhd .bl-star { width: 38px; height: 38px; font-size: 20px; }
+.bl-food .nu { gap: 6px; }
+.bl-food .nu-net { padding: 6px 12px; border-radius: 12px; }
+.bl-food .nu-v { font-size: 20px; }
+.bl-food .nu-l b { font-size: 14px; }
+.bl-food .nu-g { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; grid-auto-flow: dense; }
+.bl-food .nu-g > div { padding: 5px 8px; border-radius: 10px; }
+.bl-food .nu-g .wide { grid-column: span 2; }
+.bl-food .nu-g > .wide:first-child:not(:last-child) { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: baseline; }
+.bl-food .nu-g dt { font-size: 12.5px; }
+.bl-food .nu-g dd { font-size: 14.5px; }
+.bl-fmeals { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.bl-fmeals .fl { margin: 0; font-size: 13px; }
+.bl-fmeals .bl-flt { margin: 0; gap: 5px; }
+.bl-fmeals .bl-fb { padding: 4px 11px; min-height: 36px; font-size: 13px; }
+.bl-nf-r { display: flex; gap: 10px; }
+
+/* ---- Alimentos frequentes e busca ---- */
+@container vw (min-width: 600px) {
+  .bl-fm-g { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bl-sr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bl-gb { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .bl-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .bl-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .bl-items .bl-item, .bl-items .bl-item:first-child, .bl-items .bl-item:last-child { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--s2); }
+}
+@container vw (min-width: 860px) {
+  .bl-fm-g { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .bl-gb { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bl-sr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bl-sv { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
+
+/* ---- Início ---- */
+@container vw (min-width: 440px) { .in-exl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container vw (min-width: 600px) {
+  .pn-c { grid-column: span 4; } .pn-evo { grid-column: span 8; } .pn-trat { grid-column: span 4; }
+  .pn-med, .pn-cmp, .pn-hipo, .pn-hiper { grid-column: span 3; } .pn-c.mini { grid-column: span 2; }
+  .pn-c.wide { grid-column: span 4; } .pn-c.pn-dist-c { grid-column: span 6; }
+}
+
+/* ---- Histórico: medições em duas colunas, cabeçalhos do dia ocupam a linha toda ---- */
+@container vw (min-width: 600px) {
+  #h-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; align-items: start; }
+  #h-list > :not(.rec) { grid-column: 1 / -1; }
+  #h-list > .rec.epi { grid-column: 1 / -1; }
+  #h-list > .rec { margin-bottom: 8px; }
+}
+@container vw (min-width: 900px) { #h-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---- listas de menus (Mais, Configurações), exames, HbA1c e tratamento ---- */
+@container vw (min-width: 600px) {
+  .stack:has(> .menu-item):not(.bl-sv) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+  .stack:has(> .menu-item) > .menu-item { height: 100%; }
+  #mais-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 0 12px; }
+  .gx-sch-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+@container vw (min-width: 900px) { .gx-sch-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---- formulários: campos relacionados lado a lado quando há espaço ---- */
+@container vw (min-width: 520px) { .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container vw (min-width: 700px) { .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .bl-gs::after { transition: none; } }

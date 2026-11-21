@@ -219,7 +219,7 @@ function banners() {
   if (!Store.persistent) h += `<div class="banner warn"><span>O armazenamento do navegador não está disponível aqui. Os dados valem só nesta sessão. Exporte uma cópia antes de sair.</span></div>`;
   h += hypoBanner() + hyperBanner() + rwBanner() + drvBanner() + backupBanner() + basalBanner() + dinnerBanner() + remBanner() + planBanner() + irBanner() + caBanner();
   if (hasExamples()) h += `<div class="banner"><span><b>Dados de exemplo.</b> Eles somem sozinhos quando você importar ou registrar a primeira medição real.</span><button class="btn sm" data-act="rm-examples">Remover agora</button></div>`;
-  return h;
+  return h ? `<div class="banners">${h}</div>` : '';
 }
 
 /* ---------- Painel: medições do dia e HbA1c ---------- */
