@@ -165,7 +165,7 @@ function mealIcon(r) {
 }
 function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MIC.seringa}</svg><i class="mi-l">${x.kind === 'basal' ? 'Basal' : x.kind === 'extra' ? 'Extra' : 'Rápida'}</i>`; }
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
-const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar de outros aplicativos', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o TiaBete', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
+const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar de outros aplicativos', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o GLUXO', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : (r === 'metricas' || r === 'metrica') ? 'painel' : 'mais';
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 /* Comparação visual (Design System) da média entre períodos; só apresenta números já calculados acima. */
@@ -618,7 +618,7 @@ function viewImportar() {
       ${p.unitNote ? `<div class="banner warn" style="margin-top:10px;display:block">${esc(p.unitNote)}</div>` : ''}
       ${p.warning ? `<p class="err">${esc(p.warning)}</p>` : ''}${imp.error ? `<p class="err">${esc(imp.error)}</p>` : ''}
       ${imp.dups && imp.dups.length ? `<details class="more" style="margin-top:12px"><summary>Ver duplicados (${imp.dupCount})</summary><p class="hint" style="margin:0 0 6px">Mesma data, hora e valor de um registro que já existe (ou repetido no arquivo). Eles não são importados de novo e os existentes não são alterados.</p><ul class="plain" style="margin-bottom:12px">${imp.dups.map(d => `<li>${fmtDate(d.date)} ${d.noTime ? '' : esc(d.time)} · ${d.glucose} mg/dL</li>`).join('')}${imp.dupCount > imp.dups.length ? `<li>…e mais ${imp.dupCount - imp.dups.length}</li>` : ''}</ul></details>` : ''}
-      ${reasons.length ? `<h2 class="sec" style="margin-top:18px">Linhas ignoradas</h2><ul class="plain">${reasons.map(([k, n]) => `<li>${n} · ${esc(k)}</li>`).join('')}</ul>${p.withOtherData ? `<p class="hint">${p.withOtherData} linha(s) sem glicemia tinham dose de insulina ou carboidrato. Elas não são importadas, porque o TiaBete guarda cada registro a partir de uma medição.</p>` : ''}${p.ignored.length ? `<details class="more" style="margin-top:10px"><summary>Ver linhas (${Math.min(p.ignored.length, 200)})</summary><ul class="plain" style="margin-bottom:12px">${p.ignored.slice(0, 60).map(i => `<li>${i.where ? esc(i.where) + ', ' : ''}linha ${i.line}: ${esc(i.reason)}${i.extra ? ' (“' + esc(i.extra.slice(0, 30)) + '”)' : ''}</li>`).join('')}${p.ignored.length > 60 ? `<li>…e mais ${p.ignored.length - 60}</li>` : ''}</ul></details>` : ''}` : ''}
+      ${reasons.length ? `<h2 class="sec" style="margin-top:18px">Linhas ignoradas</h2><ul class="plain">${reasons.map(([k, n]) => `<li>${n} · ${esc(k)}</li>`).join('')}</ul>${p.withOtherData ? `<p class="hint">${p.withOtherData} linha(s) sem glicemia tinham dose de insulina ou carboidrato. Elas não são importadas, porque o GLUXO guarda cada registro a partir de uma medição.</p>` : ''}${p.ignored.length ? `<details class="more" style="margin-top:10px"><summary>Ver linhas (${Math.min(p.ignored.length, 200)})</summary><ul class="plain" style="margin-bottom:12px">${p.ignored.slice(0, 60).map(i => `<li>${i.where ? esc(i.where) + ', ' : ''}linha ${i.line}: ${esc(i.reason)}${i.extra ? ' (“' + esc(i.extra.slice(0, 30)) + '”)' : ''}</li>`).join('')}${p.ignored.length > 60 ? `<li>…e mais ${p.ignored.length - 60}</li>` : ''}</ul></details>` : ''}` : ''}
       ${skipBlock}
       ${p.hba.length ? `<label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-hba" ${imp.includeHba ? 'checked' : ''}><span>Importar também ${p.hba.length} valor(es) de HbA1c encontrados no arquivo, como resultado sem laboratório informado.</span></label>` : ''}
       <label class="chk" style="margin-top:16px"><input type="checkbox" id="imp-rule" ${imp.timeRule ? 'checked' : ''}><span>Definir jejum, antes e depois da refeição pelo <b>horário</b> da medição (${p.items.filter(i => applyRule(i)).length} de ${p.items.length} serão definidas ou alteradas). As etiquetas originais do arquivo são mantidas.</span></label>
@@ -740,7 +740,7 @@ function viewBackup() {
     <h2 class="sec">Exportar</h2>${(() => { const d = blExport(), nf = (S.bl.foods || []).length, nm = (S.bl.meals || []).length, nd = Object.keys(S.bl.days || {}).length; return `<p class="hint" style="margin:0 0 10px">${d ? `<b>Cálculo de bolus entra na cópia:</b> ${nf} alimento${nf === 1 ? '' : 's'}, ${nd} dia(s), ${nm} refeição(ões) registrada(s).` : '<b>Cálculo de bolus:</b> ainda sem dados neste aparelho (nada a incluir).'}</p>`; })()}<div class="stack"><button class="btn pri full" data-act="bk-json">Cópia completa (.json)</button><button class="btn full" data-act="bk-csv">Medições (.csv)</button></div>
     ${driveCard()}
     <h2 class="sec">Proteção dos dados</h2><div class="card"><p class="hint" style="margin:0 0 10px">Cópia protegida por senha, Drive com criptografia e bloqueio por PIN ou biometria ficam agora em Segurança e privacidade.</p><button class="btn full" data-act="go" data-r="seguranca">Abrir Bloqueio e proteção</button></div>
-    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo TiaBete.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher cópia</button>${secPrompt()}`;
+    <h2 class="sec">Restaurar</h2><div class="card"><p class="hint" style="margin:0 0 12px">Escolha um arquivo .json gerado pelo GLUXO.</p><input type="file" id="rest-file" accept=".json,application/json" hidden><button class="btn full" data-act="pick-json">Escolher cópia</button>${secPrompt()}`;
   if (S.rest) {
     const x = S.rest;
     h += `<div style="margin-top:14px"><div class="eyebrow">Arquivo lido</div><p style="margin:6px 0 4px" class="num">${x.records.length} medições · ${x.hba.length} HbA1c · ${x.schemes.length} esquemas</p><p class="hint" style="margin:0 0 12px">Exportado em ${esc(x.exportedAt ? new Date(x.exportedAt).toLocaleString('pt-BR') : 'data desconhecida')}.</p>
@@ -801,7 +801,7 @@ function menuGroups() {
   /* Ordem = importância para o dia a dia. Perfil sempre primeiro; ajustes e informações do app por último.
      Categoria com um só item vira atalho direto (sem expandir). Cada item continua com a mesma rota e a mesma tela. */
   const G = {
-    'g-perfil': { t: 'Perfil e licença', d: 'Foto, dados pessoais, diabetes e licença', items: [['perfil', 'Meu perfil', pfMenuDesc()], ['licenca', 'Licença TiaBete', typeof licMenuDesc === 'function' ? licMenuDesc() : 'Gratuito, teste e licença vitalícia']] },
+    'g-perfil': { t: 'Perfil e licença', d: 'Foto, dados pessoais, diabetes e licença', items: [['perfil', 'Meu perfil', pfMenuDesc()], ['licenca', 'Licença GLUXO', typeof licMenuDesc === 'function' ? licMenuDesc() : 'Gratuito, teste e licença vitalícia']] },
     'g-saude': { t: 'Saúde e diabetes', d: 'Hemoglobina glicada, exames e hipoglicemia', items: [['hba1c', 'Hemoglobina glicada', 'Resultados de laboratório e gráfico'], HAS_CLAUDE ? ['exames', 'Exames laboratoriais', 'Enviar exames, ver notas e comparar'] : null, ['hypo', 'Protocolo de hipoglicemia', 'Reavaliar a cada 15 minutos até voltar a 70 mg/dL ou mais', 'hypo-open']] },
     'g-trat': { t: 'Tratamento e insulina', d: 'Medicamentos, horários e doses de insulina', items: [['esquemas', 'Meu tratamento', 'Diabetes, insulinas, medicamentos e histórico'], ['insrem', 'Lembretes de insulina', 'Avisos de basal e rápida, com confirmação da aplicação'], ['insulinas', 'Histórico de insulinas', 'Horários, média e variação das insulinas']] },
     'g-bolus': { t: 'Cálculo de bolus', d: 'Razão insulina/carboidratos, alimentos e refeições', items: [['bolus', 'Cálculo de bolus', 'Razão insulina/carboidratos, alimentos e refeições']] },
@@ -812,7 +812,7 @@ function menuGroups() {
     'g-seg': { t: 'Segurança e privacidade', d: 'Bloqueio por PIN, biometria, cópia protegida e privacidade', items: [['seguranca', 'Bloqueio e proteção', 'PIN, biometria, cópia protegida por senha e Drive cifrado'], ['privacidade', 'Privacidade e armazenamento', 'Onde ficam seus dados, armazenamento persistente e apagar perfil']] },
     'g-notif': { t: 'Alertas e lembretes', d: 'Avisos, horários e modo de exibição', items: [['lembretes', 'Alertas e lembretes', 'Lembretes, silêncio noturno e modo de exibição'], ['alertasp', 'Alertas personalizados', 'Avisos pelas suas marcações e pela glicemia'], ['alertashist', 'Histórico de alertas', 'Avisos recebidos, lidos e dispensados']] },
     'g-aj': { t: 'Aparência e ajustes', d: 'Tema, tamanho da tela, metas e limites', items: [['aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela'], ['config', 'Configurações', 'Meta de HbA1c, limite da insulina do jantar e outros ajustes']] },
-    'g-sobre': { t: 'Sobre o TiaBete', d: 'Versão, cálculos e avisos', items: [['sobre', 'Sobre o TiaBete', 'Versão, cálculos e avisos']] }
+    'g-sobre': { t: 'Sobre o GLUXO', d: 'Versão, cálculos e avisos', items: [['sobre', 'Sobre o GLUXO', 'Versão, cálculos e avisos']] }
   };
   for (const g of Object.values(G)) g.items = g.items.filter(Boolean);
   { const ia = G['g-ia'], q = ia.items.some(x => x[0] === 'perguntas'), p = ia.items.some(x => x[0] === 'ia'); ia.d = q && p ? 'Pergunte sobre seus registros e configure a IA' : q ? 'Pergunte à IA sobre seus registros' : p ? 'Configure o provedor, o modelo e a chave' : ia.d; }
@@ -862,7 +862,7 @@ function viewSobre() {
   <h2 class="sec">Seus dados neste aparelho</h2><div class="card">${kv('Medições de glicemia', n.med)}${kv('Resultados de HbA1c', n.hba)}${kv('Exames laboratoriais', n.ex)}${kv('Registros de insulina', n.ins)}<p class="hint" style="margin:10px 0 0">Tudo fica só neste aparelho. Faça cópias em Mais → Cópia de segurança.</p></div>
   <h2 class="sec">Privacidade</h2><div class="card"><p class="hint" style="margin:0">Os dados ficam no banco local deste aparelho. Não há contas nem rastreamento. Arquivos CSV e cópias são lidos no aparelho. Única exceção: na tela de Exames, quando você pede a análise, o texto do exame (sem CPF e e-mail) é enviado ao Claude da sua conta, com sua autorização.</p></div>
   <h2 class="sec">Como os números são calculados</h2><div class="card"><ul class="plain" style="margin:0"><li>Faixas: &lt; 54 muito baixa · 54–69 baixa · 70–180 dentro da faixa · 181–250 elevada · &gt; 250 muito elevada (mg/dL). Em medições de <b>jejum</b> a faixa normal é 70–130, e acima de 130 é elevada.</li><li>“Episódio” de hipo ou hiperglicemia é uma medição fora do limite (&lt; 70 ou acima da faixa: &gt; 180, ou &gt; 130 em jejum). O app não agrupa medições em eventos.</li><li>As medições são pontuais. A distribuição por faixa é contagem de medições e não equivale ao tempo no alvo.</li><li>Período anterior: mesma duração, imediatamente antes (30 dias contra os 30 anteriores).</li><li>Médias com menos de ${MIN_BUCKET} medições não são exibidas.</li><li>Classificação por horário (opcional): 04h–08h jejum; 08h–10h depois do café; 10h–12h antes do almoço; 12h–16h depois do almoço; 16h–19h antes do jantar; 19h–00h depois do jantar. Medições entre 00h e 04h e sem horário não são alteradas.</li><li>Estimativa de HbA1c: (média + 46,7) ÷ 28,7, opcional e separada dos exames. Não é o GMI (estimativa de sensor contínuo).</li></ul></div>
-  <h2 class="sec">Avisos</h2><div class="card"><p class="hint" style="margin:0">O TiaBete não substitui avaliação médica nem muda o tratamento por conta própria. O cálculo de bolus apenas faz a conta com a razão que você definiu com a sua equipe de saúde, sem considerar a glicemia atual. Use os relatórios para conversar com sua equipe de saúde.</p></div>`;
+  <h2 class="sec">Avisos</h2><div class="card"><p class="hint" style="margin:0">O GLUXO não substitui avaliação médica nem muda o tratamento por conta própria. O cálculo de bolus apenas faz a conta com a razão que você definiu com a sua equipe de saúde, sem considerar a glicemia atual. Use os relatórios para conversar com sua equipe de saúde.</p></div>`;
 }
 
 /* ================= Roteamento e renderização ================= */
@@ -874,7 +874,7 @@ function safetyNote(view, route) {
   const sh = SF_SHORT[route]; if (!sh) return;
   const el = document.createElement('details'); el.className = 'sf-note' + (route === 'painel' ? ' bottom' : '');
   el.innerHTML = `<summary><span class="sf-i" aria-hidden="true">!</span><span class="sf-t">${sh}</span><span class="sf-m">Aviso completo</span></summary><ul>
-    <li>O TiaBete é uma ferramenta de <b>acompanhamento e apoio</b> ao gerenciamento do diabetes.</li>
+    <li>O GLUXO é uma ferramenta de <b>acompanhamento e apoio</b> ao gerenciamento do diabetes.</li>
     <li>Ele <b>não substitui</b> consultas, exames nem o acompanhamento com endocrinologista e outros profissionais de saúde.</li>
     <li>Resultados da <b>IA</b> podem conter imprecisões. Confira sempre com o laudo e com a sua equipe.</li>
     <li>Cálculos e estimativas (bolus, HbA1c estimada, médias) <b>não devem ser usados isoladamente</b> para decidir o tratamento.</li>
@@ -1017,13 +1017,13 @@ async function saveFile(name, data, textFallback) {
 }
 const stamp = () => isoDate(new Date());
 function backupText() {
-  const payload = { app: 'TiaBete', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { metricsCfg: typeof mtCfgExport === 'function' ? mtCfgExport() : undefined, swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, insRem: S.ir && S.ir.items.length ? { ...S.ir, state: {}, tz: '' } : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
+  const payload = { app: 'GLUXO', version: APP_VERSION, schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: S.records.filter(r => !isEx(r)), hba1c: S.hba.filter(x => !isEx(x) && x.source !== 'exame'), schemes: S.schemes.filter(x => !isEx(x)), exams: S.exams, events: S.events, inslog: S.inslog, settings: { a1cTarget: S.a1cT }, state: { metricsCfg: typeof mtCfgExport === 'function' ? mtCfgExport() : undefined, swipeNav: S.swipeNav === false ? false : undefined, insulin: S.ins, rewards: S.rw || null, saved: S.saved || [], profile: S.profile || undefined, alerts: JSON.stringify(alCfg()) !== JSON.stringify(AL_DEF) ? alCfg() : undefined, bolus: blExport() ? S.bl : null, plan: plHas() ? S.plan : undefined, insRem: S.ir && S.ir.items.length ? { ...S.ir, state: {}, tz: '' } : undefined, customAlerts: S.ca && S.ca.rules.length ? S.ca : undefined, alertCenter: S.ac && S.ac.items.length ? { mode: S.ac.mode, items: S.ac.items.slice(0, AC_MAX).map(({ html, ...r }) => r) } : undefined } };
   if (!payload.records.length && !payload.hba1c.length && !payload.schemes.length && !payload.exams.length && !blDirty() && !plHas() && !(S.rw && S.rw.cust && S.rw.cust.length) && !(S.saved || []).length && !(S.profile && (S.profile.name || S.profile.photo))) return null;
   return JSON.stringify(payload, null, 1);
 }
 async function exportBackup() {
   const txt = backupText(); if (!txt) { toast('Ainda não há dados reais para exportar.'); return; }
-  if (await saveFile(`tiabete-backup-${stamp()}.json`, txt, txt) === true) { await markBackup(); render(); }
+  if (await saveFile(`gluxo-backup-${stamp()}.json`, txt, txt) === true) { await markBackup(); render(); }
 }
 function csvCell(v) { const s = String(v == null ? '' : v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 const csvNum = v => v == null ? '' : String(v).replace('.', ',');
@@ -1032,7 +1032,7 @@ async function exportCSV() {
   const rows = S.records.filter(r => !isEx(r)).map(r => { const sc = S.schemes.find(s => s.id === schemeOf(r, S.schemes)); return [fmtDate(r.date), r.noTime ? '' : r.time, csvNum(r.glucose), CONTEXTS[r.context] || '', MEALS[r.meal] || '', csvNum(r.carbs), csvNum(r.insMeal), csvNum(r.insCorr), csvNum(r.insBasal), csvNum(r.insPen), csvNum(r.insPump), csvNum(r.actMin), r.actDesc || '', r.tags || '', r.notes || '', sc ? sc.name : '', r.source || '']; });
   if (!rows.length) { toast('Ainda não há medições reais para exportar.'); return; }
   const txt = '﻿' + [head, ...rows].map(r => r.map(csvCell).join(';')).join('\r\n');
-  await saveFile(`tiabete-medicoes-${stamp()}.csv`, txt, txt);
+  await saveFile(`gluxo-medicoes-${stamp()}.csv`, txt, txt);
 }
 async function readBackupFile(file) {
   if (!file) return;
@@ -1042,8 +1042,8 @@ async function readBackupFile(file) {
 async function ingestBackup(j) {
   try {
     if (j && j.enc === 1) { SEC.pend = j; SEC.msg = ''; S.rest = null; render(); return; }
-    if (!j || !['GlicoTrack', 'TiaBete'].includes(j.app) || !Array.isArray(j.records)) throw new Error('Este arquivo não é uma cópia do TiaBete.');
-    if (j.schema && j.schema > SCHEMA_VERSION) throw new Error('Esta cópia foi criada por uma versão mais nova do TiaBete.');
+    if (!j || !['GlicoTrack', 'TiaBete', 'GLUXO'].includes(j.app) || !Array.isArray(j.records)) throw new Error('Este arquivo não é uma cópia do GLUXO.');
+    if (j.schema && j.schema > SCHEMA_VERSION) throw new Error('Esta cópia foi criada por uma versão mais nova do GLUXO.');
     const okRec = r => r && typeof r.date === 'string' && parseDate(r.date) && typeof r.glucose === 'number' && r.glucose >= GLU_MIN && r.glucose <= GLU_MAX;
     const recs = j.records.filter(okRec).map(r => ({ ...r, id: r.id || uid(), time: r.time || '00:00', ts: mkTs(r.date, r.time || '00:00') }));
     const bad = j.records.length - recs.length;

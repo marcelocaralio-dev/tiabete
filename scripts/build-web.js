@@ -4,8 +4,8 @@ const root = path.join(__dirname, '..'), rd = (...p) => fs.readFileSync(path.joi
 const order = ['src/brand-assets.js', 'native/ai-core.js', 'src/logic.js', 'src/ds.js', 'src/cards.js', 'src/xlsx.js', 'src/charts.js', 'src/app.js', 'src/report.js', 'src/exams.js', 'src/extras.js', 'src/bolusfoods.js', 'src/bolus.js', 'src/plan.js', 'src/insrem-core.js', 'src/insrem.js', 'src/alertas.js', 'src/alertcenter.js', 'src/painel2.js', 'src/inicio-core.js', 'src/inicio.js', 'src/analise-core.js', 'src/analise.js', 'src/metricas.js', 'src/conquistas2.js', 'src/prontidao.js', 'src/iastatus.js', 'src/ambient.js', 'src/glucoform.js', 'src/buttons.js', 'src/drawer.js', 'src/secure.js', 'src/licensecore.js', 'src/license.js', 'src/premium.js', 'native/native.js', 'native/insrem-native.js', 'native/ai-ui.js', 'native/drive.js', 'native/login.js', 'native/migrate.js', 'src/uipicker.js', 'src/ptr.js', 'src/readmore.js', 'src/iconset.js', 'src/overlayguard.js', 'src/persist.js', 'src/init.js'];
 /* ID do cliente Google (OAuth) para o backup no Drive: arquivo config/google-client-id.txt (não é segredo). Se não existir, o app pede para colar na tela. */
 let gid = ''; try { gid = rd('config', 'google-client-id.txt').trim().split(/\s+/)[0] || ''; } catch (e) { }
-/* Licenciamento: PRODUÇÃO é o padrão. O modo de desenvolvimento só liga com "--dev" ou TIABETE_DEV=1 (npm run build:web:dev). */
-const DEV = process.argv.includes('--dev') || process.env.TIABETE_DEV === '1';
+/* Licenciamento: PRODUÇÃO é o padrão. O modo de desenvolvimento só liga com "--dev" ou GLUXO_DEV=1 (npm run build:web:dev). */
+const DEV = process.argv.includes('--dev') || (process.env.GLUXO_DEV === '1' || process.env.TIABETE_DEV === '1');
 let lapi = '', lpub = '';
 try { lapi = rd('config', 'license-api.txt').trim().split(/\s+/)[0] || ''; } catch (e) { }
 if (lapi && !/^https:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(lapi)) { console.error('config/license-api.txt deve ter SÓ o endereço público https://… (sem caminho, senha ou token). Ignorado.'); lapi = ''; }
@@ -19,7 +19,7 @@ const APK_TEXT = [
   [/ao Claude da sua conta/g, 'ao provedor de IA que você configurou (Mais → Inteligência artificial)'],
   [/Leitura comparativa do Claude/g, 'Leitura comparativa da IA'],
   [/ao Claude/g, 'à IA'], [/do Claude/g, 'da IA'], [/pelo Claude/g, 'pela IA'], [/O Claude/g, 'A IA'], [/o Claude/g, 'a IA'],
-  [/<h2 class="sec">Versão web<\/h2><div class="card"><p class="hint" style="margin:0">[^<]*<\/p><\/div>/, '<h2 class="sec">Aplicativo Android</h2><div class="card"><p class="hint" style="margin:0">Aplicativo instalável do TiaBete. Os dados ficam só neste aparelho (banco local). Recursos opcionais: IA com a sua própria chave (Mais → Inteligência artificial) e cópia de segurança no seu Google Drive (Mais → Cópia de segurança). Ambos só enviam dados quando você pede.</p></div>'],
+  [/<h2 class="sec">Versão web<\/h2><div class="card"><p class="hint" style="margin:0">[^<]*<\/p><\/div>/, '<h2 class="sec">Aplicativo Android</h2><div class="card"><p class="hint" style="margin:0">Aplicativo instalável do GLUXO. Os dados ficam só neste aparelho (banco local). Recursos opcionais: IA com a sua própria chave (Mais → Inteligência artificial) e cópia de segurança no seu Google Drive (Mais → Cópia de segurança). Ambos só enviam dados quando você pede.</p></div>'],
 ];
 let js = order.map(f => rd(f)).join('\n');
 /* Logotipo oficial GLUXO (assets/brand/web-logo-completo.png) embutido como data URI, uma única vez. */

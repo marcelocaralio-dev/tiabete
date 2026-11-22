@@ -1,3 +1,5 @@
+> **Registro histórico (0.35.0):** este relatório descreve a etapa anterior. O nome TiaBete citado abaixo foi migrado para GLUXO na versão 0.35.0 (ver CHANGELOG-0.35.0.md e docs/MIGRACAO-NOME-GLUXO.md).
+
 # Relatório de alterações — GLUXO 0.32.0
 
 ## Adicionados

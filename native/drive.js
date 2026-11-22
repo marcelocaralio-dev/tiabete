@@ -1,4 +1,4 @@
-/* TiaBete (APK) · backup no Google Drive com a conta Google do próprio usuário.
+/* GLUXO (APK) · backup no Google Drive com a conta Google do próprio usuário.
    Login OAuth 2.0 com PKCE no navegador do sistema; permissão mínima "drive.file" (o app só enxerga os arquivos que ele mesmo criou).
    O token de renovação fica cifrado no aparelho. Os dados vão do aparelho direto ao Drive do usuário. */
 if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
@@ -76,7 +76,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     signIn: () => connect(), state: G,
     card(drv, body) {
       if (!G.loaded) load();
-      const intro = `Salva uma cópia completa na pasta <b>TiaBete Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
+      const intro = `Salva uma cópia completa na pasta <b>GLUXO Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
       if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px"><button class="btn full" data-act="g-out" ${G.busy ? 'disabled' : ''}>Sair da conta Google</button></div></div>`;
       const idField = G.baked ? '' : `<div class="field" style="margin-top:12px"><label class="fl" for="g-cid">ID do cliente Google (OAuth)</label><input class="in" id="g-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid)}"></div>`;
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}

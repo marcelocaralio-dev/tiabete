@@ -1,4 +1,4 @@
--- TiaBete · banco COMERCIAL (Cloudflare D1). Nunca guarda glicemias, insulina ou outros dados de saúde.
+-- GLUXO · banco COMERCIAL (Cloudflare D1). Nunca guarda glicemias, insulina ou outros dados de saúde.
 CREATE TABLE IF NOT EXISTS accounts (
   sub TEXT PRIMARY KEY,               -- identificador estável do Google (já validado no servidor)
   email TEXT, name TEXT,

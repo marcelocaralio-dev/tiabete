@@ -183,7 +183,7 @@ async function licBuy() {
     let a = await licAuth(); if (!a) { await licSession(undefined, true); a = await licAuth(); }
     if (!a) { if (!LK.msg) LK.msg = 'Entre com a sua conta Google antes de comprar.'; LK.busy = false; try { render(); } catch (e) { } return; }
     const r = await licCall('/v1/order', {}, a);
-    if (r.status === 200 && r.data.checkout_url) { const B = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.Browser; if (B) await B.open({ url: r.data.checkout_url }); else window.open(r.data.checkout_url, '_blank'); LK.msg = 'Depois de pagar, volte ao TiaBete. A licença é liberada quando o pagamento for confirmado.'; }
+    if (r.status === 200 && r.data.checkout_url) { const B = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.Browser; if (B) await B.open({ url: r.data.checkout_url }); else window.open(r.data.checkout_url, '_blank'); LK.msg = 'Depois de pagar, volte ao GLUXO. A licença é liberada quando o pagamento for confirmado.'; }
     else if (r.status === 409) { LK.msg = 'Você já tem a licença vitalícia.'; await licRefresh(true); }
     else LK.msg = 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.';
   } catch (e) { LK.msg = 'Sem conexão no momento. Tente de novo mais tarde.'; }
@@ -207,7 +207,7 @@ function viewLicenca() {
   let head, tone = '';
   if (st === 'dev') head = ['Modo de desenvolvimento', 'Premium liberado só para testes. Esta versão não deve ser publicada.'];
   else if (st === 'unconfigured') head = ['Plano gratuito', 'O servidor de licenças não está configurado nesta versão, então o teste e a licença não estão disponíveis. Registrar glicemia e insulina, histórico e exportação funcionam normalmente.'];
-  else if (st === 'lifetime_active') head = ['Licença vitalícia ativa', 'Todos os recursos do TiaBete, sem mensalidade' + (LK.info && LK.info.paid ? ' · valor pago ' + licMoney(LK.info.paid) : '') + '.'];
+  else if (st === 'lifetime_active') head = ['Licença vitalícia ativa', 'Todos os recursos do GLUXO, sem mensalidade' + (LK.info && LK.info.paid ? ' · valor pago ' + licMoney(LK.info.paid) : '') + '.'];
   else if (st === 'trial_active' && te) head = ['Teste gratuito ativo', `Restam ${licRemaining(te, n)}. Termina em ${new Date(te).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}. Todos os recursos do teste estão liberados${guest ? '. Você está usando sem conta Google' : ''}.`];
   else if (st === 'trial_unverified') head = ['Teste aguardando conexão', 'Conecte-se à internet para o servidor registrar o início do seu teste de 14 dias. Enquanto isso, os recursos gratuitos e os seus registros continuam normais.'];
   else if (st === 'trial_expired') head = ['A experiência Premium terminou', 'Os seus registros continuam preservados e as funcionalidades gratuitas continuam disponíveis. Para voltar a usar os recursos Premium, adquira a licença vitalícia.'];
@@ -251,7 +251,7 @@ document.addEventListener('click', e => {
 });
 /* registro das telas: as originais continuam intactas; só ganham um portão quando o recurso é premium */
 (function () {
-  VIEWS.licenca = viewLicenca; TITLES.licenca = 'Licença TiaBete';
+  VIEWS.licenca = viewLicenca; TITLES.licenca = 'Licença GLUXO';
   try { MI.licenca = '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.500-7-10V6z"/><path d="M9 12l2 2 4-4"/>'; } catch (e) { }
   for (const [route, feat] of [['bolus', 'bolus'], ['padroes', 'padroes'], ['perguntas', 'ia'], ['exames', 'exames'], ['exame', 'exames'], ['comparar', 'exames'], ['analise', 'analise']]) {
     const o = VIEWS[route]; if (typeof o !== 'function') continue;
@@ -271,7 +271,7 @@ if (LK.cfg) {
     if (typeof setTimeout !== 'function') return; clearTimeout(authT); authT = setTimeout(() => { if (!LK.loaded) return; if (t === 'connected' || t === 'guest' || !LK.payload) licRefresh(true); else licRefresh(false); }, 250);
   });
   try { const A = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App; if (A && A.addListener) {
-    A.addListener('appUrlOpen', d => { if (d && /^app\.tiabete\.glicose:\/pagamento/.test(d.url || '')) { try { const B = Capacitor.Plugins.Browser; B && B.close(); } catch (e) { } licRefresh(true).then(() => go('licenca')); } });
+    A.addListener('appUrlOpen', d => { if (d && /^app\.gluxo\.glicose:\/pagamento/.test(d.url || '')) { try { const B = Capacitor.Plugins.Browser; B && B.close(); } catch (e) { } licRefresh(true).then(() => go('licenca')); } });
     A.addListener('resume', () => licRefresh(false));
   } } catch (e) { }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') licRefresh(false); else if (LK.loaded) { licNow(); licSeenFlush(); } });

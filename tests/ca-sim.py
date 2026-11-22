@@ -31,7 +31,7 @@ async def main():
         h = await pg.evaluate("new Date().getHours()")
         pn = await pend()
         chk(len(pn)>=1 and all(n['extra']['route']=='alertasp' for n in pn), f'agendou {len(pn)} notificação(ões) do alerta (hora atual {h}h)')
-        if pn: chk(pn[0]['body'].startswith('Dia de perna identificado!') and pn[0]['title'].startswith('TiaBete'), 'texto e título')
+        if pn: chk(pn[0]['body'].startswith('Dia de perna identificado!') and pn[0]['title'].startswith('GLUXO'), 'texto e título')
         # sem duplicar ao sincronizar de novo
         await pg.evaluate("caSync()"); await pg.wait_for_timeout(500); chk(len(await pend())==len(pn),'sincronizar de novo não duplica')
         # tocar abre a tela

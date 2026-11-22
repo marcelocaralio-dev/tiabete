@@ -144,10 +144,10 @@ async function makePDFInner() {
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i); doc.setDrawColor(...DARK); doc.setLineWidth(.6); doc.line(M, H - 38, W - M, H - 38);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUT);
-    doc.text('TiaBete ' + APP_VERSION + ' · Dados armazenados localmente · Não substitui avaliação médica', M, H - 26);
+    doc.text('GLUXO ' + APP_VERSION + ' · Dados armazenados localmente · Não substitui avaliação médica', M, H - 26);
     doc.text(`Página ${i} de ${pages}`, W - M, H - 26, { align: 'right' });
   }
-  const ok = await outFile(`tiabete-relatorio-${D.from}_${D.to}.pdf`, doc.output('arraybuffer'));
+  const ok = await outFile(`gluxo-relatorio-${D.from}_${D.to}.pdf`, doc.output('arraybuffer'));
   if (status) status.textContent = ok ? 'PDF gerado.' : '';
 }
 
@@ -163,7 +163,7 @@ async function makeXLSXInner() {
   const hw = [12, 8, 16, 14, 18, 14, 14, 16, 12, 10, 10, 10, 14, 18, 20, 30, 10];
   const sheets = [
     { name: 'Resumo', title: 0, hdr: [4, 13], widths: [36, 26, 18], rows: [
-      ['TiaBete ' + APP_VERSION + ' - Relatório de glicemia'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], pfLine() ? ['Paciente', pfLine()] : [], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
+      ['GLUXO ' + APP_VERSION + ' - Relatório de glicemia'], ['Período', fmtDate(D.from) + ' a ' + fmtDate(D.to)], pfLine() ? ['Paciente', pfLine()] : [], D.ex ? ['ATENÇÃO', 'Contém dados de exemplo'] : [], [],
       ['Indicador', 'Valor'], ['Medições', s.n], ['Média (mg/dL)', r1(s.mean)], ['Desvio-padrão (mg/dL)', r1(s.sd)], ['Menor (mg/dL)', s.min ?? ''], ['Maior (mg/dL)', s.max ?? ''], ['Medições < 70', s.hypo], ['Medições acima da faixa', s.hyper], [],
       ['Faixa (mg/dL)', 'Medições', '% das medições'], ...BAND_LIST.map(b => [b.label + ' ' + b.name, D.bands[b.k], s.n ? r1(D.bands[b.k] / s.n * 100) : 0]), [],
       ['Observação', 'Contagem de medições pontuais; não representa tempo no alvo (TIR). Este relatório não recomenda doses.']] },
@@ -178,6 +178,6 @@ async function makeXLSXInner() {
     { name: 'Esquemas', widths: [24, 12, 12, 18, 16, 18, 28, 18, 24, 30, 12, 12, 8, 8], rows: [['Esquema', 'Início', 'Fim', 'Insulina basal', 'Dose basal', 'Insulina rápida', 'Doses por refeição', 'Horários', 'Medicamentos adicionais', 'Observações', 'Medições no período', 'Média (mg/dL)', '< 70', 'Acima da faixa'],
       ...D.sch.map(x => [x.s.name, fmtDate(x.s.start), x.s.end ? fmtDate(x.s.end) : 'em uso', x.s.basalInsulin || '', x.s.basalDose || '', x.s.rapidInsulin || '', x.s.mealDoses || '', x.s.times || '', x.s.extraMeds || '', x.s.notes || '', x.n, r1(x.mean), x.hypo, x.hyper]), [], ['Comparação descritiva. Não recomenda doses nem mudanças de tratamento.']] }
   ];
-  const ok = await saveFile(`tiabete-relatorio-${D.from}_${D.to}.xlsx`, buildXlsx(sheets));
+  const ok = await saveFile(`gluxo-relatorio-${D.from}_${D.to}.xlsx`, buildXlsx(sheets));
   if (status) status.textContent = ok ? 'Excel gerado.' : '';
 }

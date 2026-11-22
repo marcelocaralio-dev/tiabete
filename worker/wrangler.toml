@@ -1,5 +1,6 @@
-# Cloudflare Worker do licenciamento do TiaBete.
+# Cloudflare Worker do licenciamento do GLUXO.
 # Este arquivo é VERSIONADO: nunca coloque aqui senhas, tokens ou chaves (veja "Segredos" no fim).
+# Nomes técnicos "tiabete-*" MANTIDOS de propósito (0.35.0): são os recursos reais já em produção; renomear criaria outro Worker/banco e perderia licenças.
 # Recursos já criados na conta Cloudflare: Worker "tiabete-license-api", banco D1 "tiabete-licenses", binding "DB".
 name = "tiabete-license-api"
 main = "src/index.js"

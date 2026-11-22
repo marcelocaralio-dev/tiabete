@@ -1,4 +1,4 @@
--- TiaBete · registro PERMANENTE de que um aparelho já recebeu o teste gratuito (0.34.0).
+-- GLUXO · registro PERMANENTE de que um aparelho já recebeu o teste gratuito (0.34.0).
 -- Guarda só um identificador PSEUDONIMIZADO: HMAC-SHA256 do ANDROID_ID com um segredo que existe apenas no Worker (DEVICE_HMAC_KEY).
 -- O ANDROID_ID bruto nunca é gravado, nem em log. Este registro não é apagado quando o usuário limpa dados, reinstala ou restaura backup:
 -- ele vive no banco D1 do servidor, fora do aparelho. Sem a conta nem o id da instalação, é ele que reconhece a reinstalação.

@@ -1,6 +1,6 @@
-# Política de privacidade do TiaBete
+# Política de privacidade do GLUXO
 
-**Resumo: o TiaBete não coleta, não envia e não vende nenhum dado seu.**
+**Resumo: o GLUXO não coleta, não envia e não vende nenhum dado seu.**
 
 ## Onde ficam os dados
 Medições, insulina, exames, alimentos, preferências e demais informações ficam **apenas no armazenamento local do seu aparelho** (banco de dados do app). Não existe conta, servidor do projeto, análise de uso, rastreadores ou anúncios.
@@ -30,9 +30,9 @@ Alterações nesta política aparecem neste arquivo, com a data da versão. Últ
 
 ## Recursos opcionais (desligados até você configurar)
 
-**IA com chave própria (Mais → Inteligência artificial).** Quando você usa a análise de exames, as perguntas sobre os registros ou o cálculo de carboidratos, o conteúdo necessário é enviado **direto do aparelho ao provedor que você escolheu** (Anthropic, OpenAI, Google, OpenRouter ou outro). O TiaBete não tem servidor e não recebe esses dados. A chave da API fica cifrada no aparelho (WebCrypto, chave não exportável), fora de backups e relatórios. Só são aceitos endereços https://. Cada provedor tem sua própria política de dados; em planos gratuitos alguns usam o conteúdo para melhorar produtos.
+**IA com chave própria (Mais → Inteligência artificial).** Quando você usa a análise de exames, as perguntas sobre os registros ou o cálculo de carboidratos, o conteúdo necessário é enviado **direto do aparelho ao provedor que você escolheu** (Anthropic, OpenAI, Google, OpenRouter ou outro). O GLUXO não tem servidor e não recebe esses dados. A chave da API fica cifrada no aparelho (WebCrypto, chave não exportável), fora de backups e relatórios. Só são aceitos endereços https://. Cada provedor tem sua própria política de dados; em planos gratuitos alguns usam o conteúdo para melhorar produtos.
 
-**Backup no Google Drive (Mais → Backup e dados).** Login Google (OAuth com PKCE) com a permissão `drive.file`: o app só acessa os arquivos que criou, na pasta "TiaBete Backups" do **seu** Drive. O token fica cifrado no aparelho. Nada é enviado sem você conectar a conta; o backup automático só roda se você ligar.
+**Backup no Google Drive (Mais → Backup e dados).** Login Google (OAuth com PKCE) com a permissão `drive.file`: o app só acessa os arquivos que criou, na pasta "GLUXO Backups" do **seu** Drive. O token fica cifrado no aparelho. Nada é enviado sem você conectar a conta; o backup automático só roda se você ligar.
 
 ## Licença e teste gratuito (0.34.0)
 Para conceder o teste de 14 dias uma única vez por aparelho (com ou sem conta Google), o servidor de licença guarda: um identificador aleatório da instalação, o hash de um segredo aleatório, as datas UTC de início e fim do teste e um **identificador pseudonimizado do aparelho**.

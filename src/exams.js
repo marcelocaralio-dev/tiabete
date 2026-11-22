@@ -100,7 +100,7 @@ const EXAM_RULES = `Regras:
 - Não faça diagnóstico, não indique medicamentos, doses nem mudanças de tratamento. Use linguagem prudente ("pode estar associado a", "vale conversar com seu médico").
 - Texto em português do Brasil, simples, para uma pessoa leiga.`;
 function examPrompt(text) {
-  return `Você lê laudos de exames laboratoriais para uma pessoa adulta que acompanha o diabetes no app TiaBete.
+  return `Você lê laudos de exames laboratoriais para uma pessoa adulta que acompanha o diabetes no app GLUXO.
 Leia o laudo ${text ? 'abaixo' : 'nas imagens anexas'} e devolva este JSON:
 {"date":"AAAA-MM-DD da coleta ou null","lab":"laboratório ou null","title":"nome curto do exame ou conjunto (ex.: Check-up, Lipidograma)",
 "items":[{"name":"nome como está no laudo","canonical":"nome padrão curto, minúsculo, sem acento (ex.: glicemia de jejum, hemoglobina glicada, colesterol ldl, creatinina, tsh)","value":número ou null,"text":"resultado em texto quando não for numérico (ex.: Negativo) ou \\"\\"","unit":"unidade","refLow":limite inferior numérico da referência do próprio laudo ou null,"refHigh":limite superior numérico ou null,"refText":"referência como impressa","flag":"normal|baixo|alto|indeterminado","context":"até 2 frases: o que o exame mede e o que este resultado significa, só para itens fora da referência ou importantes no diabetes (glicemia, hemoglobina glicada, lipídios, função renal, microalbuminúria, TSH, vitamina B12); para os demais use \\"\\""}],
@@ -331,7 +331,7 @@ function viewComparar() {
 function narrPrompt(C) {
   const rows = C.multi.map(r => `- ${r.name}${r.unit ? ' (' + r.unit + ')' : ''}: ` + r.cells.map((c, i) => c ? `${fmtDate(C.exams[i].date)} = ${c.value != null ? c.value : c.text}${c.refText ? ' [ref ' + c.refText + ']' : ''}` : null).filter(Boolean).join(' → ')).join('\n');
   const sc = C.exams.map(e => { const s = examScore(e.items); return `${fmtDate(e.date)}: nota ${s ? s.score : 'n/d'}`; }).join('; ');
-  return `Você ajuda uma pessoa adulta com diabetes a entender a evolução de exames laboratoriais, no app TiaBete.
+  return `Você ajuda uma pessoa adulta com diabetes a entender a evolução de exames laboratoriais, no app GLUXO.
 Abaixo estão os mesmos itens em exames de datas diferentes (cada valor com a referência impressa no laudo). Escreva uma leitura comparativa em português do Brasil, simples, com 2 a 4 parágrafos curtos: o que melhorou, o que piorou, o que ficou estável e o que merece conversa com o médico. Cite os números. Use apenas os dados abaixo.
 Regras: não faça diagnóstico, não indique medicamentos, doses nem mudanças de tratamento; use linguagem prudente; não use markdown, listas nem títulos.
 Notas calculadas pelo app (0 a 10): ${sc}.

@@ -111,7 +111,7 @@ function irStatus() {
     if (!st) return { lvl: 'info', t: 'Verificando as notificações do celular…', d: '', b };
     if (st.perm !== 'granted') {
       b.push(st.perm === 'prompt' ? ['ir-perm', 'Permitir notificações', 1] : ['ir-settings', 'Abrir configurações do aparelho', 1]);
-      return { lvl: 'bad', t: 'Notificações desativadas', d: st.perm === 'prompt' ? 'O TiaBete ainda não tem permissão. Sem ela, os lembretes não tocam.' : 'O Android está bloqueando os avisos do TiaBete. Ative-os nas configurações para os lembretes tocarem com o app fechado.', b };
+      return { lvl: 'bad', t: 'Notificações desativadas', d: st.perm === 'prompt' ? 'O GLUXO ainda não tem permissão. Sem ela, os lembretes não tocam.' : 'O Android está bloqueando os avisos do GLUXO. Ative-os nas configurações para os lembretes tocarem com o app fechado.', b };
     }
     const extra = []; let lvl = 'ok', t = 'Notificações autorizadas e funcionando';
     const want = irNotifPlan(S.ir, S.plan, { quiet: plQuietAt }).length;
@@ -119,13 +119,13 @@ function irStatus() {
     else if (want) extra.push(st.pending + ' aviso' + (st.pending === 1 ? '' : 's') + ' agendado' + (st.pending === 1 ? '' : 's') + ' no celular. Tocam com o app fechado, na tela de bloqueio (conforme as regras do aparelho) e depois de reiniciar.');
     else extra.push('Nenhum lembrete de insulina ligado agora.');
     if (st.exact === 'denied') { if (lvl === 'ok') { lvl = 'warn'; t = 'Autorizadas, mas sem horário exato'; } extra.push('Sem a permissão de alarmes exatos, o Android pode atrasar os avisos em alguns minutos.'); b.push(['ir-exact', 'Permitir horários exatos', 0]); }
-    if (st.battery === false) extra.push('Se o celular for Xiaomi, Samsung, Motorola ou Huawei, deixe o TiaBete “sem restrição” na bateria para não perder avisos.');
+    if (st.battery === false) extra.push('Se o celular for Xiaomi, Samsung, Motorola ou Huawei, deixe o GLUXO “sem restrição” na bateria para não perder avisos.');
     if (st.battery === false) b.push(['ir-battery', 'Ajustar bateria', 0]);
     b.push(['ir-test', 'Testar em 10 segundos', 0]);
     return { lvl, t, d: extra.join(' '), b };
   }
   const supported = typeof Notification !== 'undefined', perm = supported ? Notification.permission : 'unsupported';
-  const lim = 'Navegador e aplicativo instalado pela página (PWA) não conseguem agendar notificações para quando o app está fechado. Os avisos só aparecem com o TiaBete aberto. Para receber com o app fechado, use o aplicativo Android (APK).';
+  const lim = 'Navegador e aplicativo instalado pela página (PWA) não conseguem agendar notificações para quando o app está fechado. Os avisos só aparecem com o GLUXO aberto. Para receber com o app fechado, use o aplicativo Android (APK).';
   if (!supported) return { lvl: 'warn', t: 'Este navegador não oferece notificações', d: lim, b };
   if (perm === 'granted') { b.push(['ir-test', 'Testar aviso agora', 0]); return { lvl: 'warn', t: 'Avisos do navegador ligados, só com o app aberto', d: lim, b }; }
   if (perm === 'denied') return { lvl: 'bad', t: 'Notificações bloqueadas no navegador', d: 'Libere as notificações deste site nas configurações do navegador. ' + lim, b };
@@ -162,8 +162,8 @@ function viewInsRem() {
   if (miss.length) h += `<h2 class="sec">Criar a partir do meu tratamento</h2><div class="card pl-card"><p class="hint" style="margin:0 0 10px">Horários que você já cadastrou em Meu tratamento e ainda não têm lembrete. Se você mudar o horário lá, o lembrete acompanha.</p><div class="stack" style="gap:8px">${miss.map(m => `<div class="ir-m"><span><b>${esc(m.it.name || 'Sem nome')}</b><small>${esc(irRoleTxt(m.it.role))} · ${m.times.join(' · ')}</small></span><button class="btn sm pri" data-act="ir-make" data-item="${esc(m.it.id)}">Criar</button></div>`).join('')}</div>${miss.length > 1 ? '<button class="btn full" style="margin-top:10px" data-act="ir-make-all">Criar todos</button>' : ''}</div>`;
   h += `<h2 class="sec">Limitações</h2><div class="card pl-card"><details class="pl-it"><summary><span class="pl-s"><b>O que pode impedir um aviso</b><small>Android, bateria, navegador</small></span></summary><div class="pl-b hint" style="line-height:1.5">
     <p style="margin:0 0 8px"><b>Aplicativo Android.</b> Usa alarmes do sistema: tocam com o app fechado, em segundo plano e depois de reiniciar o celular. Podem falhar se a permissão de notificações estiver negada, se a economia de bateria do fabricante travar o app, se o modo Não perturbe estiver ligado ou se o app for forçado a parar (abra-o uma vez para voltar). A tela de bloqueio mostra o aviso conforme as regras do aparelho.</p>
-    <p style="margin:0 0 8px"><b>Fuso horário.</b> Os horários seguem o relógio do celular. Ao mudar de fuso ou de horário de verão, o TiaBete refaz os agendamentos quando é aberto; se o app ficar fechado depois da mudança, os avisos podem sair no horário antigo até a próxima abertura.</p>
-    <p style="margin:0"><b>Navegador e PWA.</b> Sem servidor, o navegador não agenda notificações para quando o app está fechado. Os avisos só aparecem com o TiaBete aberto (faixa no Início e, se você permitir, notificação do navegador).</p></div></details></div>`;
+    <p style="margin:0 0 8px"><b>Fuso horário.</b> Os horários seguem o relógio do celular. Ao mudar de fuso ou de horário de verão, o GLUXO refaz os agendamentos quando é aberto; se o app ficar fechado depois da mudança, os avisos podem sair no horário antigo até a próxima abertura.</p>
+    <p style="margin:0"><b>Navegador e PWA.</b> Sem servidor, o navegador não agenda notificações para quando o app está fechado. Os avisos só aparecem com o GLUXO aberto (faixa no Início e, se você permitir, notificação do navegador).</p></div></details></div>`;
   return h;
 }
 const irRoleTxt = role => role === 'basal' ? 'Basal' : role === 'rapida' ? 'Rápida' : role === 'mista' ? 'Pré-misturada' : 'Insulina';
@@ -242,7 +242,7 @@ document.addEventListener('click', async e => {
     else if (a === 'ir-exact') { if (n) await n.openExact(); }
     else if (a === 'ir-battery') { if (n) await n.openBattery(); }
     else if (a === 'ir-test') {
-      if (n) { const ok = await n.test(); toast(ok ? 'Teste agendado. Pode fechar o app e aguardar 10 segundos.' : 'Permita as notificações do TiaBete nas configurações do Android.'); }
+      if (n) { const ok = await n.test(); toast(ok ? 'Teste agendado. Pode fechar o app e aguardar 10 segundos.' : 'Permita as notificações do GLUXO nas configurações do Android.'); }
       else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification('Hora da insulina basal', { body: 'Teste: os avisos do navegador estão funcionando (com o app aberto).' }); } catch (x) { toast('O navegador não permitiu mostrar o aviso.'); } }
     }
   } catch (err) { console.error(err); toast('Algo deu errado: ' + (err && err.message || err)); }

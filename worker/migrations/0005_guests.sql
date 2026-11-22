@@ -1,4 +1,4 @@
--- TiaBete · teste de 14 dias para VISITANTES (uso sem conta Google). Guarda só um identificador ALEATÓRIO de instalação (gerado no app,
+-- GLUXO · teste de 14 dias para VISITANTES (uso sem conta Google). Guarda só um identificador ALEATÓRIO de instalação (gerado no app,
 -- sem IMEI/serial/MAC), o hash do segredo da instalação e a data de início do teste. Nenhum dado de saúde, nenhum dado pessoal.
 -- O início do teste nunca é reescrito para uma data mais nova; ao entrar com Google vale o início MAIS ANTIGO entre instalação e conta.
 CREATE TABLE IF NOT EXISTS installs (

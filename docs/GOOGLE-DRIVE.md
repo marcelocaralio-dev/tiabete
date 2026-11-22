@@ -8,7 +8,7 @@ Dados do app para preencher abaixo:
 
 ## 1. Criar o projeto
 1. Entre em https://console.cloud.google.com com a sua conta Google.
-2. No topo, clique no seletor de projetos → **Novo projeto** → nome `TiaBete` → **Criar**.
+2. No topo, clique no seletor de projetos → **Novo projeto** → nome `GLUXO` → **Criar**.
 
 ## 2. Ativar a API do Drive
 1. Menu ☰ → **APIs e serviços** → **Biblioteca**.
@@ -16,13 +16,13 @@ Dados do app para preencher abaixo:
 
 ## 3. Tela de consentimento
 1. **APIs e serviços** → **Tela de permissão OAuth** (ou "Google Auth Platform").
-2. Tipo de usuário: **Externo**. Nome do app: `TiaBete`. E-mail de suporte: o seu. Salve.
+2. Tipo de usuário: **Externo**. Nome do app: `GLUXO`. E-mail de suporte: o seu. Salve.
 3. Em **Escopos / Acesso a dados**, adicione `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile` (para o login mostrar seu nome e e-mail) e `.../auth/drive.file` ("Ver, editar, criar e excluir somente os arquivos do Google Drive que você usa com este app").
 4. Em **Público**, clique em **Publicar app** (mudar de "Teste" para "Produção"). Sem isso, o login expira a cada 7 dias. Como o escopo `drive.file` não é restrito, não exige verificação demorada; pode aparecer um aviso de "app não verificado" no login, e é normal para um app pessoal (Avançado → Continuar).
 
 ## 4. Criar o ID do cliente Android
 1. **APIs e serviços** → **Credenciais** → **Criar credenciais** → **ID do cliente OAuth**.
-2. Tipo de aplicativo: **Android**. Nome: `TiaBete Android`.
+2. Tipo de aplicativo: **Android**. Nome: `GLUXO Android`.
 3. Nome do pacote: `app.tiabete.glicose`. Impressão digital SHA-1: a do início deste arquivo.
 4. Abra **Configurações avançadas** e ative **Ativar esquema de URI personalizado** (custom URI scheme). Esse passo é essencial.
 5. **Criar**. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`).

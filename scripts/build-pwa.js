@@ -20,9 +20,9 @@ const files = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png',
   .concat(fs.existsSync(path.join(out, 'fonts')) ? fs.readdirSync(path.join(out, 'fonts')).map(f => 'fonts/' + f) : []);
 const ver = crypto.createHash('sha1').update(html).digest('hex').slice(0, 10);
 /* Service worker: só guarda arquivos do próprio app (mesma origem). Servidor de licenças, Google e qualquer outra origem passam direto pela rede, sem cache. */
-fs.writeFileSync(path.join(out, 'sw.js'), `const CACHE = 'tiabete-pwa-${ver}', FILES = ${JSON.stringify(files)};
+fs.writeFileSync(path.join(out, 'sw.js'), `const CACHE = 'gluxo-pwa-${ver}', FILES = ${JSON.stringify(files)};
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('tiabete-pwa-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('gluxo-pwa-') || k.startsWith('tiabete-pwa-')) && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET') return; const u = new URL(r.url); if (u.origin !== self.location.origin) return;
   e.respondWith(fetch(r).then(res => { if (res && res.ok) { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); } return res; }).catch(() => caches.match(r).then(m => m || (r.mode === 'navigate' ? caches.match('index.html') : Response.error()))));

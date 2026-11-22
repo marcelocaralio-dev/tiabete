@@ -1,4 +1,4 @@
-/* TiaBete · API de licenciamento (Cloudflare Worker + D1). Autoridade final do direito premium.
+/* GLUXO · API de licenciamento (Cloudflare Worker + D1). Autoridade final do direito premium.
    Não recebe nem guarda dados de saúde. Tudo que depende de tempo usa o relógio DESTE servidor. */
 import core from '../../src/licensecore.js';
 const { LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, licComputeState, licTrialEnd, licSign, licEarliest, LIC_TRIAL_MS } = core;
@@ -227,8 +227,8 @@ async function createOrder(req, deps) {
   /* Checkout Pro via Orders API (POST /v1/orders, modo manual). total_amount é string = soma de unit_price × quantity. */
   const body = {
     type: 'online', processing_mode: 'manual', total_amount: total, external_reference: id,
-    description: 'TiaBete · Licença Premium Vitalícia',
-    items: [{ title: 'TiaBete · Licença Premium Vitalícia', unit_price: total, quantity: 1 }],
+    description: 'GLUXO · Licença Premium Vitalícia',
+    items: [{ title: 'GLUXO · Licença Premium Vitalícia', unit_price: total, quantity: 1 }],
     config: { online: { success_url: ret, pending_url: ret, failure_url: ret, auto_return: 'approved' } }
   };
   let r, j = {};
@@ -416,7 +416,7 @@ async function webhook(req, deps) {
 }
 function returnPage(url, env) {
   const id = (url.searchParams.get('order') || '').replace(/[^\w-]/g, '').slice(0, 40), to = `${env.APP_RETURN || 'app.tiabete.glicose:/pagamento'}?order=${id}`;
-  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TiaBete</title><body style="font:16px system-ui;background:#08070A;color:#F5F3F4;padding:32px;text-align:center"><h1>Voltando ao TiaBete…</h1><p>Voltar não significa pagamento aprovado: a licença só é liberada quando o servidor confirma o pagamento. Ela aparece em Mais → Perfil e configurações → Licença.</p><p><a style="color:#FF8E98" href="${to}">Abrir o TiaBete</a></p><script>location.replace(${JSON.stringify(to)})</script>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GLUXO</title><body style="font:16px system-ui;background:#08070A;color:#F5F3F4;padding:32px;text-align:center"><h1>Voltando ao GLUXO…</h1><p>Voltar não significa pagamento aprovado: a licença só é liberada quando o servidor confirma o pagamento. Ela aparece em Mais → Perfil e configurações → Licença.</p><p><a style="color:#FF8E98" href="${to}">Abrir o GLUXO</a></p><script>location.replace(${JSON.stringify(to)})</script>`, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 /* Não existem rotas administrativas: preço e configuração só mudam por "wrangler d1 execute" (exige login na sua conta Cloudflare). */
 export function createApp(base) {

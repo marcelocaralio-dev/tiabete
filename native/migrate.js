@@ -1,4 +1,4 @@
-/* TiaBete (APK) · do modo visitante para a conta Google (0.33.0).
+/* GLUXO (APK) · do modo visitante para a conta Google (0.33.0).
    Neste app os dados NUNCA ficam presos a uma conta: o banco é local ao aparelho, tanto para visitante quanto para quem entra com Google. Por isso entrar
    com Google não move, não renomeia e não apaga nenhum registro, e não existe "estrutura autenticada" para a qual copiar. O que a conta traz é a cópia opcional
    no Drive do próprio usuário, a licença vinculada à conta e a recuperação ao trocar de aparelho. Este módulo cuida do que pode dar errado nessa passagem:

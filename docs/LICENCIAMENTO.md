@@ -1,4 +1,4 @@
-# Licenciamento do TiaBete: guia de ativação
+# Licenciamento do GLUXO: guia de ativação
 
 > **Regra inegociável:** registrar glicemia e insulina, consultar o histórico e exportar os próprios dados são **sempre gratuitos**, com teste ativo, expirado ou sem licença. O licenciamento não lê nem grava dados de saúde e não mexe no banco `glicotrack`.
 
@@ -22,7 +22,7 @@ Senhas, o **Access Token** do Mercado Pago, a **assinatura secreta** do webhook 
 
 ## Passo 2. Conferir os recursos já criados e preencher o `wrangler.toml`
 Recursos já existentes na sua conta (não crie outros): Worker **`tiabete-license-api`**, banco D1 **`tiabete-licenses`**, binding **`DB`**.
-- **Onde:** no computador, na pasta do projeto TiaBete. Precisa de Node 22.13 ou mais novo (`node -v`).
+- **Onde:** no computador, na pasta do projeto GLUXO. Precisa de Node 22.13 ou mais novo (`node -v`).
 - **O que fazer:**
   1. `npm install -g wrangler` e depois `wrangler login` (abre o navegador; clique em *Allow*).
   2. Abra `worker/wrangler.toml`. Já estão certos: `name = "tiabete-license-api"`, `binding = "DB"`, `database_name = "tiabete-licenses"` e `migrations_dir = "migrations"`.
@@ -58,7 +58,7 @@ Os três segredos ficam **só no Worker**, cadastrados com `wrangler secret put`
 
 ## Passo 5. Criar a aplicação e obter as credenciais do Mercado Pago
 - **Onde:** https://www.mercadopago.com.br/developers/panel/app (*Suas integrações*), logado na conta que vai receber os pagamentos.
-- **O que criar:** *Criar aplicação* → um nome (ex.: TiaBete) → tipo de solução **Pagamentos online** → produto **Checkout Pro** (o Worker cria os pedidos pela **API de Orders**, `POST /v1/orders`; a API de Preferences, legado, não é mais usada). Os nomes dos botões podem mudar; siga o que o painel mostrar.
+- **O que criar:** *Criar aplicação* → um nome (ex.: GLUXO) → tipo de solução **Pagamentos online** → produto **Checkout Pro** (o Worker cria os pedidos pela **API de Orders**, `POST /v1/orders`; a API de Preferences, legado, não é mais usada). Os nomes dos botões podem mudar; siga o que o painel mostrar.
 - **O que copiar:** em *Credenciais*, o **Access Token de produção** (formato `APP_USR-...`). Para testar sem dinheiro existem as *credenciais de teste* (formato `TEST-...`).
 - **Onde colocar:** `wrangler secret put MP_ACCESS_TOKEN` (cole no terminal, nunca em arquivo).
 - **Como verificar:** o painel mostra a aplicação com *Checkout Pro* ativo. Se a conta ainda não tiver identidade validada, o Mercado Pago pede isso antes de liberar produção.
@@ -77,7 +77,7 @@ Os três segredos ficam **só no Worker**, cadastrados com `wrangler secret put`
   1. Crie `config/license-api.txt` com **apenas** o endereço público, ex.: `https://tiabete-license-api.SEU-SUBDOMINIO.workers.dev` (sem barra no fim, sem caminho, sem token). O build ignora qualquer outra coisa.
   2. Confirme que `config/license-public-key.json` existe (gerado no passo 4) e vá para o GitHub (os dois arquivos são públicos e podem ser enviados).
   3. Gere o APK: **Actions → APK Android → Run workflow**, ou localmente `npm run android:debug`.
-- **Como verificar:** instale o APK, entre com o Google; em *Mais → Perfil e configurações → Licença TiaBete* deve aparecer **Teste gratuito ativo** com os dias restantes. Sem internet, registre uma glicemia: deve funcionar. Com o teste vencido, as telas premium mostram o aviso e o resto segue normal.
+- **Como verificar:** instale o APK, entre com o Google; em *Mais → Perfil e configurações → Licença GLUXO* deve aparecer **Teste gratuito ativo** com os dias restantes. Sem internet, registre uma glicemia: deve funcionar. Com o teste vencido, as telas premium mostram o aviso e o resto segue normal.
 - **Desenvolvimento:** `npm run build:web:dev` libera o premium **sem** servidor, só para testar visualmente. Nunca publique esse build (o terminal avisa).
 
 ---
@@ -122,7 +122,7 @@ Segredos só como Worker Secrets · validação do ID token do Google (assinatur
 ## Contestações (chargebacks)
 Fonte oficial: [Gerenciar contestações](https://www.mercadopago.com.br/developers/en/docs/checkout-pro-orders/chargebacks/manage), [Configurar notificações de contestações](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/chargebacks/notifications) e [GET /v1/chargebacks/{id}](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-api/chargebacks/get-chargeback/get).
 - A notificação chega como `type: order`, `action: order.charged_back`, `data.id` = id da Order, e é validada com o mesmo HMAC. O corpo **não** decide nada: o Worker consulta `GET /v1/orders/{id}` e, para cada `transactions.chargebacks[].case_id`, `GET /v1/chargebacks/{case_id}` (cabeçalhos `Authorization` e `X-Caller-Id` = `user_id` da Order, o vendedor).
-- Estados no TiaBete (`orders.chargeback_state`): **open** (contestação com `coverage_applied` vazio): só registra na auditoria, a licença **não** é revogada · **lost** (`coverage_applied = false` ou Order `charged_back`): licença `revoked` · **won** (`coverage_applied = true`): licença mantida; se havia sido revogada por perda, só é restaurada se a Order voltou a `processed/accredited` com o pagamento original `processed`; senão fica registrado `chargeback_won_unconfirmed` para você conferir.
+- Estados no GLUXO (`orders.chargeback_state`): **open** (contestação com `coverage_applied` vazio): só registra na auditoria, a licença **não** é revogada · **lost** (`coverage_applied = false` ou Order `charged_back`): licença `revoked` · **won** (`coverage_applied = true`): licença mantida; se havia sido revogada por perda, só é restaurada se a Order voltou a `processed/accredited` com o pagamento original `processed`; senão fica registrado `chargeback_won_unconfirmed` para você conferir.
 - A contestação só vale para a licença se o `payments[]` dela contém o pagamento do pedido; contestação de outro pagamento/pedido é ignorada. Falha na API de contestações responde 502 (o Mercado Pago reenvia) e **nada** muda.
 - Notificação antiga: `last_updated_date` da Order mais antigo que o já aplicado é ignorado (`stale`); uma decisão `lost` não é desfeita por uma consulta "sem contestação".
 - Pagamento relevante da Order: o que já ativou a licença; antes disso, só o único `processed` com valor pago igual ao preço (mais de um = ambíguo, não ativa). Reembolso de outro pagamento da mesma Order não derruba a licença.

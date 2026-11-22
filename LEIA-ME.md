@@ -9,4 +9,4 @@ O `.gitignore` incluído é o ANTIGO (continua ignorando `android/`) mais 4 linh
 
 Substitui `package.json` e `package-lock.json` (dependências novas) e `scripts/patch-android.js` (o `versionCode` continua = número de execução do repositório antigo, que continua crescendo).
 
-Depois de rodar o workflow, ANTES de instalar: o arquivo deve se chamar `TiaBete.apk` (não `TiaBete-debug.apk`) e `apksigner verify --print-certs TiaBete.apk` deve mostrar o mesmo SHA-256 do app instalado.
+Depois de rodar o workflow, ANTES de instalar: o arquivo deve se chamar `GLUXO.apk` (não `GLUXO-debug.apk`) e `apksigner verify --print-certs GLUXO.apk` deve mostrar o mesmo SHA-256 do app instalado.

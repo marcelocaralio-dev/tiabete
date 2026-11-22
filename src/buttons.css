@@ -1,6 +1,6 @@
 /* ================= Padrão dos botões =================
    Dois estados obrigatórios, em todo o app:
-   · NORMAL    → disponível: contorno/fundo vermelho (identidade TiaBete) sobre o preto.
+   · NORMAL    → disponível: contorno/fundo vermelho (identidade GLUXO) sobre o preto.
    · APÓS CLIQUE → a cor muda NA HORA: escurece enquanto o dedo/mouse está pressionado (.is-press / :active)
                    e dá um brilho curto de confirmação depois do clique (.is-hit, ~0,6 s), voltando ao normal.
    Animação: reduz até 96 % ao pressionar e as cores trocam em 120–250 ms. Nada atrasa a ação (só CSS).

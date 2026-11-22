@@ -34,7 +34,7 @@ ok(!/<svg[^>]*>[^]*M50 4 C50 4 14 44/.test(rd('src/head.html')) && !/M50 4 C50 4
 /* 6. ícones e instalação */
 const pngSize = f => { const b = fs.readFileSync(path.join(ROOT, f)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
 ok(pngSize('assets/icon-only.png').join() === '1024,1024' && pngSize('assets/pwa/icon-192.png').join() === '192,192' && pngSize('assets/pwa/icon-512.png').join() === '512,512' && pngSize('assets/pwa/icon-maskable-512.png').join() === '512,512', 'ícones do app e PWA nos tamanhos corretos');
-const exp = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 }; for (const [d, s] of Object.entries(exp)) ok(pngSize(`assets/notification/ic_stat_tiabete-${d}.png`).join() === `${s},${s}`, 'ícone de notificação ' + d);
+const exp = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 }; for (const [d, s] of Object.entries(exp)) ok(pngSize(`assets/notification/ic_stat_gluxo-${d}.png`).join() === `${s},${s}`, 'ícone de notificação ' + d);
 const cap = JSON.parse(rd('capacitor.config.json')); ok(cap.plugins.LocalNotifications.iconColor === '#E50308' && cap.appId === 'app.tiabete.glicose' && cap.backgroundColor === '#0a090c', 'Android: cor da notificação na marca; appId e fundo preservados');
 const pwa = rd('scripts/build-pwa.js'); ok(/short_name: 'GLUXO'/.test(pwa) && /background_color: '#0a090c'/.test(pwa), 'PWA: nome GLUXO, fundo preservado');
 /* 7. movimento */

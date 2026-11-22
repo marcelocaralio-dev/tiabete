@@ -50,7 +50,7 @@ with sync_playwright() as p:
     # permissão revogada: aviso, nada quebra; ao devolver, refaz
     pg.evaluate("""async()=>{await Store.put('meta',{id:'rem-active',value:{items:[{k:'jejum',t:'07:00',title:'Jejum'}],adv:0}});localStorage.setItem('__perm','denied');}""")
     pg.close(); pg=ctx.new_page(); boot(pg)
-    toast=pg.evaluate("document.body.innerText.includes('notificações do TiaBete estão desligadas') || (window.__toasts||[]).length>=0")
+    toast=pg.evaluate("document.body.innerText.includes('notificações do GLUXO estão desligadas') || (window.__toasts||[]).length>=0")
     ok(pg.evaluate("Store.persistent && alCfg().quiet===true"),'permissão revogada: app abre normalmente e mantém as configurações')
     pg.evaluate("localStorage.setItem('__perm','granted')"); pg.evaluate("window.__resume&&window.__resume()"); pg.wait_for_timeout(2500)
     pend4=pg.evaluate("Object.keys(JSON.parse(localStorage.getItem('__fake_pending')||'{}')).map(Number)")

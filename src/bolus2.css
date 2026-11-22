@@ -1,7 +1,7 @@
 /* Cálculo de bolus: menus, etiquetas nutricionais, alimentos frequentes */
 :root { --amb: #F0B04A; --amb-d: #3A2A0C; --amb-l: #FFD58A; --amb-ink: #1C1305; }
 :root[data-theme="light"] { --amb: #9A6000; --amb-d: #FBEBCB; --amb-l: #8A5300; --amb-ink: #fff; }
-/* menus: Razão (vermelho do TiaBete) e Alimentos (âmbar); mesmo tamanho dos demais */
+/* menus: Razão (vermelho do GLUXO) e Alimentos (âmbar); mesmo tamanho dos demais */
 .bl-tabs .seg-b.bl-t-rz { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--s2)); color: var(--brand-l); }
 .bl-tabs .seg-b.bl-t-rz.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .bl-tabs .seg-b.bl-t-al { border-color: var(--amb); background: var(--amb-d); color: var(--amb-l); }

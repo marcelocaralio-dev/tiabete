@@ -1,4 +1,4 @@
-# TiaBete
+# GLUXO
 
 Aplicativo gratuito e de código aberto para acompanhar **glicemia, insulina e hemoglobina glicada**, pensado para quem tem diabetes MODY. Escrito em português do Brasil (mg/dL, datas DD/MM/AAAA).
 
@@ -6,7 +6,7 @@ Aplicativo gratuito e de código aberto para acompanhar **glicemia, insulina e h
 - Funciona sem internet.
 - Instalável no Android (APK) e também como página web de um único arquivo.
 
-> **Aviso importante.** O TiaBete é uma ferramenta de **registro e organização**. Não faz diagnóstico, não substitui avaliação médica e **não decide o seu tratamento**. Siga sempre o plano da sua equipe de saúde. Em emergência, ligue **192 (SAMU)**.
+> **Aviso importante.** O GLUXO é uma ferramenta de **registro e organização**. Não faz diagnóstico, não substitui avaliação médica e **não decide o seu tratamento**. Siga sempre o plano da sua equipe de saúde. Em emergência, ligue **192 (SAMU)**.
 
 ## O que ele faz
 
@@ -21,7 +21,7 @@ Aplicativo gratuito e de código aberto para acompanhar **glicemia, insulina e h
 
 ## Instalar o APK
 
-1. Abra a página de [Releases](../../releases) e baixe `TiaBete.apk`.
+1. Abra a página de [Releases](../../releases) e baixe `GLUXO.apk`.
 2. No Android, permita instalar apps de fontes desconhecidas para o navegador ou gerenciador de arquivos usado.
 3. Abra o arquivo e instale. Permita as notificações quando o app pedir.
 

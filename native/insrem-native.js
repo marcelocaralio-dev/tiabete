@@ -69,9 +69,9 @@ if (typeof NATIVE !== 'undefined' && NATIVE) (function () {
       const ln = LN(); if (!ln) return; const ids = irIdMap(S.ir), list = [0, 1, 2, 3, 4, 5, 6, 'a', 'z'].map(w => ids[rid + '#' + w]).filter(Boolean).map(id => ({ id }));
       try { if (list.length) await ln.removeDeliveredNotifications({ notifications: list }); } catch (e) { }
     },
-    openSettings: async () => { const t = TBS(); try { if (t) { await t.openNotifications(); return; } } catch (e) { } guide('Abra Configurações do Android → Apps → TiaBete → Notificações e ative.'); },
+    openSettings: async () => { const t = TBS(); try { if (t) { await t.openNotifications(); return; } } catch (e) { } guide('Abra Configurações do Android → Apps → GLUXO → Notificações e ative.'); },
     openExact: async () => { const t = TBS(); try { if (t) { await t.openExactAlarms(); return; } } catch (e) { } try { await LN().changeExactNotificationSetting(); } catch (e) { guide('Neste Android não é preciso permitir horários exatos.'); } },
-    openBattery: async () => { const t = TBS(); try { if (t) { await t.openBattery(); return; } } catch (e) { } guide('Abra Configurações do Android → Apps → TiaBete → Bateria e escolha “Sem restrições”.'); },
+    openBattery: async () => { const t = TBS(); try { if (t) { await t.openBattery(); return; } } catch (e) { } guide('Abra Configurações do Android → Apps → GLUXO → Bateria e escolha “Sem restrições”.'); },
     test: async () => {
       const ln = LN(); if (!ln || !(await request())) return false; await setup();
       const tx = 'Teste: os lembretes de insulina estão funcionando. Nada foi registrado.';

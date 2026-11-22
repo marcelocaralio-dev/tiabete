@@ -1,4 +1,4 @@
-/* TiaBete (APK) · camada de IA com chave própria do usuário.
+/* GLUXO (APK) · camada de IA com chave própria do usuário.
    Define `window.claude` com a mesma interface usada pelo app web (capacidade "sample"), mas falando direto com o provedor
    escolhido (Claude/Anthropic, OpenAI, Google Gemini, OpenRouter ou outro compatível com OpenAI). Nada passa por servidor do projeto.
    Segurança: a chave fica cifrada (AES-GCM, chave não exportável do WebCrypto) num banco separado do aparelho, fora de backups.

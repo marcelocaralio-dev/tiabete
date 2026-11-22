@@ -1,4 +1,4 @@
-/* ================= TiaBete · lógica pura (sem DOM) ================= */
+/* ================= GLUXO · lógica pura (sem DOM) ================= */
 const APP_VERSION = '0.2';
 const SCHEMA_VERSION = 5;
 const BUILD_RAW = '__BUILD_DATE__', BUILD_DATE = BUILD_RAW.startsWith('__') ? '' : BUILD_RAW;
@@ -223,7 +223,7 @@ function normStamp(s) {
 }
 const newResult = () => ({ ok: false, error: '', delim: ',', columns: [], ignoredCols: [], unmappedCols: [], items: [], hba: [], ignored: [], reasons: {}, totalRows: 0, emptyRows: 0, withOtherData: 0, format: '', source: '', fileKind: '', converted: 0, unit: 'mg/dL', unitNote: '', skipped: [] });
 const NO_GLU_MSG = 'Não encontrei as colunas de data e de glicemia neste arquivo. Ele precisa ter, no mínimo, uma coluna de data (ou de data e hora) e uma de glicemia, como "Data" e "Glicemia (mg/dL)".';
-const AUTO_ONLY_MSG = 'Este arquivo só tem leituras automáticas de sensor (CGM). O TiaBete importa as medições manuais (dedo, tira, leitura e calibração).';
+const AUTO_ONLY_MSG = 'Este arquivo só tem leituras automáticas de sensor (CGM). O GLUXO importa as medições manuais (dedo, tira, leitura e calibração).';
 
 /* Interpreta um CSV (ou JSON) de qualquer aplicativo suportado. Não grava nada: só devolve o que encontrou.
    parseMySugr continua existindo com o mesmo nome e o mesmo resultado para os arquivos que já eram aceitos. */
@@ -427,7 +427,7 @@ function parseSensor(rows, sn, res) {
     rec.ts = mkTs(rec.date, rec.time); rec.key = dedupKey(rec); data.push(rec);
   }
   data.sort((a, b) => a.ts - b.ts); res.items = data; res.ok = true;
-  if (!data.length) { res.ok = false; res.error = 'Este arquivo de ' + name + ' só tem leituras automáticas do sensor. O TiaBete importa as medições manuais (leituras, tira e calibrações).'; }
+  if (!data.length) { res.ok = false; res.error = 'Este arquivo de ' + name + ' só tem leituras automáticas do sensor. O GLUXO importa as medições manuais (leituras, tira e calibrações).'; }
   return res;
 }
 
@@ -607,7 +607,7 @@ async function parseImportFile(name, buf) {
     return r;
   } catch (e) {
     if (e instanceof ImportError) { const r = newResult(); r.error = e.message; return r; }
-    const r = newResult(); r.error = 'Não consegui ler este arquivo. Ele pode estar corrompido ou em um formato que o TiaBete não conhece.'; return r;
+    const r = newResult(); r.error = 'Não consegui ler este arquivo. Ele pode estar corrompido ou em um formato que o GLUXO não conhece.'; return r;
   }
 }
 
@@ -967,7 +967,7 @@ function caCompute(rules, records, now, opts) {
       }
       at = caAfterQuiet(at, q); if (at < now - 3 * 3600e3) continue;
       const key = rule.id + '|' + Math.round(at / 60000); if (seen.has(key)) continue; seen.add(key);
-      out.push({ key, id: caHash(key), ruleId: rule.id, name: rule.name, at, title: 'TiaBete · ' + rule.name, body: rule.msg || 'Alerta personalizado: confira sua orientação.', route: 'alertasp' });
+      out.push({ key, id: caHash(key), ruleId: rule.id, name: rule.name, at, title: 'GLUXO · ' + rule.name, body: rule.msg || 'Alerta personalizado: confira sua orientação.', route: 'alertasp' });
     }
   }
   return out.sort((a, b) => a.at - b.at);

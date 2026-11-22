@@ -119,11 +119,11 @@ function plPlatform() {
   const nat = typeof IS_NATIVE !== 'undefined' && IS_NATIVE;
   if (nat) {
     const n = window.TB_PLAN_N, perm = window.TB_PLAN_PERM;
-    if (perm === false) return '<div class="banner warn" style="margin:0 0 12px"><span><b>Notificações bloqueadas.</b> Ative em Configurações do Android → Apps → TiaBete → Notificações. Sem isso, os lembretes não tocam com o app fechado.</span></div>';
+    if (perm === false) return '<div class="banner warn" style="margin:0 0 12px"><span><b>Notificações bloqueadas.</b> Ative em Configurações do Android → Apps → GLUXO → Notificações. Sem isso, os lembretes não tocam com o app fechado.</span></div>';
     if (typeof n === 'number') return `<p class="hint" style="margin:0 0 12px">✓ ${n ? n + ' notificaç' + (n === 1 ? 'ão agendada' : 'ões agendadas') + ' no celular. Tocam com o app fechado e são refeitas sozinhas quando você altera o tratamento.' : 'Nenhuma notificação agendada agora.'}</p>`;
     return '<p class="hint" style="margin:0 0 12px">Verificando as notificações do celular…</p>';
   }
-  return '<div class="banner" style="margin:0 0 12px"><span><b>Aqui o lembrete aparece como faixa no Início, com o app aberto.</b> Para tocar com o app fechado, use o aplicativo Android (APK) do TiaBete.</span></div>';
+  return '<div class="banner" style="margin:0 0 12px"><span><b>Aqui o lembrete aparece como faixa no Início, com o app aberto.</b> Para tocar com o app fechado, use o aplicativo Android (APK) do GLUXO.</span></div>';
 }
 function plRemindersCard() {
   const c = alCfg(), all = plCollect(true), p = S.plan;
@@ -137,7 +137,7 @@ function plRemindersCard() {
     <div class="pl-rl">${rows || '<p class="hint" style="margin:10px 0 0">Nenhum lembrete ainda. Cadastre horários nos itens de insulina, remédios e medições abaixo.</p>'}</div>${pump}
     <p class="hint" style="margin:12px 0 0">Os lembretes usam só os medicamentos, doses e horários que <b>você</b> cadastrou. O app não cria nem muda horários de dose. Mudou o tratamento? Fale com a sua equipe e atualize aqui: os alarmes se ajustam sozinhos.</p>
     <details class="pl-it" style="margin-top:12px"><summary><span class="pl-s"><b>Limitações por plataforma</b><small>Android, aplicativo instalado e navegador</small></span></summary><div class="pl-b hint" style="line-height:1.5">
-    <p style="margin:0 0 8px"><b>Aplicativo Android (APK).</b> Agenda alarmes no sistema: tocam com o app fechado e são refeitos quando você altera o tratamento. Podem falhar se: a permissão de notificações estiver negada; a economia de bateria do fabricante (Xiaomi, Samsung, Huawei e outros) travar o app, então deixe o TiaBete “sem restrição”; o modo Não perturbe estiver ligado; ou o app for forçado a parar (abra-o uma vez para voltar). Depois de reiniciar o celular, abra o app uma vez para garantir.</p>
+    <p style="margin:0 0 8px"><b>Aplicativo Android (APK).</b> Agenda alarmes no sistema: tocam com o app fechado e são refeitos quando você altera o tratamento. Podem falhar se: a permissão de notificações estiver negada; a economia de bateria do fabricante (Xiaomi, Samsung, Huawei e outros) travar o app, então deixe o GLUXO “sem restrição”; o modo Não perturbe estiver ligado; ou o app for forçado a parar (abra-o uma vez para voltar). Depois de reiniciar o celular, abra o app uma vez para garantir.</p>
     <p style="margin:0 0 8px"><b>Aplicativo instalado pelo navegador.</b> Sem servidor, o navegador não permite agendar notificação com o app fechado, e no iPhone isso exige envio por servidor. Só aparece a faixa no Início com o app aberto.</p>
     <p style="margin:0"><b>Versão web dentro do Claude.</b> Igual ao aplicativo instalado: faixa no Início enquanto a página está aberta.</p></div></details></div>`;
 }
@@ -204,7 +204,7 @@ function plSettingsCard() {
 function planCards() {
   const type = (S.profile || {}).type || '', pre = PL_PRESETS[type], p = S.plan, on = k => p.types.includes(k);
   const sw = ([k, t, d]) => `<label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-ptype="${k}" ${on(k) ? 'checked' : ''}><span><b>${t}</b><small>${d}</small></span></label>`;
-  let h = `<div class="banner warn" style="margin:0 0 12px"><span><b>O TiaBete não substitui a consulta com a sua equipe de saúde.</b> Medicamentos, doses e horários devem ser os que ela indicou. O app só organiza as informações e lembra.</span></div>` + dbCard();
+  let h = `<div class="banner warn" style="margin:0 0 12px"><span><b>O GLUXO não substitui a consulta com a sua equipe de saúde.</b> Medicamentos, doses e horários devem ser os que ela indicou. O app só organiza as informações e lembra.</span></div>` + dbCard();
   h += `<h2 class="sec">Como você trata</h2><div class="card pl-card">
     ${pre ? `<p class="hint" style="margin:0">${esc(pre.intro)}</p>${pre.tips.map(t => `<p class="hint" style="margin:6px 0 0">• ${esc(t)}</p>`).join('')}<button class="btn full" style="margin-top:12px" data-act="pl-preset">Usar modelo para ${esc(type)}</button><p class="hint" style="margin:8px 0 0">O modelo só cria uma estrutura editável, sem doses. Tudo pode ser alterado ou removido.</p>`
       : `<p class="hint" style="margin:0">${type && type !== 'Prefiro não informar' ? 'Para este tipo não há modelo pronto.' : 'Escolha o tipo de diabetes acima para ver um modelo de tratamento do seu tipo.'} Você também pode montar o seu do zero abaixo.</p>`}
@@ -329,7 +329,7 @@ function treatmentCard() {
   if (on('bomba')) h += plPumpToday();
   const ck = p.checks.filter(x => x.times.length);
   if (ck.length) h += plTodayCard('Medições programadas · hoje', 'checks', ck, 'Marcam sozinhas quando você registra uma glicemia perto do horário.');
-  h += `<div class="card" style="margin-top:12px"><button class="btn pri full tr-edit" data-act="go" data-r="esquemas">EDITAR MEU TRATAMENTO</button><p class="hint" style="margin:10px 0 0">O TiaBete não substitui a consulta com a sua equipe de saúde. Siga o que ela indicou; o app só organiza e lembra.</p></div>`;
+  h += `<div class="card" style="margin-top:12px"><button class="btn pri full tr-edit" data-act="go" data-r="esquemas">EDITAR MEU TRATAMENTO</button><p class="hint" style="margin:10px 0 0">O GLUXO não substitui a consulta com a sua equipe de saúde. Siga o que ela indicou; o app só organiza e lembra.</p></div>`;
   return h;
 }
 document.addEventListener('click', async e => {

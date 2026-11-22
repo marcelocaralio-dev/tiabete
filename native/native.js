@@ -25,7 +25,7 @@ if (NATIVE) {
     }
   };
 
-  const diagCard = () => `<h2 class="sec">Diagnóstico das notificações</h2><div class="card"><p class="hint" id="nt-status" style="margin:0 0 10px">Verificando…</p><div class="stack" style="gap:8px"><button class="btn full" data-act="nt-perm">Permitir notificações</button><button class="btn full" data-act="nt-exact">Permitir horários exatos</button><button class="btn pri full" data-act="nt-test">Testar aviso em 10 segundos</button></div><p class="hint" style="margin:10px 0 0">Se o teste não chegar: no Android, vá em Apps → TiaBete → Notificações (ligadas) e Bateria → “Sem restrições”. Alguns celulares (Xiaomi, Samsung, Motorola) fecham apps em segundo plano e bloqueiam avisos.</p></div>`;
+  const diagCard = () => `<h2 class="sec">Diagnóstico das notificações</h2><div class="card"><p class="hint" id="nt-status" style="margin:0 0 10px">Verificando…</p><div class="stack" style="gap:8px"><button class="btn full" data-act="nt-perm">Permitir notificações</button><button class="btn full" data-act="nt-exact">Permitir horários exatos</button><button class="btn pri full" data-act="nt-test">Testar aviso em 10 segundos</button></div><p class="hint" style="margin:10px 0 0">Se o teste não chegar: no Android, vá em Apps → GLUXO → Notificações (ligadas) e Bateria → “Sem restrições”. Alguns celulares (Xiaomi, Samsung, Motorola) fecham apps em segundo plano e bloqueiam avisos.</p></div>`;
   async function diagFill() {
     const el = document.getElementById('nt-status'), ln = LN(); if (!el) return;
     if (!ln) { el.textContent = 'Notificações não estão disponíveis neste aparelho.'; return; }
@@ -49,7 +49,7 @@ if (NATIVE) {
     h = h.replace('data-act="ics-make">Gerar arquivo de calendário</button>', 'data-act="rem-on">Ativar lembretes neste aparelho</button><button class="btn full" style="margin-top:8px" data-act="rem-off">Desligar todos os lembretes</button>');
     h = h.replace('<h2 class="sec">Lembretes de horário</h2>', diagCard() + '<h2 class="sec">Lembretes de horário</h2>');
     setTimeout(diagFill, 60);
-    h = h.replace('Para parar os lembretes, apague os eventos “TiaBete” do calendário.', 'Para parar, use “Desligar todos os lembretes”.');
+    h = h.replace('Para parar os lembretes, apague os eventos “GLUXO” do calendário.', 'Para parar, use “Desligar todos os lembretes”.');
     return h;
   };
   const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
@@ -80,7 +80,7 @@ if (NATIVE) {
     for (const it of items) {
       let [h, m] = it.t.split(':').map(Number); m -= adv; while (m < 0) { m += 60; h = (h + 23) % 24; }
       if (inQuiet(h, m)) continue;
-      list.push({ id: REM_ID[it.k], title: 'TiaBete', body: it.title + '. Registre no app depois.', channelId: 'lembretes', schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } });
+      list.push({ id: REM_ID[it.k], title: 'GLUXO', body: it.title + '. Registre no app depois.', channelId: 'lembretes', schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } });
     }
     if (list.length) await ln.schedule({ notifications: list });
     return list.length;
@@ -102,7 +102,7 @@ if (NATIVE) {
       const at = last.ts + c.hypoMin * 60000; if (at <= Date.now() + 5000) return;
       if (!(await ensurePerm())) return;
       try { await ln.createChannel({ id: 'hipo', name: 'Reavaliação de hipoglicemia', description: 'Aviso para medir de novo depois de uma glicemia baixa', importance: 5, vibration: true }); } catch (x) { }
-      await ln.schedule({ notifications: [{ id: HYPO_ID, title: 'TiaBete · medir de novo', body: 'Passaram ' + c.hypoMin + ' minutos da glicemia baixa. Meça novamente e siga o protocolo do seu médico. Emergência: 192 (SAMU).', channelId: 'hipo', schedule: { at: new Date(at), allowWhileIdle: true } }] });
+      await ln.schedule({ notifications: [{ id: HYPO_ID, title: 'GLUXO · medir de novo', body: 'Passaram ' + c.hypoMin + ' minutos da glicemia baixa. Meça novamente e siga o protocolo do seu médico. Emergência: 192 (SAMU).', channelId: 'hipo', schedule: { at: new Date(at), allowWhileIdle: true } }] });
     } catch (e) { console.error(e); }
   }
   /* O alerta do cronômetro já apareceu dentro do app: tira a notificação do sistema da mesma contagem para não repetir. */
@@ -139,7 +139,7 @@ if (NATIVE) {
       }
       if (add.length && (await ensurePerm())) {
         try { await ln.createChannel({ id: 'pos', name: 'Medir 2 horas depois', description: 'Lembrete para medir a glicemia 2 horas após a insulina rápida pré-prandial', importance: 4, vibration: true }); } catch (e) { }
-        await ln.schedule({ notifications: add.map(a => ({ id: a.id, title: 'TiaBete · hora de medir', body: 'Faz 2 horas desde a insulina ' + ({ fast: 'do jejum', lunch: 'do almoço', dinner: 'do jantar' }[a.kind]) + '. Meça a glicemia pós-prandial e registre no app.', channelId: 'pos', schedule: { at: new Date(a.at), allowWhileIdle: true } })) });
+        await ln.schedule({ notifications: add.map(a => ({ id: a.id, title: 'GLUXO · hora de medir', body: 'Faz 2 horas desde a insulina ' + ({ fast: 'do jejum', lunch: 'do almoço', dinner: 'do jantar' }[a.kind]) + '. Meça a glicemia pós-prandial e registre no app.', channelId: 'pos', schedule: { at: new Date(a.at), allowWhileIdle: true } })) });
         for (const a of add) { map[a.id] = { at: a.at }; try { const x = TBX(); if (x) await x.schedule({ id: String(a.id), at: String(a.at + POST_WIN * 60000) }); } catch (e) { } }
       }
       await Store.put('meta', { id: 'post-sched', value: map });
@@ -168,14 +168,14 @@ if (NATIVE) {
         const quietOn = !!alCfg().plQuiet;
         for (const a of plCollect(false)) {
           if (!parseTime(a.time) || seen.has(a.key)) continue; seen.add(a.key); const [h, m] = a.time.split(':').map(Number); if (quietOn && inQuiet(h, m)) continue;
-          const base = { title: a.sec === 'Medição' ? 'TiaBete · hora de medir' : 'TiaBete · hora do tratamento', body: (a.label || a.sec) + ' · ' + a.time + (a.dose && a.sec !== 'Medição' ? ' · ' + a.dose : ''), channelId: 'tratamento' };
+          const base = { title: a.sec === 'Medição' ? 'GLUXO · hora de medir' : 'GLUXO · hora do tratamento', body: (a.label || a.sec) + ' · ' + a.time + (a.dose && a.sec !== 'Medição' ? ' · ' + a.dose : ''), channelId: 'tratamento' };
           const days = a.days && a.days.length && a.days.length < 7 ? a.days : null;
           if (!days) { const id = planId(a.key); ids.push(id); list.push({ id, ...base, schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } }); }
           else for (const d of days) { const id = planId(a.key + '#' + d); ids.push(id); list.push({ id, ...base, schedule: { on: { weekday: d + 1, hour: h, minute: m }, allowWhileIdle: true } }); } /* weekday do Capacitor: 1 = domingo */
         }
         if (on('bomba') && p.pump.alarm && p.pump.lastChange) {
           const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))), at = mkTs(due, p.pump.siteTime || '08:00');
-          if (at > Date.now() && !(alCfg().plQuiet && inQuiet(new Date(at).getHours(), new Date(at).getMinutes()))) { ids.push(900000); list.push({ id: 900000, title: 'TiaBete · bomba de insulina', body: 'Hora de trocar o cateter.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
+          if (at > Date.now() && !(alCfg().plQuiet && inQuiet(new Date(at).getHours(), new Date(at).getMinutes()))) { ids.push(900000); list.push({ id: 900000, title: 'GLUXO · bomba de insulina', body: 'Hora de trocar o cateter.', channelId: 'tratamento', schedule: { at: new Date(at), allowWhileIdle: true } }); }
         }
       }
       let granted = true;
@@ -212,7 +212,7 @@ if (NATIVE) {
       if (stale.length) await ln.cancel({ notifications: stale.map(id => ({ id })) });
       if (!fut.length) { try { localStorage.setItem(CA_KEY, '[]'); } catch (e) { } return; }
       if (!(await ensurePerm())) return;
-      try { await ln.createChannel({ id: 'alertasp', name: 'Alertas personalizados', description: 'Avisos que você configurou no TiaBete', importance: 4, vibration: true }); } catch (e) { }
+      try { await ln.createChannel({ id: 'alertasp', name: 'Alertas personalizados', description: 'Avisos que você configurou no GLUXO', importance: 4, vibration: true }); } catch (e) { }
       await ln.schedule({ notifications: fut.map(x => ({ id: x.id, title: x.title, body: x.body, largeBody: x.body, channelId: 'alertasp', extra: { route: 'alertasp', rule: x.ruleId }, schedule: { at: new Date(x.at), allowWhileIdle: true } })) });
       try { localStorage.setItem(CA_KEY, JSON.stringify(fut.map(x => x.id))); } catch (e) { }
     } catch (e) { console.error(e); } finally { caBusy = false; }
@@ -229,7 +229,7 @@ if (NATIVE) {
       if (p === 'granted') { if (permPrev && permPrev !== 'granted') { permWarned = false; window.tbCfgReady(); } }
       else if (!permWarned) {
         const rm = (await Store.all('meta')).find(x => x.id === 'rem-active');
-        if ((rm && rm.value) || (S.ir && S.ir.on) || (alCfg().plan && typeof plCollect === 'function' && plCollect(false).length)) { permWarned = true; toast('As notificações do TiaBete estão desligadas no Android. Seus lembretes continuam salvos e voltam a tocar quando você permitir.'); }
+        if ((rm && rm.value) || (S.ir && S.ir.on) || (alCfg().plan && typeof plCollect === 'function' && plCollect(false).length)) { permWarned = true; toast('As notificações do GLUXO estão desligadas no Android. Seus lembretes continuam salvos e voltam a tocar quando você permitir.'); }
       }
       permPrev = p;
     } catch (e) { }
@@ -242,7 +242,7 @@ if (NATIVE) {
     try {
       const ln = LN(); if (!ln || !(await ensurePerm())) return;
       try { await ln.createChannel({ id: 'backup', name: 'Cópia no Drive', description: 'Avisos de falha da cópia programada', importance: 3 }); } catch (e) { }
-      await ln.schedule({ notifications: [{ id: 998, title: 'TiaBete · cópia não concluída', body: ((ev && ev.detail) || 'A cópia no Google Drive falhou.') + ' Abra o app para tentar de novo.', channelId: 'backup', schedule: { at: new Date(Date.now() + 1500) } }] });
+      await ln.schedule({ notifications: [{ id: 998, title: 'GLUXO · cópia não concluída', body: ((ev && ev.detail) || 'A cópia no Google Drive falhou.') + ' Abra o app para tentar de novo.', channelId: 'backup', schedule: { at: new Date(Date.now() + 1500) } }] });
     } catch (e) { console.error(e); }
   });
   const _loadAll = loadAll;
@@ -252,12 +252,12 @@ if (NATIVE) {
   document.addEventListener('click', async e => {
     const el = e.target.closest('[data-act^="nt-"]'); if (!el) return; const ln = LN(); if (!ln) return toast('Notificações não estão disponíveis neste aparelho.');
     try {
-      if (el.dataset.act === 'nt-perm') { const p = await ln.requestPermissions(); toast(p.display === 'granted' ? 'Notificações permitidas.' : 'Permissão negada. Ative em Configurações do Android → Apps → TiaBete → Notificações.'); }
+      if (el.dataset.act === 'nt-perm') { const p = await ln.requestPermissions(); toast(p.display === 'granted' ? 'Notificações permitidas.' : 'Permissão negada. Ative em Configurações do Android → Apps → GLUXO → Notificações.'); }
       else if (el.dataset.act === 'nt-exact') { try { await ln.changeExactNotificationSetting(); } catch (x) { toast('Neste Android não é preciso permitir horários exatos.'); } }
       else if (el.dataset.act === 'nt-test') {
-        if (!(await ensurePerm())) return toast('Permita as notificações do TiaBete nas configurações do Android.');
+        if (!(await ensurePerm())) return toast('Permita as notificações do GLUXO nas configurações do Android.');
         try { await ln.createChannel({ id: 'lembretes', name: 'Lembretes', description: 'Horários de medir a glicemia e da insulina', importance: 4, vibration: true }); } catch (x) { }
-        await ln.schedule({ notifications: [{ id: 999, title: 'TiaBete', body: 'Teste: as notificações estão funcionando.', channelId: 'lembretes', schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true } }] }); toast('Teste agendado. Pode fechar o app e aguardar 10 segundos.');
+        await ln.schedule({ notifications: [{ id: 999, title: 'GLUXO', body: 'Teste: as notificações estão funcionando.', channelId: 'lembretes', schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true } }] }); toast('Teste agendado. Pode fechar o app e aguardar 10 segundos.');
       }
     } catch (x) { console.error(x); toast('Não consegui concluir.'); }
     setTimeout(diagFill, 500);
@@ -273,7 +273,7 @@ if (NATIVE) {
         await Store.put('meta', { id: 'rem-active', value: null }); toast('Lembretes desligados.'); return;
       }
       const r = readItems(); if (!r) return; if (!r.items.length) { toast('Marque pelo menos um lembrete.'); return; }
-      if (!(await ensurePerm())) { toast('Permita as notificações do TiaBete nas configurações do Android.'); return; }
+      if (!(await ensurePerm())) { toast('Permita as notificações do GLUXO nas configurações do Android.'); return; }
       const n = await remSchedule(r.items, r.adv);
       S.icsPref = r.pref; try { await Store.put('meta', { id: 'ics-pref', value: r.pref }); await Store.put('meta', { id: 'rem-active', value: { items: r.items, adv: r.adv } }); } catch (x) { }
       const sk = r.items.length - n;

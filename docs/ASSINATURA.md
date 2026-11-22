@@ -1,6 +1,6 @@
 # Assinar o APK (release)
 
-O Android só instala atualizações de um app se o APK for assinado **sempre com a mesma chave**. Sem chave, o fluxo gera `TiaBete-debug.apk` (serve para testar). Com a chave nos *secrets*, gera `TiaBete.apk` assinado.
+O Android só instala atualizações de um app se o APK for assinado **sempre com a mesma chave**. Sem chave, o fluxo gera `GLUXO-debug.apk` (serve para testar). Com a chave nos *secrets*, gera `GLUXO.apk` assinado.
 
 ## 1. Criar a chave (uma única vez)
 
@@ -31,7 +31,7 @@ Em **Settings → Secrets and variables → Actions → New repository secret**:
 ## 4. Conferir
 
 ```bash
-apksigner verify --print-certs TiaBete.apk
+apksigner verify --print-certs GLUXO.apk
 ```
 
 Divulgue o **hash SHA-256** do certificado na página de Releases para que as pessoas confirmem a origem.

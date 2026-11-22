@@ -11,7 +11,7 @@
   },
   "plugins": {
     "LocalNotifications": {
-      "smallIcon": "ic_stat_tiabete",
+      "smallIcon": "ic_stat_gluxo",
       "iconColor": "#E50308"
     }
   }

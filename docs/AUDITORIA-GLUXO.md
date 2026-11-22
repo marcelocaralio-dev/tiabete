@@ -1,3 +1,5 @@
+> **Registro histórico (0.35.0):** este relatório descreve a etapa anterior. O nome TiaBete citado abaixo foi migrado para GLUXO na versão 0.35.0 (ver CHANGELOG-0.35.0.md e docs/MIGRACAO-NOME-GLUXO.md).
+
 # Relatório de auditoria (etapa 1) — identidade GLUXO
 
 Base: código-fonte recebido (0.30.0 + a análise por horários 0.31.0 já entregue). O pedido cita a 0.21.1; a árvore em uso é a mais recente enviada.

@@ -1,6 +1,6 @@
-# Como ativar a IA no TiaBete (passo a passo)
+# Como ativar a IA no GLUXO (passo a passo)
 
-A IA do TiaBete precisa de uma **chave** (uma senha de acesso) de um provedor de IA. O mesmo passo a passo aparece dentro do app, em **Mais → Inteligência artificial**.
+A IA do GLUXO precisa de uma **chave** (uma senha de acesso) de um provedor de IA. O mesmo passo a passo aparece dentro do app, em **Mais → Inteligência artificial**.
 
 ## Qual escolher?
 - **OpenRouter** – o mais fácil e tem modelos gratuitos (terminam em `:free`). Limite de uso por dia.
@@ -9,7 +9,7 @@ A IA do TiaBete precisa de uma **chave** (uma senha de acesso) de um provedor de
 
 ## OpenRouter (gratuito)
 1. Abra https://openrouter.ai/keys e entre com a conta Google.
-2. Toque em **Create Key**, dê um nome (TiaBete) e **Create**.
+2. Toque em **Create Key**, dê um nome (GLUXO) e **Create**.
 3. Copie a chave (começa com `sk-or-`). Ela só aparece uma vez.
 4. No app: **Mais → Inteligência artificial**, provedor **OpenRouter**, cole a chave em **Chave da API**.
 5. Toque em **Carregar lista de modelos** e escolha um que termine em `:free`.

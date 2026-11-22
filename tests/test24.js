@@ -12,5 +12,5 @@ ok(/permWatch/.test(nat) && /tbPermWatch/.test(nat), 'permissão de notificaçõ
 ok(/masterP/.test(core) && /dbp = null/.test(core), 'cofre: chave mestra única e reabertura após falha');
 ok(/'tb-lock'/.test(ps) && /'tb-pnl'/.test(ps) && /pagehide/.test(ps), 'persist.js copia ajustes do localStorage para o banco e grava ao sair');
 ok(/'src\/persist\.js', 'src\/init\.js'/.test(R('scripts/build-web.js')), 'persist.js carrega logo antes de init.js');
-for (const [f, h] of Object.entries({ 'src/license.js': 'ddf8bb2807aa8f0bade16707e5b069db', 'src/licensecore.js': 'e7ba4ce34217ea6faa237f7d2ed4b278', 'worker/src/index.js': '8b8a3ae8c89ffdbbd2f630f7e52ad521' })) ok(md5(f) === h, 'módulo de licença intacto: ' + f);
+for (const [f, h] of Object.entries({ 'src/license.js': '866b366ce03fcaf9b305a5af26fa4017', 'src/licensecore.js': 'e7ba4ce34217ea6faa237f7d2ed4b278', 'worker/src/index.js': '404b98eef6a5032c0387f21a5c261454' })) ok(md5(f) === h, 'módulo de licença intacto: ' + f);
 console.log(fail ? 'test24 FALHOU (' + fail + ')' : 'test24 ok (' + n + ' verificações)'); process.exit(fail ? 1 : 0);

@@ -8,7 +8,7 @@ const rd = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 (async () => {
   /* ---------- 0) o módulo de licenciamento está travado na versão 0.34.0 (visitante + Android ID): qualquer mudança futura exige atualizar estes hashes de propósito ---------- */
-  const LOCK = { 'src/license.js': 'ddf8bb2807aa8f0bade16707e5b069db', 'src/licensecore.js': 'e7ba4ce34217ea6faa237f7d2ed4b278', 'worker/src/index.js': '8b8a3ae8c89ffdbbd2f630f7e52ad521' };
+  const LOCK = { 'src/license.js': '866b366ce03fcaf9b305a5af26fa4017', 'src/licensecore.js': 'e7ba4ce34217ea6faa237f7d2ed4b278', 'worker/src/index.js': '404b98eef6a5032c0387f21a5c261454' };
   for (const [f, h] of Object.entries(LOCK)) ok(md5(f) === h, 'intacto: ' + f);
   for (const f of fs.readdirSync(path.join(ROOT, 'worker/migrations'))) ok(/^000[1-6]_/.test(f), 'sem migração nova: ' + f);
   const pm = rd('src/premium.js');

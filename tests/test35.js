@@ -156,7 +156,7 @@ function d1() {
   const pa = rd('scripts/patch-android.js');
   ok(/Settings\.Secure\.ANDROID_ID/.test(pa) && /registerPlugin\(TbDevicePlugin\.class\)/.test(pa) && !/getMacAddress|getImei|getDeviceId|Build\.getSerial|Build\.SERIAL|READ_PHONE_STATE/.test(pa), 'Android: só ANDROID_ID, plugin registrado, sem MAC/IMEI/serial/permissões novas');
   ok(/allowBackup="false"/.test(pa) && /setTextZoom\(100\)/.test(pa) && /const K = 1\.29;/.test(rd('scripts/build-web.js')), 'ajustes aprovados do APK e da tela intactos');
-  ok(/"version": "0\.34\.0"/.test(rd('package.json')), 'versão 0.34.0');
+  ok(/"version": "0\.35\.0"/.test(rd('package.json')), 'versão 0.35.0');
   console.error = oe;
   console.log(fail ? `test35 FALHOU (${fail}/${n})` : `test35 ok (${n} verificações)`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('test35 erro:', e); process.exit(1); });

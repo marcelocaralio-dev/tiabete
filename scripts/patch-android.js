@@ -113,16 +113,16 @@ public class TbExpirePlugin extends Plugin {
   console.log('Plugin TbExpire gravado em', dir);
 }
 
-/* Ícone das notificações: a gota oficial do TiaBete (máscara branca sobre transparente, como o Android exige).
+/* Ícone das notificações: a gota oficial do GLUXO (máscara branca sobre transparente, como o Android exige).
    Os PNGs saem de assets/notification/ e a cor de destaque vem de capacitor.config.json (iconColor). */
 (function notifIcon() {
   const res = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res'), src = path.join(__dirname, '..', 'assets', 'notification');
   if (!fs.existsSync(res) || !fs.existsSync(src)) { console.warn('Pasta res ou assets/notification não encontrada; ícone de notificação não instalado.'); return; }
   let n = 0;
   for (const d of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
-    const from = path.join(src, 'ic_stat_tiabete-' + d + '.png'); if (!fs.existsSync(from)) continue;
+    const from = path.join(src, 'ic_stat_gluxo-' + d + '.png'); if (!fs.existsSync(from)) continue;
     const dir = path.join(res, 'drawable-' + d); fs.mkdirSync(dir, { recursive: true });
-    fs.copyFileSync(from, path.join(dir, 'ic_stat_tiabete.png')); n++;
+    fs.copyFileSync(from, path.join(dir, 'ic_stat_gluxo.png')); n++;
   }
   console.log('Ícone de notificação (gota) instalado em', n, 'densidades.');
 })();
@@ -202,7 +202,7 @@ public class TbBiometricPlugin extends Plugin {
     public void authenticate(final PluginCall call) {
         if (getActivity() == null || !(getActivity() instanceof FragmentActivity)) { call.reject("Sem atividade", "unavailable"); return; }
         final FragmentActivity act = (FragmentActivity) getActivity();
-        final String title = call.getString("title", "TiaBete");
+        final String title = call.getString("title", "GLUXO");
         final String sub = call.getString("subtitle", "");
         final String neg = call.getString("negative", "Usar PIN");
         act.runOnUiThread(new Runnable() {

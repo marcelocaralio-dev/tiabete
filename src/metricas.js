@@ -252,7 +252,7 @@ function mtPresentation() {
     <section class="mt-ph"><span class="mt-ph-ic">${mtSvg('central')}<span class="mt-ph-lk">${mtSvg('lock')}</span></span>
       <span class="mt-prem big">${mtSvg('lock')}PREMIUM · LICENÇA VITALÍCIA</span>
       <h2 class="mt-ph-t">Entenda seu controle glicêmico além da média.</h2>
-      <p class="mt-ph-p">Uma visão aprofundada do seu comportamento glicêmico, com indicadores e análises históricas. A Central de Métricas é uma área exclusiva de quem tem a licença vitalícia do TiaBete.</p></section>
+      <p class="mt-ph-p">Uma visão aprofundada do seu comportamento glicêmico, com indicadores e análises históricas. A Central de Métricas é uma área exclusiva de quem tem a licença vitalícia do GLUXO.</p></section>
     <h2 class="mt-eh">Os cinco indicadores</h2>
     <div class="mt-list">${MT_KEYS.map(k => `<div class="mt-li"><span class="mt-ico lk">${mtSvg(k)}<span class="mt-lk">${mtSvg('lock')}</span></span><span class="mt-li-t"><b>${MT_IND[k].name}<small>${MT_IND[k].sig}</small></b><span>${ex[k]}</span></span></div>`).join('')}</div>
     <h2 class="mt-eh">O que você ganha</h2>

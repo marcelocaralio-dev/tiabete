@@ -244,7 +244,7 @@ function d1() {
   ok(m.Store.writes.every(w => w[0] === 'meta' && w[1] === 'guest-link'), 'a migração só grava o marcador guest-link: nenhum registro do usuário é tocado');
   ok(m.gmBanner() === '', 'concluída: sem faixa');
   await m.fire('connected'); ok(m.st() === 'done' && m.backups === 1, 'reconectar a mesma conta não oferece de novo nem duplica a cópia');
-  m = makeMig({ older: [{ id: 'f9', title: 'tiabete-backup-2026-01-01-0800.json' }, { id: 'f8', title: 'tiabete-backup-2025-12-01-0800.json' }] }); await m.fire('connected'); await m.click('gm-save');
+  m = makeMig({ older: [{ id: 'f9', title: 'gluxo-backup-2026-01-01-0800.json' }, { id: 'f8', title: 'gluxo-backup-2025-12-01-0800.json' }] }); await m.fire('connected'); await m.click('gm-save');
   ok(m.st() === 'merge' && m.backups === 1 && /já tem 2 cópias/.test(m.gmBanner()) && /sem apagar nada/.test(m.gmBanner()), 'CONTA COM DADOS EXISTENTES: salva a cópia local sem apagar e oferece mesclar');
   await m.click('gm-merge'); ok(m.went.includes('backup') && m.loaded[0] === 'f9', 'mesclar abre a restauração existente (mescla sem sobrescrever, remove duplicados) com a cópia mais recente');
   await m.click('gm-done'); ok(m.st() === 'done' && m.gmBanner() === '', 'fechar encerra o aviso');
@@ -269,7 +269,7 @@ function d1() {
   ok(/const K = 1\.29;/.test(rd('scripts/build-web.js')), 'escala de tela aprovada (K = 1,29) intacta');
   ok(/'native\/login\.js', 'native\/migrate\.js'/.test(rd('scripts/build-web.js')), 'migrate.js incluído no build, depois do login');
   ok(!/guest|install/i.test(rd('src/logic.js')) && !/guest\//.test(rd('src/app.js')), 'regras de negócio do app (registros) não conhecem visitante');
-  ok(/"version": "0\.3[34]\.0"/.test(rd('package.json')), 'versão 0.33.x/0.34.x');
+  ok(/"version": "0\.3[345]\.0"/.test(rd('package.json')), 'versão 0.33.x a 0.35.x');
 
   console.log(fail ? `test34 FALHOU (${fail}/${n})` : `test34 ok (${n} verificações)`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('test34 erro:', e); process.exit(1); });

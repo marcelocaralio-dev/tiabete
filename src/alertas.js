@@ -1,6 +1,6 @@
 /* ================= Alertas personalizados =================
    Condição (marcação do registro ou glicemia acima/abaixo de um valor) + momento + mensagem + frequência.
-   O TiaBete NÃO calcula nem sugere doses: o texto é um lembrete escrito pelo próprio usuário, conforme o plano dele.
+   O GLUXO NÃO calcula nem sugere doses: o texto é um lembrete escrito pelo próprio usuário, conforme o plano dele.
    A lista de avisos é sempre recalculada dos registros de hoje; apagar ou editar o registro cancela o aviso. */
 S.ca = { rules: [], state: { once: {}, seen: {}, dis: {} }, seeded: false };
 S._caList = [];
@@ -49,7 +49,7 @@ function viewAlertasP() {
   h += `<div class="card"><p class="hint" style="margin:0"><b>${on}</b> ${on === 1 ? 'alerta ativo' : 'alertas ativos'} de ${rules.length}. Cada alerta liga uma condição dos seus registros a um aviso com o texto que você escrever.</p><button class="btn pri full" style="margin-top:10px" data-act="ca-new">+ Novo alerta</button></div>`;
   h += rules.length ? rules.map(caRuleCard).join('') : '<div class="card"><div class="empty">Nenhum alerta ainda. Toque em “Novo alerta” ou escolha um modelo.</div></div>';
   h += `<h2 class="sec">Modelos rápidos</h2><div class="card"><p class="hint" style="margin:0 0 10px">Toque para criar um alerta já preenchido e ajuste do seu jeito.</p><div class="chips">${caPresets().map((p, i) => `<button class="chip" data-act="ca-preset" data-i="${i}">${esc(p.name)}</button>`).join('')}</div></div>`;
-  h += `<h2 class="sec">Como funciona</h2><div class="card"><p class="hint" style="margin:0">• O aviso só é criado quando a condição aparece nos registros de <b>hoje</b>. Se você apagar o registro ou tirar a marcação, o aviso é cancelado.<br>• Na próxima refeição, o horário vem do seu horário habitual (a mediana dos seus últimos registros dessa refeição). Sem histórico, usa 07:00, 12:00, 16:00 e 19:00.<br>• O silêncio noturno de “Alertas e lembretes” também vale aqui.<br>• Com o app aberto, o aviso aparece como faixa no Início. No aplicativo instalado (APK), ele toca também com o app fechado, e tocar nele abre esta tela.<br>• <b>O TiaBete não calcula nem sugere doses de insulina.</b> A mensagem é um lembrete seu, conforme a orientação do seu médico. Em emergência, ligue 192 (SAMU).</p></div>`;
+  h += `<h2 class="sec">Como funciona</h2><div class="card"><p class="hint" style="margin:0">• O aviso só é criado quando a condição aparece nos registros de <b>hoje</b>. Se você apagar o registro ou tirar a marcação, o aviso é cancelado.<br>• Na próxima refeição, o horário vem do seu horário habitual (a mediana dos seus últimos registros dessa refeição). Sem histórico, usa 07:00, 12:00, 16:00 e 19:00.<br>• O silêncio noturno de “Alertas e lembretes” também vale aqui.<br>• Com o app aberto, o aviso aparece como faixa no Início. No aplicativo instalado (APK), ele toca também com o app fechado, e tocar nele abre esta tela.<br>• <b>O GLUXO não calcula nem sugere doses de insulina.</b> A mensagem é um lembrete seu, conforme a orientação do seu médico. Em emergência, ligue 192 (SAMU).</p></div>`;
   return h;
 }
 function caForm(r, isNew) {
@@ -68,7 +68,7 @@ function caForm(r, isNew) {
   <div class="field" id="ca-tf" ${wk === 'time' ? '' : 'hidden'}><label class="fl" for="ca-time">Horário</label><input class="in" type="time" id="ca-time" value="${w.time || '12:00'}"></div>
   <div class="field" id="ca-mf" ${wk === 'after' ? '' : 'hidden'}><label class="fl" for="ca-min">Minutos depois</label><input class="in" id="ca-min" inputmode="numeric" value="${w.min || 30}"></div>
   <div class="field"><label class="fl" for="ca-freq">Frequência</label>${sel('ca-freq', CA_FREQ, r.freq)}</div>
-  <div class="field"><label class="fl" for="ca-msg">Mensagem do aviso</label><textarea class="in" id="ca-msg" rows="4" maxlength="${CA_MAXMSG}" placeholder="Escreva o lembrete que quer receber">${esc(r.msg)}</textarea><p class="hint" style="margin:6px 0 0">Escreva apenas um lembrete seu. O TiaBete não define doses nem percentuais.</p></div>
+  <div class="field"><label class="fl" for="ca-msg">Mensagem do aviso</label><textarea class="in" id="ca-msg" rows="4" maxlength="${CA_MAXMSG}" placeholder="Escreva o lembrete que quer receber">${esc(r.msg)}</textarea><p class="hint" style="margin:6px 0 0">Escreva apenas um lembrete seu. O GLUXO não define doses nem percentuais.</p></div>
   <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" id="ca-on" ${r.on ? 'checked' : ''}><span><b>Alerta ativo</b></span></label>
   <div class="row" style="gap:8px"><button class="btn grow" data-act="ca-cancel">Cancelar</button><button class="btn pri grow" data-act="ca-save">Salvar</button></div></div>`;
 }

@@ -11,7 +11,7 @@ async function secKey(pass, salt, iter) {
 }
 async function secSeal(text, key, salt, iter) {
   const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
-  return JSON.stringify({ app: 'TiaBete', enc: 1, kdf: 'PBKDF2-SHA256', iter, salt: b64e(salt), iv: b64e(iv), data: b64e(ct) });
+  return JSON.stringify({ app: 'GLUXO', enc: 1, kdf: 'PBKDF2-SHA256', iter, salt: b64e(salt), iv: b64e(iv), data: b64e(ct) });
 }
 async function secOpenWith(env, key) {
   try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(env.iv) }, key, b64d(env.data))); }
@@ -28,7 +28,7 @@ async function secDriveKey() { const r = await secDriveRec(); if (!r) return nul
 async function secExportEnc(pass) {
   const txt = backupText(); if (!txt) { toast('Ainda não há dados reais para exportar.'); return false; }
   const salt = crypto.getRandomValues(new Uint8Array(16)), out = await secSeal(txt, await secKey(pass, salt, SEC_ITER), salt, SEC_ITER);
-  if (await saveFile(`tiabete-backup-${stamp()}-protegido.json`, out, out) === true) { await markBackup(); return true; } return false;
+  if (await saveFile(`gluxo-backup-${stamp()}-protegido.json`, out, out) === true) { await markBackup(); return true; } return false;
 }
 async function secIngest(text) {
   const j = JSON.parse(text); await ingestBackup(j);
@@ -46,7 +46,7 @@ const lkWait = () => { const c = lkCfg(); return c && c.until > Date.now() ? Mat
 /* ---- Biometria / rosto (WebAuthn, autenticador do próprio aparelho) ---- */
 /* No APK: biometria nativa do Android (BiometricPrompt, via plugin TbBiometric). Nos demais ambientes: WebAuthn. */
 const bioNat = () => { try { const C = window.Capacitor; return (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.TbBiometric) || null; } catch (e) { return null; } };
-const BIO_TXT = { none_hardware: 'Este aparelho não tem leitor de digital nem reconhecimento facial compatível.', none_enrolled: 'O aparelho tem biometria, mas nenhuma digital ou rosto está cadastrado. Cadastre nas configurações do Android e volte aqui.', hw_unavailable: 'O sensor de biometria está indisponível agora. Tente de novo em instantes.', security_update: 'O Android pede uma atualização de segurança antes de liberar a biometria.', unsupported: 'Este Android não oferece este nível de biometria ao app.', lockout: 'Biometria bloqueada por muitas tentativas. Aguarde um pouco ou use o PIN.', lockout_permanent: 'O Android bloqueou a biometria. Desbloqueie o aparelho com o PIN ou a senha dele para liberá-la. Enquanto isso, use o PIN do TiaBete.', user_cancel: 'Autenticação cancelada.', timeout: 'Tempo esgotado. Tente de novo ou use o PIN.', unavailable: 'A biometria não está disponível agora. Use o PIN.', unknown: 'Não foi possível verificar a biometria deste aparelho.' };
+const BIO_TXT = { none_hardware: 'Este aparelho não tem leitor de digital nem reconhecimento facial compatível.', none_enrolled: 'O aparelho tem biometria, mas nenhuma digital ou rosto está cadastrado. Cadastre nas configurações do Android e volte aqui.', hw_unavailable: 'O sensor de biometria está indisponível agora. Tente de novo em instantes.', security_update: 'O Android pede uma atualização de segurança antes de liberar a biometria.', unsupported: 'Este Android não oferece este nível de biometria ao app.', lockout: 'Biometria bloqueada por muitas tentativas. Aguarde um pouco ou use o PIN.', lockout_permanent: 'O Android bloqueou a biometria. Desbloqueie o aparelho com o PIN ou a senha dele para liberá-la. Enquanto isso, use o PIN do GLUXO.', user_cancel: 'Autenticação cancelada.', timeout: 'Tempo esgotado. Tente de novo ou use o PIN.', unavailable: 'A biometria não está disponível agora. Use o PIN.', unknown: 'Não foi possível verificar a biometria deste aparelho.' };
 const bioWhy = code => BIO_TXT[code] || BIO_TXT.unknown;
 const bioDo = async fn => { SEC.bioBusy = true; try { return await fn(); } finally { setTimeout(() => { SEC.bioBusy = false; SEC.hiddenAt = 0; }, 1200); } };
 const bioOk = () => !!(bioNat() || (window.PublicKeyCredential && navigator.credentials && secOk()));
@@ -57,11 +57,11 @@ async function bioEnroll() {
   const N = bioNat();
   if (N) {
     await bioProbe(); if (!SEC.bioAvail) { const e = new Error(bioWhy(SEC.bioSt && SEC.bioSt.code)); e.bioCode = SEC.bioSt && SEC.bioSt.code; throw e; }
-    try { await bioDo(() => N.authenticate({ title: 'Ativar biometria no TiaBete', subtitle: 'Confirme com a digital ou o rosto cadastrados no aparelho', negative: 'Cancelar' })); }
+    try { await bioDo(() => N.authenticate({ title: 'Ativar biometria no GLUXO', subtitle: 'Confirme com a digital ou o rosto cadastrados no aparelho', negative: 'Cancelar' })); }
     catch (er) { const e = new Error(bioWhy(er && er.code)); e.bioCode = er && er.code; throw e; }
     return { native: 1 };
   }
-  const cred = await navigator.credentials.create({ publicKey: { rp: { name: 'TiaBete' }, user: { id: bioRnd(16), name: 'tiabete', displayName: 'TiaBete' }, challenge: bioRnd(32), pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+  const cred = await navigator.credentials.create({ publicKey: { rp: { name: 'GLUXO' }, user: { id: bioRnd(16), name: 'gluxo', displayName: 'GLUXO' }, challenge: bioRnd(32), pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
   const pk = cred && cred.response.getPublicKey && cred.response.getPublicKey(); if (!pk) throw new Error('Este aparelho não devolveu a chave de verificação.');
   return { id: b64e(new Uint8Array(cred.rawId)), pk: b64e(new Uint8Array(pk)) };
 }
@@ -70,7 +70,7 @@ function bioDer(sig) { // assinatura ECDSA DER -> r||s (64 bytes)
   const r = rd(), s = rd(), o = new Uint8Array(64); o.set(r); o.set(s, 32); return o;
 }
 async function bioVerify(bio) {
-  if (bio && bio.native) { const N = bioNat(); if (!N) return false; await bioDo(() => N.authenticate({ title: 'Abrir o TiaBete', subtitle: 'Use a digital ou o rosto cadastrados no aparelho', negative: 'Usar PIN' })); return true; }
+  if (bio && bio.native) { const N = bioNat(); if (!N) return false; await bioDo(() => N.authenticate({ title: 'Abrir o GLUXO', subtitle: 'Use a digital ou o rosto cadastrados no aparelho', negative: 'Usar PIN' })); return true; }
   const ch = bioRnd(32);
   const a = await navigator.credentials.get({ publicKey: { challenge: ch, allowCredentials: [{ type: 'public-key', id: b64d(bio.id), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } });
   const r = a.response, cd = new Uint8Array(r.clientDataJSON), cj = JSON.parse(new TextDecoder().decode(cd)), ad = new Uint8Array(r.authenticatorData);
@@ -93,11 +93,11 @@ function lkShow(forgot) {
   const c = lkCfg(); if (!c || !document.body) return;
   SEC.locked = true; try { if (typeof drClose === 'function') drClose(false); } catch (e) { }
   let o = document.getElementById('lk');
-  if (!o) { o = document.createElement('div'); o.id = 'lk'; o.className = 'lk'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'TiaBete bloqueado'); document.body.appendChild(o); }
+  if (!o) { o = document.createElement('div'); o.id = 'lk'; o.className = 'lk'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'GLUXO bloqueado'); document.body.appendChild(o); }
   document.querySelectorAll('.top, #view, #nav').forEach(e => e.setAttribute('inert', ''));
   o.innerHTML = forgot ? `<div class="lk-in"><h1>Esqueci o PIN</h1><p>Por segurança, o PIN não pode ser recuperado. Você pode <b>apagar todos os dados deste aparelho</b> e remover o bloqueio. Depois, restaure uma cópia sua, se tiver.</p>
       <form data-lk-form="wipe"><label for="lk-w">Digite APAGAR para confirmar</label><input id="lk-w" autocomplete="off" autocapitalize="characters"><button class="btn pri full" type="submit">Apagar dados e remover PIN</button><button class="btn full" type="button" data-lk="back">Voltar</button></form></div>`
-    : `<div class="lk-in"><h1>TiaBete</h1><p>Digite o seu PIN para abrir.</p>
+    : `<div class="lk-in"><h1>GLUXO</h1><p>Digite o seu PIN para abrir.</p>
       <form data-lk-form="pin"><input id="lk-pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="8" aria-label="PIN" aria-describedby="lk-msg"><div class="lk-msg" id="lk-msg" role="alert"></div><button class="btn pri full" type="submit">Entrar</button>${c.bio ? '<button class="btn full" type="button" data-lk="bio">Usar biometria ou rosto</button>' : ''}<button class="btn full" type="button" data-lk="forgot">Esqueci o PIN</button></form></div>`;
   const f = o.querySelector('input'); if (f) setTimeout(() => f.focus(), 30);
   if (!forgot && c.bio) setTimeout(() => lkBio(true), 350);
@@ -130,7 +130,7 @@ const secPwField = (id, label, auto) => `<label class="fl" for="${id}">${label}<
 function secForm() {
   const f = SEC.form, msg = SEC.msg ? `<p class="hint" role="alert" style="color:var(--red-t);margin:0 0 10px">${esc(SEC.msg)}</p>` : '';
   const pin = (id, l) => `<label class="fl" for="${id}">${l}</label><input id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" class="in" style="width:100%;margin-bottom:10px">`;
-  const warn = '<p class="hint" style="margin:0 0 10px"><b>Atenção:</b> se você esquecer a senha, ninguém consegue recuperar estes dados, nem o TiaBete.</p>';
+  const warn = '<p class="hint" style="margin:0 0 10px"><b>Atenção:</b> se você esquecer a senha, ninguém consegue recuperar estes dados, nem o GLUXO.</p>';
   const go = t => `<div class="row" style="gap:8px"><button class="btn pri grow" type="submit">${t}</button><button class="btn" type="button" data-sec="cancel">Cancelar</button></div>`;
   if (f === 'bk') return `<form data-sec-form="bk">${warn}${secPwField('sec-p1', `Senha do arquivo (mín. ${SEC_MIN} caracteres)`)}${secPwField('sec-p2', 'Repita a senha')}${msg}${go('Gerar cópia protegida')}</form>`;
   if (f === 'drv') return `<form data-sec-form="drv">${warn}<p class="hint" style="margin:0 0 10px">As cópias enviadas ao Drive passam a ser gravadas cifradas. Para restaurar em outro aparelho você vai precisar desta senha.</p>${secPwField('sec-p1', `Senha das cópias do Drive (mín. ${SEC_MIN} caracteres)`)}${secPwField('sec-p2', 'Repita a senha')}${msg}${go('Ativar cifra no Drive')}</form>`;

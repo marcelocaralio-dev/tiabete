@@ -156,9 +156,9 @@ async function makeSummaryPDF() {
     const ev = S.events.filter(e => e.date >= from).sort((a, b) => a.date.localeCompare(b.date)).slice(-6);
     if (ev.length) { h2('Eventos marcados'); ev.forEach(e => para(`${fmtDate(e.date)} - ${e.text}`, { fs: 8.5 })); }
     need(40); y = Math.max(y, H - 56); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUT);
-    doc.text(doc.splitTextToSize('Documento de acompanhamento pessoal gerado pelo TiaBete. Nao e diagnostico nem indicacao de tratamento; a interpretacao e do medico. Notas e textos de exames sao resumos automaticos: confira com os laudos originais.', CW), M, y);
+    doc.text(doc.splitTextToSize('Documento de acompanhamento pessoal gerado pelo GLUXO. Nao e diagnostico nem indicacao de tratamento; a interpretacao e do medico. Notas e textos de exames sao resumos automaticos: confira com os laudos originais.', CW), M, y);
     const pdf = doc.output('arraybuffer');
-    await outFile(`tiabete-resumo-consulta-${stamp()}.pdf`, new Uint8Array(pdf));
+    await outFile(`gluxo-resumo-consulta-${stamp()}.pdf`, new Uint8Array(pdf));
     say('');
   } catch (e) { console.error(e); toast('Não consegui gerar o resumo: ' + (e && e.message || e)); const st = $('#rep-status'); if (st) st.textContent = ''; }
 }
@@ -926,15 +926,15 @@ function viewLembretes() {
   <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row-reverse;justify-content:space-between;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on swt" role="switch" data-k="${x.k}" ${on ? 'checked' : ''}><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
   <div class="field" style="margin-top:14px"><label class="fl" for="ics-adv">Avisar com antecedência</label><select class="in" id="ics-adv"><option value="0">Na hora</option><option value="5">5 minutos antes</option><option value="10">10 minutos antes</option><option value="15">15 minutos antes</option></select></div></div>
   <button class="btn pri full" style="margin-top:12px" data-act="ics-make">Gerar arquivo de calendário</button>
-  <p class="hint" style="margin:10px 0 0">O horário da basal vem da sua média registrada, quando existe. Para parar os lembretes, apague os eventos “TiaBete” do calendário. Os horários são só avisos seus: o app não indica doses.</p>`;
+  <p class="hint" style="margin:10px 0 0">O horário da basal vem da sua média registrada, quando existe. Para parar os lembretes, apague os eventos “GLUXO” do calendário. Os horários são só avisos seus: o app não indica doses.</p>`;
 }
 const icsEsc = s => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 function makeICS(items, adv) {
   const d0 = isoDate(new Date()).replace(/-/g, ''), now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TiaBete//Lembretes//PT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GLUXO//Lembretes//PT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
   items.forEach(it => {
     const [h, m] = it.t.split(':'), dur = new Date(2000, 0, 1, +h, +m + 10), end = pad(dur.getHours()) + pad(dur.getMinutes());
-    L.push('BEGIN:VEVENT', `UID:tiabete-${it.k}-${d0}@tiabete.local`, `DTSTAMP:${now}`, `DTSTART:${d0}T${h}${m}00`, `DTEND:${d0}T${end}00`, 'RRULE:FREQ=DAILY', `SUMMARY:${icsEsc('TiaBete · ' + it.title)}`, `DESCRIPTION:${icsEsc('Lembrete do TiaBete. Registre no app depois.')}`, 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(it.title)}`, `TRIGGER:-PT${adv}M`, 'END:VALARM', 'END:VEVENT');
+    L.push('BEGIN:VEVENT', `UID:tiabete-${it.k}-${d0}@tiabete.local`, `DTSTAMP:${now}`, `DTSTART:${d0}T${h}${m}00`, `DTEND:${d0}T${end}00`, 'RRULE:FREQ=DAILY', `SUMMARY:${icsEsc('GLUXO · ' + it.title)}`, `DESCRIPTION:${icsEsc('Lembrete do GLUXO. Registre no app depois.')}`, 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(it.title)}`, `TRIGGER:-PT${adv}M`, 'END:VALARM', 'END:VEVENT');
   });
   L.push('END:VCALENDAR');
   return L.join('\r\n') + '\r\n';
@@ -947,7 +947,7 @@ document.addEventListener('click', async e => {
     if (items.length < 0) return;
     if (!items.length) { toast('Marque pelo menos um lembrete.'); return; }
     S.icsPref = pref; try { await Store.put('meta', { id: 'ics-pref', value: pref }); } catch (x) { }
-    await saveFile(`tiabete-lembretes-${stamp()}.ics`, makeICS(items, +$('#ics-adv').value || 0), makeICS(items, +$('#ics-adv').value || 0));
+    await saveFile(`gluxo-lembretes-${stamp()}.ics`, makeICS(items, +$('#ics-adv').value || 0), makeICS(items, +$('#ics-adv').value || 0));
   } catch (err) { console.error(err); toast('Não consegui gerar o arquivo: ' + (err && err.message || err)); }
 });
 
@@ -1002,7 +1002,7 @@ const ASK_TOOLS = () => {
   ];
 };
 function askSystem() {
-  return `Você é o assistente de análise de dados do aplicativo TiaBete (controle de glicemia, em mg/dL) e conversa em português do Brasil com o próprio usuário, que tem diabetes tipo MODY. Hoje é ${fmtDate(isoDate(new Date()))} (${WD[new Date().getDay()]}), ${nowHM()}.
+  return `Você é o assistente de análise de dados do aplicativo GLUXO (controle de glicemia, em mg/dL) e conversa em português do Brasil com o próprio usuário, que tem diabetes tipo MODY. Hoje é ${fmtDate(isoDate(new Date()))} (${WD[new Date().getDay()]}), ${nowHM()}.
 Responda sempre com base nos dados do usuário: use as ferramentas para buscar medições, estatísticas e registros de insulina ANTES de afirmar números. Nunca invente valores; se faltar dado, diga o que falta.
 REGRAS: (1) Descreva o que os números mostram, com datas e valores; padrões são coincidências observadas, não causas. (2) NUNCA recomende, calcule ou ajuste doses de insulina, nem mudança de tratamento ou de remédio. (3) Não faça diagnóstico. Para decisões de tratamento ou números preocupantes, sugira conversar com a equipe médica; em sintomas graves, procurar atendimento (SAMU 192). (4) Contexto "depois"+refeição "jantar" é o depois do jantar; "jejum" é a glicemia em jejum. (5) Faixas do app: baixa < 70; alta > 180 (jejum > 130); muito baixa < 54; muito alta > 250. (6) Seja objetivo: respostas curtas, sem tabelas Markdown (use listas curtas), no máximo cerca de 200 palavras salvo se pedirem mais.`;
 }
@@ -1144,7 +1144,7 @@ new MutationObserver(ms => { if (ms.every(m => m.target.nodeType === 1 && m.targ
 
 
 /* ================= Backup no Google Drive (conector do Claude) ================= */
-const DRV = 'Google Drive', DRV_FOLDER = 'TiaBete Backups';
+const DRV = 'Google Drive', DRV_FOLDER = 'GLUXO Backups', DRV_FOLDER_OLD = 'TiaBete Backups'; /* nome antigo: só para achar a pasta das cópias já feitas */
 S.drv = { auto: false, folderId: null, lastTs: 0, busy: false, msg: '', list: null, failAt: 0, freq: '1', custom: 3, notify: true, lastStatus: '', lastMsg: '', lastAt: 0, failSeen: 0 };
 /* intervalo escolhido, em ms (menos 2 h de folga, para o diário valer mesmo abrindo o app um pouco mais cedo) */
 const drvGap = () => { const d = S.drv, n = d.freq === 'custom' ? Math.min(90, Math.max(1, Math.round(+d.custom) || 1)) : (+d.freq || 1); return n * 86400000 - 2 * 3600000; };
@@ -1170,7 +1170,8 @@ const drvFiles = p => (p && Array.isArray(p.files)) ? p.files : Array.isArray(p)
 async function drvSavePref() { const d = S.drv; try { await Store.put('meta', { id: 'drive-pref', auto: d.auto, folderId: d.folderId, lastTs: d.lastTs, freq: d.freq, custom: d.custom, notify: d.notify, lastStatus: d.lastStatus, lastMsg: d.lastMsg, lastAt: d.lastAt, failSeen: d.failSeen }); } catch (e) { } }
 async function drvFolder() {
   if (S.drv.folderId) return S.drv.folderId;
-  const f = drvFiles(await drvCall('search_files', { query: `title = '${DRV_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and owner = 'me'`, excludeContentSnippets: true, pageSize: 5 }))[0];
+  const find = nm => drvCall('search_files', { query: `title = '${nm}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and owner = 'me'`, excludeContentSnippets: true, pageSize: 5 });
+  const f = drvFiles(await find(DRV_FOLDER))[0] || drvFiles(await find(DRV_FOLDER_OLD))[0]; /* cópias antigas continuam na pasta antiga: nada é perdido nem duplicado */
   if (f && f.id) { S.drv.folderId = f.id; await drvSavePref(); return f.id; }
   const c = await drvCall('create_file', { title: DRV_FOLDER, mimeType: 'application/vnd.google-apps.folder' });
   if (!c || !c.id) throw { code: 'upstream_error', message: 'pasta não criada' };
@@ -1182,7 +1183,7 @@ async function drvBackup(manual) {
   d.busy = true; d.msg = ''; if (manual) render();
   try {
     const ek = await secDriveKey(), body = ek ? await secSeal(txt, ek.key, b64d(ek.salt), ek.iter) : txt;
-    let pid = await drvFolder(), now = new Date(), name = `tiabete-backup-${isoDate(now)}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+    let pid = await drvFolder(), now = new Date(), name = `gluxo-backup-${isoDate(now)}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
     const mk = id => drvCall('create_file', { title: name, textContent: body, contentMimeType: 'application/json', disableConversionToGoogleType: true, parentId: id });
     try { await mk(pid); }
     catch (e) { if (e && e.code === 'tool_error') { S.drv.folderId = null; pid = await drvFolder(); await mk(pid); } else throw e; }
@@ -1218,7 +1219,7 @@ async function drvLoad(id) {
 function driveCardBody(intro) {
   const d = S.drv, fmt = t => new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   const acct = window.TB_DRV ? '' : '<p class="hint" style="margin:0 0 10px">Conta: a do conector Google Drive do seu Claude (o app não enxerga o e-mail).</p>';
-  const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^tiabete-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
+  const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^(?:gluxo|tiabete)-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
   const ok = d.lastStatus === 'ok' && d.lastTs, bad = d.lastStatus === 'fail';
   const status = `<div class="bl-facts" style="margin:0 0 12px"><div class="row sp"><span>Última cópia</span><b class="num">${d.lastTs ? fmt(d.lastTs) : 'nenhum ainda'}</b></div>
     <div class="row sp"><span>Status</span><b>${ok ? '✓ Concluído' : bad ? '✗ Falhou' : '—'}</b></div>${bad ? `<div class="row sp"><span>Última tentativa</span><b class="num">${fmt(d.lastAt)}</b></div>` : ''}
@@ -1231,7 +1232,7 @@ function driveCardBody(intro) {
     <div class="form-grid" style="margin-top:10px"><div class="field"><label class="fl" for="drv-freq">Frequência</label><select class="in" id="drv-freq">${[['1', 'A cada 1 dia'], ['7', 'A cada 7 dias'], ['15', 'A cada 15 dias'], ['30', 'A cada 30 dias'], ['custom', 'Personalizado']].map(([v, l]) => `<option value="${v}" ${String(d.freq) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     ${d.freq === 'custom' ? `<div class="field"><label class="fl" for="drv-custom">Dias entre cópias</label><input class="in num" type="number" inputmode="numeric" min="1" max="90" id="drv-custom" value="${d.custom}"></div>` : ''}</div>
     <label class="al-l pl-sw" style="margin-top:6px"><input type="checkbox" class="swt" role="switch" id="drv-notify" ${d.notify ? 'checked' : ''}><span><b>Avisar se a cópia falhar</b><small>Faixa no app${window.TB_DRV ? ' e notificação do Android' : ''}.</small></span></label>
-    <p class="hint" style="margin:12px 0 0"><b>Importante:</b> esta cópia <b>não roda com o app fechado</b>. ${window.TB_DRV ? 'O Android não permite que o TiaBete envie arquivos em segundo plano por conta própria.' : 'O navegador e o Claude só executam o app enquanto ele está aberto.'} Ela só acontece quando você abre o app, ou toca em “Fazer cópia agora”. Se ficar muitos dias sem abrir, a cópia atrasa.</p>
+    <p class="hint" style="margin:12px 0 0"><b>Importante:</b> esta cópia <b>não roda com o app fechado</b>. ${window.TB_DRV ? 'O Android não permite que o GLUXO envie arquivos em segundo plano por conta própria.' : 'O navegador e o Claude só executam o app enquanto ele está aberto.'} Ela só acontece quando você abre o app, ou toca em “Fazer cópia agora”. Se ficar muitos dias sem abrir, a cópia atrasa.</p>
     <p class="hint" style="margin:6px 0 0">A cópia inclui medições, exames, insulinas, tratamento, alimentos, refeições, razão insulina/carboidratos e configurações. O app não apaga cópias antigas do Drive.</p>`;
 }
 function drvBanner() {
@@ -1400,7 +1401,7 @@ function viewConfig() {
 async function shareFile(name, data, mime) {
   try {
     const f = new File([data], name, { type: mime || (name.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream') });
-    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'Resumo de glicemia (TiaBete)', text: 'Resumo de glicemia gerado pelo TiaBete.' }); return true; }
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'Resumo de glicemia (GLUXO)', text: 'Resumo de glicemia gerado pelo GLUXO.' }); return true; }
   } catch (e) { if (e && e.name === 'AbortError') return false; }
   if (!IS_NATIVE) toast('Este aparelho não abriu o menu de compartilhar. O PDF será salvo para você anexar à mensagem.');
   return await saveFile(name, data);
@@ -1411,11 +1412,11 @@ function shareText() {
   const recs = inRange(S.records.filter(x => !isEx(x)), mkTs(r.from, '00:00'), endOfDay(mkTs(r.to, '00:00'))), st = stats(recs);
   if (!st.n) return '';
   const lab = [...S.hba].reverse().find(x => !isEx(x) && x.source !== 'estimativa' && x.value != null);
-  return ['Resumo de glicemia (TiaBete)', `Período: ${fmtDate(r.from)} a ${fmtDate(r.to)}`, `${st.n} medições · média ${fn(st.mean, 0)} mg/dL · mínima ${fn(st.min, 0)} · máxima ${fn(st.max, 0)}`, `Abaixo de ${LIM.low}: ${st.hypo} · acima da faixa: ${st.hyper}`, lab ? `Última HbA1c de laboratório: ${fn(lab.value, 1)}% (${fmtDate(lab.date)})` : '', 'Dados de acompanhamento pessoal; não é diagnóstico nem indicação de tratamento.'].filter(Boolean).join('\n');
+  return ['Resumo de glicemia (GLUXO)', `Período: ${fmtDate(r.from)} a ${fmtDate(r.to)}`, `${st.n} medições · média ${fn(st.mean, 0)} mg/dL · mínima ${fn(st.min, 0)} · máxima ${fn(st.max, 0)}`, `Abaixo de ${LIM.low}: ${st.hypo} · acima da faixa: ${st.hyper}`, lab ? `Última HbA1c de laboratório: ${fn(lab.value, 1)}% (${fmtDate(lab.date)})` : '', 'Dados de acompanhamento pessoal; não é diagnóstico nem indicação de tratamento.'].filter(Boolean).join('\n');
 }
 function shareSheet() {
   const t = shareText(), q = encodeURIComponent(t), canNative = !!navigator.share || IS_NATIVE, r = S.rep;
-  openSheet(`<h2>Enviar ao meu médico</h2><p class="hint" style="margin:0 0 12px">O TiaBete não envia nada sozinho: você escolhe o destino e confere a mensagem antes. Ao compartilhar, dados de saúde saem deste aparelho.</p>
+  openSheet(`<h2>Enviar ao meu médico</h2><p class="hint" style="margin:0 0 12px">O GLUXO não envia nada sozinho: você escolhe o destino e confere a mensagem antes. Ao compartilhar, dados de saúde saem deste aparelho.</p>
   ${t ? `<label class="fl" for="sh-text">Texto do resumo (${fmtDate(r.from)} a ${fmtDate(r.to)})</label><textarea class="in" id="sh-text" style="min-height:140px;font-size:14.5px" readonly>${esc(t)}</textarea>` : '<p class="hint">Não há medições no período escolhido em Relatórios. O PDF de resumo ainda pode ser enviado.</p>'}
   <div class="stack" style="margin-top:12px">
   <button class="btn pri full" data-act="sh-pdf-sum">Enviar resumo para a consulta (PDF)</button>
@@ -1430,7 +1431,7 @@ document.addEventListener('click', async e => {
   if (a === 'sh-open') shareSheet();
   else if (a === 'sh-pdf-sum') { closeSheet(); S._share = true; try { await makeSummaryPDF(); } finally { S._share = false; } }
   else if (a === 'sh-pdf-rep') { closeSheet(); S._share = true; try { await makePDF(); } finally { S._share = false; } }
-  else if (a === 'sh-native') { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share; if (IS_NATIVE && P) await P.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText(), dialogTitle: 'Enviar resumo' }); else await navigator.share({ title: 'Resumo de glicemia (TiaBete)', text: shareText() }); } catch (err) { } }
+  else if (a === 'sh-native') { try { const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share; if (IS_NATIVE && P) await P.share({ title: 'Resumo de glicemia (GLUXO)', text: shareText(), dialogTitle: 'Enviar resumo' }); else await navigator.share({ title: 'Resumo de glicemia (GLUXO)', text: shareText() }); } catch (err) { } }
   else if (a === 'sh-copy') { const t = shareText(); try { await navigator.clipboard.writeText(t); toast('Texto copiado.'); } catch (err) { const ta = $('#sh-text'); if (ta) { ta.focus(); ta.select(); } toast('Selecione o texto e copie.'); } }
 });
 
@@ -1438,7 +1439,7 @@ document.addEventListener('click', async e => {
 function viewSeguranca() { return banners() + secCard(); }
 function viewPrivacidade() {
   const has = !!S.profile;
-  return banners() + `<h2 class="sec">Privacidade e armazenamento</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no TiaBete nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (a sua cópia, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} Para proteger o acesso, use o bloqueio por PIN (Bloqueio e proteção) ou o bloqueio de tela do aparelho.</p>
+  return banners() + `<h2 class="sec">Privacidade e armazenamento</h2><div class="card"><p class="hint" style="margin:0 0 10px">Seus dados ficam no aparelho. Não há conta no GLUXO nem rastreamento. Eles só saem do aparelho quando você usa a IA (o trecho enviado) ou o Google Drive (a sua cópia, na sua conta).${IS_NATIVE ? ' A chave da IA é guardada cifrada.' : ''} Para proteger o acesso, use o bloqueio por PIN (Bloqueio e proteção) ou o bloqueio de tela do aparelho.</p>
     <p class="hint" style="margin:0 0 10px">Armazenamento persistente: <b>${S.persisted ? 'ativo' : 'não confirmado'}</b>. Ele reduz o risco de o navegador apagar os dados por falta de espaço.</p>
     <div class="stack"><button class="btn full" data-act="pf-persist">Proteger dados no aparelho</button>${has ? '<button class="btn full" data-act="pf-clear">Apagar meu perfil</button>' : ''}</div>
     <p class="hint" style="margin:10px 0 0">Apagar o perfil não apaga medições nem outros registros. Para apagar tudo, use Cópia de segurança → Apagar dados.</p></div>`;
