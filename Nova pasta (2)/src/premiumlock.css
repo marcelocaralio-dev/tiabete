@@ -1,0 +1,24 @@
+/* Selo PREMIUM dos recursos bloqueados (src/premiumlock.js). Discreto, só vermelhos do GLUXO; usa variáveis já existentes. */
+.pl-bd { display: inline-flex; align-items: center; gap: 4px; flex: none; font-style: normal; font-family: var(--f-mono); font-size: 10px; line-height: 1; letter-spacing: .09em; color: #FFD9DD; padding: 4px 7px; border-radius: 99px; border: 1px solid rgba(255,114,118,.38); background: linear-gradient(135deg, rgba(227,30,44,.34), rgba(91,13,22,.5)); vertical-align: middle; white-space: nowrap; pointer-events: none; }
+.pl-bd b { font-weight: 700; }
+.pl-bd svg, button .pl-bd svg { width: 10px; height: 10px; flex: none; margin: 0; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="light"] .pl-bd { color: #A3101F; border-color: rgba(212,22,42,.35); background: linear-gradient(135deg, rgba(212,22,42,.12), rgba(212,22,42,.05)); }
+.pl-has { position: relative; }
+/* botões e links em linha: o selo vai depois do texto, sem empurrar o layout */
+.pl-inl { margin-left: 8px; }
+/* cartões do menu Mais: o selo fica numa linha própria abaixo da descrição */
+.pl-menu { display: inline-flex; margin-top: 6px; }
+/* menu lateral: selo à direita do item */
+.pl-dr { margin-left: auto; }
+.dr-it.pl-has > span { flex: 1 1 auto; }
+/* barra de navegação: só o cadeado, num canto do ícone (não altera a largura da aba) */
+.pl-nav { position: absolute; top: 3px; left: 50%; margin-left: 6px; padding: 3px; border-radius: 99px; }
+#nav button .pl-nav svg, .nav-in button .pl-nav svg { width: 9px; height: 9px; }
+.nav-in button .pl-nav { top: 4px; left: 50%; margin-left: 5px; width: 17px; height: 17px; padding: 0; justify-content: center; box-sizing: border-box; background: rgba(60,8,14,.92); }
+/* janela explicativa */
+.pl-sh-h { display: flex; align-items: center; gap: 12px; }
+.pl-sh-ic { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #FFE3E6; background: linear-gradient(145deg, #E31E2C, #7A1020); box-shadow: 0 6px 16px rgba(227,30,44,.35), inset 0 1px 0 rgba(255,255,255,.3); }
+.pl-sh-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.pl-sh-p { color: var(--mut); font-size: 15px; margin: 12px 0 0; }
+.pl-sh-p b { color: var(--fg); font-weight: 600; }
+@media (max-width: 380px) { .pl-bd { font-size: 9.5px; padding: 4px 6px; } .pl-inl { margin-left: 6px; } }
