@@ -19,7 +19,9 @@ APP_RETURN = "app.tiabete.glicose:/pagamento"   # retorno ao app após o pagamen
 MP_SELLER_ID = ""       # ID numérico do VENDEDOR no Mercado Pago (público). Usado no X-Caller-Id da consulta de contestações; vazio = sem essa consulta (decide só pelo status oficial da Order)
 
 # Segredos (NÃO ficam aqui; cadastre com "wrangler secret put NOME"):
-#   LICENSE_PRIVATE_JWK · MP_ACCESS_TOKEN · MP_WEBHOOK_SECRET
+#   LICENSE_PRIVATE_JWK · MP_ACCESS_TOKEN · MP_WEBHOOK_SECRET · DEVICE_HMAC_KEY
+#   DEVICE_HMAC_KEY (0.34.0): texto aleatório longo (ex.: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"). NÃO troque depois:
+#   trocar a chave faz o servidor esquecer os aparelhos que já receberam o teste. Sem ela o reconhecimento por aparelho fica desligado.
 [observability]
 enabled = true
 

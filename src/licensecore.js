@@ -23,6 +23,8 @@ function licComputeState(acct, lic, openOrder, now) {
   if (openOrder) return 'payment_pending';
   return now < acct.trial_started_at + LIC_TRIAL_MS ? 'trial_active' : 'trial_expired';
 }
+/* Dois registros do mesmo usuário (instalação e conta): vale o início MAIS ANTIGO. Troca de conta, login depois de dias ou reinstalação nunca dão dias novos. */
+function licEarliest(a, b) { const x = a == null ? null : Number(a), y = b == null ? null : Number(b); return x == null ? y : y == null ? x : Math.min(x, y); }
 function licTrialEnd(acct) { return acct && acct.trial_started_at != null ? acct.trial_started_at + LIC_TRIAL_MS : null; }
 /* Direito às funções premium segundo o PAYLOAD (usado pelo app e pelo Worker). now = relógio já protegido contra recuo. */
 function licPremium(p, now) {
@@ -55,4 +57,4 @@ function licRemaining(te, now) {
   const ms = Math.max(0, te - now), h = Math.floor(ms / 3600e3), d = Math.floor(h / 24);
   return d >= 1 ? `${d} ${d === 1 ? 'dia' : 'dias'}${h % 24 ? ' e ' + (h % 24) + ' h' : ''}` : `${h} h`;
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { LIC_TRIAL_MS, LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, LIC_SKEW_MS, LIC_STATES, licB64u, licB64d, licComputeState, licTrialEnd, licPremium, licSign, licVerify, licClock, licRemaining };
+if (typeof module !== 'undefined' && module.exports) module.exports = { licEarliest, LIC_TRIAL_MS, LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, LIC_SKEW_MS, LIC_STATES, licB64u, licB64d, licComputeState, licTrialEnd, licPremium, licSign, licVerify, licClock, licRemaining };

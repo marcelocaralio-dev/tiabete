@@ -7,10 +7,10 @@ const md5 = f => nodeCrypto.createHash('md5').update(fs.readFileSync(path.join(R
 const rd = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 (async () => {
-  /* ---------- 0) o módulo de licenciamento continua byte a byte igual ao da versão 0.23.0 ---------- */
-  const LOCK = { 'src/license.js': '8fc50c23d8daeea0333b6c42b5afe04d', 'src/licensecore.js': 'e040fad3daf3efa9de4cb5914b35c090', 'worker/src/index.js': '3203b894358045ee34e272db58058553' };
+  /* ---------- 0) o módulo de licenciamento está travado na versão 0.34.0 (visitante + Android ID): qualquer mudança futura exige atualizar estes hashes de propósito ---------- */
+  const LOCK = { 'src/license.js': 'ddf8bb2807aa8f0bade16707e5b069db', 'src/licensecore.js': 'e7ba4ce34217ea6faa237f7d2ed4b278', 'worker/src/index.js': '8b8a3ae8c89ffdbbd2f630f7e52ad521' };
   for (const [f, h] of Object.entries(LOCK)) ok(md5(f) === h, 'intacto: ' + f);
-  for (const f of fs.readdirSync(path.join(ROOT, 'worker/migrations'))) ok(/^000[1-4]_/.test(f), 'sem migração nova: ' + f);
+  for (const f of fs.readdirSync(path.join(ROOT, 'worker/migrations'))) ok(/^000[1-6]_/.test(f), 'sem migração nova: ' + f);
   const pm = rd('src/premium.js');
   ok(!/\b(licSave|licSign|licVerify|licSession|licBuy|licCall|licComputeState)\s*\(/.test(pm), 'premium.js não chama validação, gravação, compra nem sessão');
   ok(!/LK\.(payload|devices|info|conflict|msg|seen|cfg|api)\s*=[^=]/.test(pm) && !/TB_HTTP|\.set\(|\.setCfg\(/.test(pm), 'premium.js não escreve no estado da licença, na rede nem no cofre');

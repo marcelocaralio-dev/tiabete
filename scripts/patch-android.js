@@ -38,8 +38,8 @@ if (fs.existsSync(g)) {
     if (j.includes('setTextZoom')) return;
     if (!/extends\s+BridgeActivity\s*\{\s*\}/.test(j)) { console.warn('MainActivity.java com formato inesperado; textZoom não aplicado.'); return; }
     const pk = (/package\s+([\w.]+)\s*;/.exec(j) || [])[1];
-    if (pk) { writeExpire(path.dirname(f), pk); writeBiometric(path.dirname(f), pk); writeSettings(path.dirname(f), pk); } else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
-    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        registerPlugin(TbBiometricPlugin.class);\n        registerPlugin(TbSettingsPlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
+    if (pk) { writeExpire(path.dirname(f), pk); writeBiometric(path.dirname(f), pk); writeSettings(path.dirname(f), pk); writeDevice(path.dirname(f), pk); } else console.warn('Pacote do MainActivity não encontrado; expiração de notificações não instalada.');
+    j = j.replace(/extends\s+BridgeActivity\s*\{\s*\}/, 'extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(TbExpirePlugin.class);\n        registerPlugin(TbBiometricPlugin.class);\n        registerPlugin(TbSettingsPlugin.class);\n        registerPlugin(TbDevicePlugin.class);\n        super.onCreate(savedInstanceState);\n        getBridge().getWebView().getSettings().setTextZoom(100);\n        getBridge().getWebView().getSettings().setUseWideViewPort(true);\n        getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);\n    }\n}');
     fs.writeFileSync(f, j); console.log('textZoom 100% aplicado em', e.name);
   }
 })(path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java'));
@@ -354,4 +354,36 @@ public class TbSettingsPlugin extends Plugin {
 }
 `);
   console.log('Plugin TbSettings gravado em', dir);
+}
+
+
+/* Plugin nativo mínimo do teste gratuito: devolve Settings.Secure.ANDROID_ID (API oficial; sem MAC, IMEI ou número de série e sem permissões novas).
+   O app só repassa o valor ao servidor por HTTPS, onde ele vira um HMAC com segredo do backend; o app não o guarda nem o mostra.
+   Limites: muda após restauração de fábrica, em outro perfil de usuário e se a chave de assinatura do APK mudar. Não é senha nem prova de identidade. */
+function writeDevice(dir, pk) {
+  fs.writeFileSync(path.join(dir, 'TbDevicePlugin.java'), `package ${pk};
+
+import android.provider.Settings;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+@CapacitorPlugin(name = "TbDevice")
+public class TbDevicePlugin extends Plugin {
+    @PluginMethod
+    public void androidId(PluginCall call) {
+        try {
+            String id = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            JSObject o = new JSObject();
+            o.put("id", id == null ? "" : id);
+            call.resolve(o);
+        } catch (Exception e) {
+            call.reject("device id unavailable");
+        }
+    }
+}
+`);
+  console.log('Plugin TbDevice gravado em', dir);
 }

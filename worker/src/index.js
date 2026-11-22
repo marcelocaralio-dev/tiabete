@@ -1,7 +1,7 @@
 /* TiaBete · API de licenciamento (Cloudflare Worker + D1). Autoridade final do direito premium.
    Não recebe nem guarda dados de saúde. Tudo que depende de tempo usa o relógio DESTE servidor. */
 import core from '../../src/licensecore.js';
-const { LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, licComputeState, licTrialEnd, licSign } = core;
+const { LIC_GRACE_MS, LIC_GRACE_LIFETIME_MS, licComputeState, licTrialEnd, licSign, licEarliest, LIC_TRIAL_MS } = core;
 const MAX_DEVICES = 2, ABUSE_WINDOW = 24 * 3600e3, ABUSE_MAX_NEW = 6;
 const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
@@ -79,6 +79,99 @@ async function takeSlot(db, sub, devId, name, secretHash, now) {
   const d = await one(db, 'SELECT revoked_at FROM devices WHERE id=? AND sub=?', devId, sub);
   return !!d && d.revoked_at == null;
 }
+/* ---------- Visitante (uso sem conta Google): teste de 14 dias por INSTALAÇÃO anônima ----------
+   O app gera um identificador aleatório (sem IMEI, serial ou MAC) e um segredo aleatório; o servidor guarda só o id e o hash do segredo.
+   Tudo que depende de tempo usa o relógio DESTE servidor. Sem Google, sem e-mail, sem dados de saúde.
+   Limite que nenhum servidor consegue remover: quem apaga os dados do app ou reinstala perde o id e, sem conta, parece uma instalação nova. */
+const ID_RE = /^[\w-]{16,64}$/, SECRET_RE = /^[\w-]{16,128}$/;
+/* ---------- Registro permanente do teste por aparelho (ANDROID_ID pseudonimizado, 0.34.0) ----------
+   O app manda o ANDROID_ID por HTTPS; aqui ele vira HMAC-SHA256 com DEVICE_HMAC_KEY (segredo só do Worker) e o valor bruto é descartado: não vai para o
+   banco, para o log, para mensagem de erro nem para a resposta. O ANDROID_ID NÃO é senha, token nem prova de identidade: só reconhece "este aparelho já
+   recebeu um teste". Pode mudar (restauração de fábrica, outro perfil de usuário, outra chave de assinatura do APK). Sem DEVICE_HMAC_KEY o recurso fica
+   desligado (nunca grava hash sem segredo). Valores sabidamente repetidos entre aparelhos são ignorados para não negar o teste a quem nunca o usou. */
+const BAD_DEV = new Set(['9774d56d682e549c', 'null', 'unknown', 'android_id']);
+async function devHash(env, raw) {
+  const key = env.DEVICE_HMAC_KEY; if (!key || String(key).length < 16) return null;
+  const v = String(raw || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{8,64}$/.test(v) || BAD_DEV.has(v) || /^(.)\1+$/.test(v)) return null;
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(key)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode('tb-android-id-v1|' + v)))].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+/* Devolve o início do teste deste aparelho (cria o registro com `candidate` se for a primeira vez; se `candidate` for mais antigo, rebaixa o início).
+   null = sem sinal de aparelho (campo ausente/inválido, sem segredo no Worker ou falha): nesse caso nada muda e nenhum teste é negado. */
+async function bindDevice(deps, hint, candidate, instId) {
+  try {
+    const db = deps.env.DB, now = deps.now(), h = await devHash(deps.env, hint); if (!h) return null;
+    let r = await one(db, 'SELECT * FROM trial_devices WHERE dev_hash=?', h);
+    if (!r) { await run(db, 'INSERT OR IGNORE INTO trial_devices(dev_hash,trial_started_at,trial_expires_at,trial_granted,first_install_id,created_at,last_seen) VALUES(?,?,?,1,?,?,?)', h, candidate, candidate + LIC_TRIAL_MS, instId || null, now, now); r = await one(db, 'SELECT * FROM trial_devices WHERE dev_hash=?', h); }
+    const first = licEarliest(r.trial_started_at, candidate);
+    await run(db, 'UPDATE trial_devices SET trial_started_at=?, trial_expires_at=?, last_seen=? WHERE dev_hash=?', first, first + LIC_TRIAL_MS, now, h);
+    return first;
+  } catch (e) { console.error('bindDevice falhou'); return null; }
+}
+async function guestSnapshot(deps, inst) {
+  const now = deps.now(), st = licComputeState({ trial_started_at: inst.trial_started_at }, null, false, now), te = licTrialEnd({ trial_started_at: inst.trial_started_at });
+  const payload = { v: 1, sub: null, guest: true, inst: inst.id, st, te, lic: false, iat: now, vexp: now + LIC_GRACE_MS, dev: null };
+  const token = await licSign(payload, JSON.parse(deps.env.LICENSE_PRIVATE_JWK));
+  const price = await one(deps.env.DB, "SELECT value FROM config WHERE key='price_cents'");
+  return { token, status: st, guest: true, trial_ends_at: te, server_time: now, price_cents: +(price && price.value || 2990), licensed_price_cents: null };
+}
+async function installAuth(req, deps) {
+  const m = /^Install ([\w-]{16,64})\.([\w-]{16,128})$/.exec(req.headers.get('authorization') || ''); if (!m) return null;
+  const i = await one(deps.env.DB, 'SELECT * FROM installs WHERE id=?', m[1]);
+  if (!i || !same(i.secret_hash, await sha256(m[2]))) return null;
+  await run(deps.env.DB, 'UPDATE installs SET last_seen=? WHERE id=?', deps.now(), i.id); return i;
+}
+/* Instalação já conhecida + aparelho: iguala os dois ao início mais antigo (nunca mais novo) */
+async function syncInstDevice(deps, inst, hint) {
+  const ds = await bindDevice(deps, hint, inst.trial_started_at, inst.id); if (ds == null || ds >= inst.trial_started_at) return inst;
+  await run(deps.env.DB, 'UPDATE installs SET trial_started_at=? WHERE id=?', ds, inst.id); return Object.assign({}, inst, { trial_started_at: ds });
+}
+async function guestStart(req, deps) {
+  if (await limited(deps, 'gip:' + ipOf(req), 60, 10 * 60e3)) return err(429, 'rate_limited');
+  const b = await readJson(req); if (!b) return err(400, 'bad_request');
+  const db = deps.env.DB, now = deps.now(), id = String(b.install_id || ''), secret = String(b.install_secret || '');
+  if (!ID_RE.test(id) || !SECRET_RE.test(secret)) return err(400, 'bad_install');
+  const hash = await sha256(secret); let inst = await one(db, 'SELECT * FROM installs WHERE id=?', id);
+  if (inst) { if (!same(inst.secret_hash, hash)) return err(401, 'install_unauthorized'); await run(db, 'UPDATE installs SET last_seen=? WHERE id=?', now, id); inst = await syncInstDevice(deps, inst, b.device_hint); }
+  else {
+    if (await limited(deps, 'gnew:' + ipOf(req), 30, 24 * 3600e3)) return err(429, 'rate_limited');   /* freio contra criação em massa a partir de um mesmo IP */
+    /* O início é SEMPRE a hora do servidor (o app não escolhe). Se este aparelho já recebeu um teste (reinstalação, dados apagados, backup restaurado), vale o início original dele. */
+    const ds = await bindDevice(deps, b.device_hint, now, id), start = licEarliest(now, ds);
+    await run(db, 'INSERT OR IGNORE INTO installs(id,secret_hash,trial_started_at,created_at,last_seen) VALUES(?,?,?,?,?)', id, hash, start, now, now);
+    inst = await one(db, 'SELECT * FROM installs WHERE id=?', id);
+    if (!inst || !same(inst.secret_hash, hash)) return err(401, 'install_unauthorized');   /* corrida: outro segredo já registrou este id */
+    await logEv(db, null, 'guest_start', now, { inst: id, known_device: ds != null && ds < now });
+  }
+  return json(await guestSnapshot(deps, inst));
+}
+async function guestRefresh(req, deps) {
+  const i = await installAuth(req, deps); if (!i) return err(401, 'install_unauthorized');
+  if (await limited(deps, 'ginst:' + i.id, 60, 3600e3)) return err(429, 'rate_limited');
+  const b = await readJson(req).catch(() => null) || {};
+  return json(await guestSnapshot(deps, await syncInstDevice(deps, i, b.device_hint)));
+}
+/* Login com Google numa instalação que o app identificou: vale o início MAIS ANTIGO entre instalação e conta (nunca dá dias novos).
+   Falha aqui nunca derruba o login: segredo errado ou formato inválido apenas ignora o vínculo. */
+/* Conta + aparelho: vale o início mais antigo entre os dois, e a conta, o aparelho e as instalações dela ficam iguais a ele (nunca um teste novo). */
+async function bindAccountDevice(deps, sub, hint, instId) {
+  if (!hint) return; const db = deps.env.DB, acct = await one(db, 'SELECT trial_started_at FROM accounts WHERE sub=?', sub); if (!acct || acct.trial_started_at == null) return;
+  const ds = await bindDevice(deps, hint, acct.trial_started_at, ID_RE.test(String(instId || '')) ? String(instId) : null);
+  if (ds == null || ds >= acct.trial_started_at) return;
+  await run(db, 'UPDATE accounts SET trial_started_at=? WHERE sub=?', ds, sub);
+  await run(db, 'UPDATE installs SET trial_started_at=? WHERE linked_sub=? AND trial_started_at>?', ds, sub, ds);
+}
+async function bindInstall(db, sub, b, now) {
+  const id = String(b.install_id || ''), secret = String(b.install_secret || ''); if (!ID_RE.test(id) || !SECRET_RE.test(secret)) return;
+  const hash = await sha256(secret), acct = await one(db, 'SELECT trial_started_at FROM accounts WHERE sub=?', sub); if (!acct) return;
+  let inst = await one(db, 'SELECT * FROM installs WHERE id=?', id);
+  if (!inst) { await run(db, 'INSERT OR IGNORE INTO installs(id,secret_hash,trial_started_at,created_at,last_seen) VALUES(?,?,?,?,?)', id, hash, acct.trial_started_at == null ? now : acct.trial_started_at, now, now); inst = await one(db, 'SELECT * FROM installs WHERE id=?', id); }
+  if (!inst || !same(inst.secret_hash, hash)) return;
+  const first = licEarliest(acct.trial_started_at, inst.trial_started_at);
+  await run(db, 'UPDATE accounts SET trial_started_at=? WHERE sub=?', first, sub);
+  await run(db, 'UPDATE installs SET trial_started_at=?, last_seen=?, linked_sub=COALESCE(linked_sub,?), linked_at=COALESCE(linked_at,?) WHERE id=?', first, now, sub, now, id);
+  if (!inst.linked_sub) await logEv(db, sub, 'install_link', now, { inst: id });
+}
 async function session(req, deps) {
   if (await limited(deps, 'ip:' + ipOf(req), 40, 10 * 60e3)) return err(429, 'rate_limited');
   const b = await readJson(req); if (!b) return err(400, 'bad_request');
@@ -90,6 +183,8 @@ async function session(req, deps) {
   /* conta: o teste só começa aqui (primeiro acesso autenticado) e nunca é reescrito */
   await run(db, 'INSERT OR IGNORE INTO accounts(sub,email,name,created_at,trial_started_at) VALUES(?,?,?,?,?)', sub, pay.email || null, pay.name || null, now, now);
   await run(db, 'UPDATE accounts SET email=COALESCE(?,email), name=COALESCE(?,name) WHERE sub=?', pay.email || null, pay.name || null, sub);
+  try { await bindInstall(db, sub, b, now); } catch (e) { console.error('bindInstall', String(e && e.message || e).slice(0, 120)); }
+  await bindAccountDevice(deps, sub, b.device_hint, b.install_id);
   const existing = await one(db, 'SELECT * FROM devices WHERE id=?', devId);
   if (existing && existing.sub !== sub) return err(409, 'device_belongs_to_other_account');
   if (b.replace_device_id) await run(db, 'UPDATE devices SET revoked_at=? WHERE id=? AND sub=? AND revoked_at IS NULL', now, String(b.replace_device_id).slice(0, 64), sub);
@@ -107,6 +202,7 @@ async function session(req, deps) {
 async function refresh(req, deps) {
   const d = await deviceAuth(req, deps); if (!d) return err(401, 'device_unauthorized');
   if (await limited(deps, 'dev:' + d.id, 60, 3600e3)) return err(429, 'rate_limited');
+  const rb = await readJson(req).catch(() => null) || {}; await bindAccountDevice(deps, d.sub, rb.device_hint, null);
   await reconcile(deps, d.sub);
   return json(Object.assign(await snapshot(deps, d.sub, d.id), { devices: await listDevices(deps.env.DB, d.sub) }));
 }
@@ -330,6 +426,8 @@ export function createApp(base) {
       if (req.method === 'POST') {
         if (p === '/v1/session') return await session(req, deps);
         if (p === '/v1/refresh') return await refresh(req, deps);
+        if (p === '/v1/guest/start') return await guestStart(req, deps);
+        if (p === '/v1/guest/refresh') return await guestRefresh(req, deps);
         if (p === '/v1/devices/remove') return await removeDevice(req, deps);
         if (p === '/v1/order') return await createOrder(req, deps);
         if (p === '/v1/mp/webhook') return await webhook(req, deps);

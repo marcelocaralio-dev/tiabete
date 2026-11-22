@@ -135,7 +135,7 @@ function d1() {
   ok(before.a === after.a && before.l === after.l, 'remover aparelho não mexe em contas nem licença');
   let abuse = 0; for (let i = 0; i < 9; i++) { const r = await sess('u5', 'dev-abuso-' + String(i).padStart(10, '0'), { replace_device_id: i ? 'dev-abuso-' + String(i - 1).padStart(10, '0') : undefined }); if (r.r.status === 429) abuse++; } ok(abuse > 0, 'proteção contra abuso de trocas');
   const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map(x => x.name).sort().join();
-  ok(tables === 'accounts,config,devices,events,licenses,orders,rate_limits,webhook_log', 'banco comercial não tem tabelas de saúde');
+  ok(tables === 'accounts,config,devices,events,installs,licenses,orders,rate_limits,trial_devices,webhook_log', 'banco comercial não tem tabelas de saúde');
   const lj = fs.readFileSync(__dirname + '/../src/license.js', 'utf8');
   ok(!/Store\.|indexedDB|glicotrack|S\.records|putMany/.test(lj), 'o licenciamento não toca nos dados de saúde nem no IndexedDB glicotrack');
 

@@ -96,7 +96,7 @@ function d1() {
   r = await call('POST', `/v1/mp/webhook?data.id=${TP.mp}&type=order`, { type: 'order', action: 'order.charged_back', data: { id: TP.mp } }, null, { 'x-request-id': rq3, 'x-signature': `ts=${ts3},v1=${v13}` }); ok(r.status === 200 && lic('ep').status === 'revoked', '3h. order.charged_back com manifesto do id como recebido (maiúsculas) é processado de ponta a ponta');
   const TQ = await buy('eq', 'dev-eq-000000000000'); put2(TQ.o, { status: 'charged_back' }, null, []); r = await hook(TQ.mp, { v1: 'c'.repeat(64), body: { type: 'order', action: 'order.charged_back', data: { id: TQ.mp } } }); ok(r.status === 401 && lic('eq').status === 'active', '3i. order.charged_back com assinatura inválida: 401 e licença intacta');
   /* 4) migrations e SQL do Worker */
-  const MIG = fs.readdirSync(path.join(ROOT, 'worker/migrations')).sort(); ok(MIG.join() === '0001_init.sql,0002_security.sql,0003_orders_api.sql,0004_chargebacks.sql', '4a. migrations existentes, em ordem: ' + MIG.join(', '));
+  const MIG = fs.readdirSync(path.join(ROOT, 'worker/migrations')).sort(); ok(MIG.join() === '0001_init.sql,0002_security.sql,0003_orders_api.sql,0004_chargebacks.sql,0005_guests.sql,0006_trial_devices.sql', '4a. migrations existentes, em ordem: ' + MIG.join(', '));
   const mk = list => { const x = new DatabaseSync(':memory:'); for (const f of list) x.exec(fs.readFileSync(path.join(ROOT, 'worker/migrations', f), 'utf8')); return x; };
   const cols = (x, t) => x.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name), full = mk(MIG);
   const src = fs.readFileSync(ROOT + '/worker/src/index.js', 'utf8'); const need = {};
