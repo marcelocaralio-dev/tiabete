@@ -198,7 +198,7 @@ function d1() {
   const tok1 = core.licB64d(cl.store.get('lic-token').split('.')[0]), p1 = JSON.parse(new TextDecoder().decode(tok1)); ok(p1.vexp - p1.iat === 7 * DAY, 'token do teste vale 7 dias offline');
   T.now += 6 * DAY; ok(cl.run('licAllowed("bolus")') === true, 'dentro do prazo offline o premium continua'); T.now += 2 * DAY; ok(cl.run('licAllowed("bolus")') === false && cl.run('licAllowed("historico")') === true, 'depois do prazo só o premium pausa'); T.now -= 8 * DAY;
   const bodies = sent.map(s => s.body).filter(Boolean); const keys = new Set(bodies.flatMap(b => Object.keys(b)));
-  ok([...keys].every(k => ['id_token', 'device_id', 'device_name', 'replace_device_id', 'id'].includes(k)), 'o app envia ao servidor só identidade e aparelho: ' + [...keys].join(','));
+  ok([...keys].every(k => ['id_token', 'device_id', 'device_name', 'replace_device_id', 'id', 'install_id', 'install_secret'].includes(k)), 'o app envia ao servidor só identidade, aparelho e instalação anônima (ids aleatórios): ' + [...keys].join(','));
   ok(!/glic|insulin|mg\/dL|records|carb/i.test(JSON.stringify(bodies)), 'nenhum dado médico vai para o servidor de licenças');
   const lj = fs.readFileSync(ROOT + '/src/license.js', 'utf8'); ok(!/Store\.|indexedDB|glicotrack|S\.records|putMany|\.clear\(|deleteDatabase/.test(lj), 'o licenciamento nunca escreve nem apaga dados médicos');
   const Lt = await orderFor('ul', 'dev-ul-000000000000'); const il = put(Lt.o); await hook(il);
