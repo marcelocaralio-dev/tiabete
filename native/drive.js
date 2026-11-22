@@ -82,7 +82,8 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}
         <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="g-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Conectar conta Google'}</button></div>
         ${G.msg ? `<p class="hint" style="margin:10px 0 0;color:var(--red-t)" role="alert">${esc(G.msg)}</p>` : ''}
-        <p class="hint" style="margin:10px 0 0">Você será levado à página de login do Google no navegador e voltará ao app. Para desfazer, use “Desconectar” ou revogue em myaccount.google.com/permissions.</p></div>`;
+        <p class="hint" style="margin:10px 0 0">Você será levado à página de login do Google no navegador e voltará ao app. Para desfazer, use “Desconectar” ou revogue em myaccount.google.com/permissions.</p>
+        <p class="hint" style="margin:10px 0 0"><b>Usando sem conta?</b> Seus dados ficam só neste aparelho e este app não faz cópia automática do Android. Se você desinstalar o app, limpar os dados dele ou trocar de celular, os registros só podem ser recuperados a partir de uma cópia que você tenha exportado (botões de cópia nesta tela) ou salvo no Drive. Ao entrar com Google, os dados deste aparelho são mantidos, nada é apagado e o teste de 14 dias não é reiniciado.</p></div>`;
     },
   };
 
@@ -106,7 +107,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       const r = await tokenCall({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: pend.verifier, redirect_uri: REDIRECT });
       if (r.status >= 300 || !r.data || !r.data.refresh_token) throw E('x', 'Não foi possível concluir o login' + (r.data && r.data.error_description ? ': ' + r.data.error_description : '.'));
       G.idToken = r.data.id_token || null; G.idAt = Date.now(); G.idErr = null; await SEC.set('g-refresh', r.data.refresh_token); G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; G.conn = true; G.msg = '';
-      try { const pl = JSON.parse(decodeURIComponent(escape(atob(String(r.data.id_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); G.profile = { email: pl.email || '', name: pl.name || '' }; await SEC.setCfg('g-profile', G.profile); } catch (e) { }
+      try { const pl = JSON.parse(decodeURIComponent(escape(atob(String(r.data.id_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))); G.profile = { email: pl.email || '', name: pl.name || '', sub: pl.sub || '' }; await SEC.setCfg('g-profile', G.profile); } catch (e) { }
       toast('Conta Google conectada.');
     } catch (e) { G.msg = e.aiMsg || 'Falha ao conectar.'; }
     G.busy = false; render(); notify(G.conn ? 'connected' : 'changed');
