@@ -1,0 +1,18 @@
+{
+  "appId": "app.tiabete.glicose",
+  "appName": "GLUXO",
+  "webDir": "www",
+  "backgroundColor": "#0a090c",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_gluxo",
+      "iconColor": "#E50308"
+    }
+  }
+}
