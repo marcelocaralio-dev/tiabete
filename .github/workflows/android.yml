@@ -16,7 +16,7 @@ env:
 
 jobs:
   build:
-    name: Compilar APK TiaBete
+    name: Compilar APK GLUXO
     runs-on: ubuntu-latest
 
     steps:
@@ -60,7 +60,7 @@ jobs:
             --ks "$RUNNER_TEMP/ks.jks" \
             --ks-key-alias "$KS_ALIAS" \
             --ks-pass env:KS_PASS \
-            --out "$GITHUB_WORKSPACE/TiaBete.apk" \
+            --out "$GITHUB_WORKSPACE/GLUXO.apk" \
             "$RUNNER_TEMP/aligned.apk"
 
       - name: APK de teste (debug)
@@ -68,16 +68,16 @@ jobs:
         run: |
           cd android
           ./gradlew assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/TiaBete-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/GLUXO-debug.apk"
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: TiaBete-apk
-          path: TiaBete*.apk
+          name: GLUXO-apk
+          path: GLUXO*.apk
 
       - name: Publicar na página de Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: TiaBete*.apk
+          files: GLUXO*.apk
