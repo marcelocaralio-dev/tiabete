@@ -711,6 +711,7 @@ async function rewardCheck() {
   st.hist = st.hist || [];
   for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (rwOn(k) && st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: isoDate(new Date()) }); delete st.got[key]; dirty = true; } }
   if (cwCheck(st, q, isoDate(new Date()), false)) dirty = true; /* personalizadas perdidas (só remove selo) */
+  try { if (typeof rwRecSync === 'function' && rwRecSync(st, ev)) dirty = true; } catch (e) { console.error(e); } /* recorde pessoal: só sobe, independe de avisos */
   if (dirty) await rwSave();
   if (rwBusy) return;
   if (!alCfg().rewards) return;

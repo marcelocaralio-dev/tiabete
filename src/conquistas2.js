@@ -24,6 +24,48 @@ const CW_ICONS = {
 const CW_MS = { g: 'Conquista alcançada!', fx: 'confetti', c: 30 };
 const rwKeyOf = id => 'c:' + id;
 
+/* ---------- Recorde pessoal (maior sequência de dias seguidos de CADA conquista) ----------
+   S.rw.rec[chave] = { n, end, sig, u }   chave = hypo | fast | norm | c:ID (uma entrada por conquista; nunca compartilhada)
+   n = recorde em dias; end = último dia dessa sequência (AAAA-MM-DD); sig = regra de contagem de quando foi registrado; u = quando foi gravado.
+   Só sobe: o valor guardado NUNCA é trocado por um menor nem zerado (perder a sequência atual não mexe nele). Também é recalculado do histórico completo
+   (rewardEval/cwEval.best), então quem já tinha sequências antes desta versão ganha o recorde na primeira abertura. Fica em S.rw (meta 'rewards'): vai
+   no backup, no Google Drive e na restauração, e sobrevive a reiniciar e atualizar o app.
+   Só existe para conquistas de dias seguidos (as 3 padrão e as personalizadas "seq" e "hab"); "acumular medições" não tem sequência.
+   Se o usuário muda a REGRA de contagem de uma personalizada (tipo, limites, medições que contam, mínimo por dia, data inicial), o recorde antigo era de outra
+   regra: ele é recalculado com a regra nova (a meta em dias não entra nisso). */
+const rwRecSigOf = c => c ? [c.type, c.lo, c.hi, c.scope, c.min, c.from].join('|') : '';
+const rwRecApplies = key => { const m = cwMeta(key); return m ? m.c.type !== 'cont' : /^(hypo|fast|norm)$/.test(key); };
+const rwRecSig = key => { const m = cwMeta(key); return m ? rwRecSigOf(m.c) : ''; };
+const dayIso = d => new Date(d * 86400000).toISOString().slice(0, 10);
+function rwRecStored(key) { const r = (rwState().rec || {})[key]; return r && Number.isInteger(r.n) && r.n > 0 && (r.sig || '') === rwRecSig(key) ? r : null; }
+/* recorde a exibir = o maior entre o guardado, o do histórico e a sequência atual */
+function rwRecShow(key, e) {
+  if (!rwRecApplies(key)) return null;
+  const st = rwRecStored(key), cur = Math.max(e.best || 0, e.streak || 0), n = Math.max(st ? st.n : 0, cur);
+  return { n, now: n > 0 && e.streak >= n, end: st && st.n >= cur ? st.end : (e.streak >= cur ? isoDate(new Date()) : e.bestEnd != null ? dayIso(e.bestEnd) : null) };
+}
+/* grava o recorde quando ele sobe (chamada por rewardCheck). Devolve true se algo mudou. */
+function rwRecSync(st, ev) {
+  let dirty = false; st.rec = st.rec && typeof st.rec === 'object' ? st.rec : {};
+  const items = Object.keys(RW_INFO).map(k => ({ k, e: ev[k] })).concat(cwEvalAll().map(x => ({ k: x.key, e: x.e })));
+  for (const { k, e } of items) {
+    if (!rwRecApplies(k) || !rwOn(k)) continue;
+    const sig = rwRecSig(k), old = st.rec[k], cur = Math.max(e.best || 0, e.streak || 0);
+    const endIso = e.streak >= cur ? isoDate(new Date()) : e.bestEnd != null ? dayIso(e.bestEnd) : null;
+    if (old && (old.sig || '') !== sig) { delete st.rec[k]; dirty = true; }        /* regra mudou: o recorde antigo era de outra regra */
+    const have = st.rec[k];
+    if (cur > 0 && (!have || cur > have.n)) { st.rec[k] = { n: cur, end: endIso, sig, u: Date.now() }; dirty = true; }
+    else if (have && have.n === cur && e.streak >= cur && have.end !== endIso) { have.end = endIso; dirty = true; }   /* sequência atual empatou com o recorde: acompanha o dia */
+  }
+  return dirty;
+}
+/* selo do recorde no cartão: troféu discreto + número, ao lado da sequência atual */
+function rwRecHtml(key, e) {
+  const r = rwRecShow(key, e); if (!r) return '';
+  const d = n => n + (n === 1 ? ' dia' : ' dias'), lbl = r.n ? `Recorde pessoal: ${d(r.n)} seguidos${r.end ? ', até ' + fmtDate(r.end) : ''}${r.now ? '. A sequência atual é o seu recorde' : ''}` : 'Recorde pessoal: ainda sem sequência';
+  return `<div class="rw-rec${r.now ? ' now' : ''}${r.n ? '' : ' none'}" role="img" aria-label="${esc(lbl)}" title="${esc(lbl)}">${rwSvg(RW_TROPHY, 14)}<span>Recorde</span><b class="num">${r.n ? d(r.n) : '—'}</b></div>`;
+}
+
 /* ---------- estado ---------- */
 const cwList = () => { const s = rwState(); if (!Array.isArray(s.cust)) s.cust = []; return s.cust; };
 const cwFind = id => cwList().find(c => c.id === id);
@@ -68,7 +110,7 @@ const cwRel = c => ({ jejum: r => r.context === 'jejum', antes: r => r.context =
 const cwOk = (c, g) => (c.lo == null || g >= c.lo) && (c.hi == null || g <= c.hi);
 function cwEval(c, records, todayIso, skip) {
   const real = (records || []).filter(r => r && r.source !== 'exemplo' && r.date && typeof r.glucose === 'number'), t = dayNum(todayIso), from = dayNum(c.from), sk = skip || new Set(), rel = cwRel(c);
-  const out = { streak: 0, n: 0, seen: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0, done: false, prog: 0, goal: c.goal };
+  const out = { streak: 0, n: 0, seen: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0, done: false, prog: 0, goal: c.goal, best: 0, bestEnd: null };
   if (c.type === 'cont') {
     let n = 0, seen = 0;
     for (const r of real) { const d = dayNum(r.date); if (d < from || d > t || sk.has(d) || !rel(r)) continue; seen++; if (cwOk(c, r.glucose)) n++; }
@@ -78,15 +120,15 @@ function cwEval(c, records, todayIso, skip) {
   for (const r of real) { const d = dayNum(r.date); if (d < from || d > t || sk.has(d) || !rel(r)) continue; const e = byDay.get(d) || { n: 0, bad: 0 }; e.n++; if (c.type === 'seq' && !cwOk(c, r.glucose)) e.bad++; byDay.set(d, e); }
   if (!byDay.size) return out;
   const valid = e => e && (c.type === 'seq' ? !e.bad : e.n >= c.min), first = Math.min(...byDay.keys());
-  let run = 0, prev = 0, brokeOn = null, cycles = 0, seen = 0; for (const e of byDay.values()) seen += e.n;
+  let run = 0, prev = 0, brokeOn = null, cycles = 0, seen = 0, best = 0, bestEnd = null; for (const e of byDay.values()) seen += e.n;
   for (let d = first; d < t; d++) {
     if (sk.has(d)) continue;
-    if (valid(byDay.get(d))) run++; else { if (run > 0) { prev = run; brokeOn = d; cycles++; } run = 0; }
+    if (valid(byDay.get(d))) { run++; if (run > best) { best = run; bestEnd = d; } } else { if (run > 0) { prev = run; brokeOn = d; cycles++; } run = 0; }
   }
   const te = byDay.get(t), today = !te ? 'empty' : (c.type === 'seq' && te.bad) ? 'bad' : 'pending';
   if (today === 'bad') { if (run > 0) { prev = run; brokeOn = t; cycles++; } run = 0; }
   const done = run >= c.goal;
-  return { ...out, streak: run, n: run, seen, prog: Math.min(run, c.goal), done, today, prev, brokeOn, cycles, state: run > 0 ? (done ? 'concluida' : cycles > 0 ? 'reiniciada' : 'andamento') : (prev > 0 ? 'quebrada' : 'aguardando') };
+  return { ...out, streak: run, n: run, seen, best, bestEnd, prog: Math.min(run, c.goal), done, today, prev, brokeOn, cycles, state: run > 0 ? (done ? 'concluida' : cycles > 0 ? 'reiniciada' : 'andamento') : (prev > 0 ? 'quebrada' : 'aguardando') };
 }
 const cwEvalAll = () => { const today = isoDate(new Date()); return cwList().map(c => ({ c, key: rwKeyOf(c.id), on: rwOn(rwKeyOf(c.id)), e: cwEval(c, S.records, today, rwSkip(rwKeyOf(c.id))) })); };
 function cwMeta(k) { if (typeof k !== 'string' || !k.startsWith('c:')) return null; const c = cwFind(k.slice(2)); return c ? { c, name: c.name, icp: CW_ICONS[c.ic] } : null; }
@@ -115,7 +157,7 @@ function cwCustomCard(x) {
   const stLbl = !on ? 'Desativada' : RW_ST[e.state];
   return `<h2 class="sec">${esc(c.name)}</h2><div class="card cw-card cw-mine${on ? '' : ' cw-off'}${on && e.done ? ' cw-done' : ''}">
     <div class="cw-top"><span class="cw-tag mine">Minha</span><span class="cw-tag">${CW_CATS[c.cat]}</span>${cwSw(key, on, c.name)}</div>
-    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0">${c.desc ? `<div style="font-size:15px;overflow-wrap:anywhere">${esc(c.desc)}</div>` : ''}<div class="dim" style="font-size:14px;margin-top:2px">${esc(cwRule(c))}</div><span class="rw-st ${on ? e.state : 'aguardando'}">${stLbl}</span></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0">${c.desc ? `<div style="font-size:15px;overflow-wrap:anywhere">${esc(c.desc)}</div>` : ''}<div class="dim" style="font-size:14px;margin-top:2px">${esc(cwRule(c))}</div><div class="rw-meta"><span class="rw-st ${on ? e.state : 'aguardando'}">${stLbl}</span>${rwRecHtml(key, e)}</div></div>
       <div style="text-align:right;flex:none"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:${on && e.prog > 0 ? 'var(--good)' : 'var(--mut)'}">${e.prog}</div><div class="dim" style="font-size:13px">${unit}</div></div></div>${prog}
     <div class="rw-bds one">${got && e.done || got ? `<button class="rw-bd on" data-act="rw-play" data-k="${key}" data-n="${c.goal}" aria-label="${esc(c.name)}, conquistada em ${fmtDate(got)}. Toque para rever a comemoração"><span class="rw-bi">${rwSvg(CW_ICONS[c.ic], 22)}</span><b>${esc(c.name)}</b><small>${fmtDate(got).slice(0, 5)}</small></button>` : `<div class="rw-bd" aria-label="${esc(c.name)}, ainda não conquistada"><span class="rw-bi">${rwSvg(CW_ICONS[c.ic], 22)}</span><b>${esc(c.name)}</b><small>bloqueada</small></div>`}</div>
     <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm" data-act="cw-edit" data-id="${esc(c.id)}">Editar</button></div></div>`;
@@ -143,12 +185,12 @@ function viewConquistas() {
         : `<div class="rw-bd" aria-label="${RW_LBL[N]}, ainda não conquistado"><span class="rw-bi">${rwSvg(c.ic, 22)}</span><b>${RW_LBL[N]}</b><small>bloqueado</small></div>`;
     }).join('');
     const stLbl = on ? RW_ST[e.state] : 'Desativada';
-    return `<h2 class="sec">${c.t}</h2><div class="card cw-card${on ? '' : ' cw-off'}${on && e.state === 'concluida' ? ' cw-done' : ''}"><div class="cw-top"><span class="cw-tag std">Padrão</span>${cwSw(k, on, c.t)}</div><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:14px">${c.d}</div><span class="rw-st ${on ? e.state : 'aguardando'}">${stLbl}</span></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:${on && e.streak > 0 ? 'var(--good)' : 'var(--mut)'}">${e.streak}</div><div class="dim" style="font-size:13px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
+    return `<h2 class="sec">${c.t}</h2><div class="card cw-card${on ? '' : ' cw-off'}${on && e.state === 'concluida' ? ' cw-done' : ''}"><div class="cw-top"><span class="cw-tag std">Padrão</span>${cwSw(k, on, c.t)}</div><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="dim" style="font-size:14px">${c.d}</div><div class="rw-meta"><span class="rw-st ${on ? e.state : 'aguardando'}">${stLbl}</span>${rwRecHtml(k, e)}</div></div><div style="text-align:right"><div class="num" style="font-family:var(--f-display);font-size:30px;font-weight:500;line-height:1;color:${on && e.streak > 0 ? 'var(--good)' : 'var(--mut)'}">${e.streak}</div><div class="dim" style="font-size:13px">${e.streak === 1 ? 'dia seguido' : 'dias seguidos'}</div></div></div>${prog}<div class="rw-bds">${badges}</div></div>`;
   }).join('');
   const master = `<div class="card cw-master"><div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${nOn} de ${nAll} conquistas ativas</b><div class="dim" style="font-size:14px">${nOn === nAll ? 'Todas estão contando.' : nOn ? 'As desativadas ficam pausadas.' : 'Todas estão pausadas.'}</div></div><div class="row" style="gap:8px"><button class="btn sm" data-act="cw-all-on" ${nOn === nAll ? 'disabled' : ''}>Ativar todas</button><button class="btn sm" data-act="cw-all-off" ${nOn === 0 ? 'disabled' : ''}>Desativar todas</button></div></div></div><button class="btn pri full" data-act="cw-new" style="margin:10px 0 0">+ Criar nova conquista</button>`;
   const mine = cs.length ? cs.map(cwCustomCard).join('') : `<h2 class="sec">Minhas conquistas</h2><div class="card"><div class="empty">Você ainda não criou nenhuma. Toque em “Criar nova conquista” para escolher a sua meta.</div></div>`;
   const sum = TBCards.j({ cls: 'gx-cw-sum', stats: [{ label: 'Conquistadas', value: nGot + '/' + total, tone: nGot ? 'pos' : 'neu' }, { label: 'Ativas', value: nOn + '/' + nAll, tone: nOn ? 'brand' : 'neu' }, { label: 'Minhas', value: cs.length, tone: 'neu' }], footHtml: total ? TBCards.prog(total ? nGot / total * 100 : 0, 'pos') : '' });
-  const how = TBCards.g({ title: 'Como funcionam as conquistas', sub: 'Regras, contagem e avisos', tone: 'brand' }, `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses, mais as conquistas que você mesmo criar. Contam só os seus registros reais (os dados de exemplo ficam de fora). Um dia só vale depois de terminar; dia sem medição não conta e interrompe a sequência. Ao interromper, a contagem volta a zero e os selos ficam bloqueados até a conquista acontecer de novo. ${total ? (nGot ? `Você já tem <b>${nGot}</b> de ${total} conquistas ativas.` : 'Você ainda não tem conquistas ativas alcançadas — a primeira dos marcos padrão sai com 7 dias seguidos.') : 'Todas estão desativadas.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica. O aviso de comemoração pode ser ligado ou desligado em Alertas (“Avisar conquistas”).</p>`);
+  const how = TBCards.g({ title: 'Como funcionam as conquistas', sub: 'Regras, contagem e avisos', tone: 'brand' }, `<p class="hint" style="margin:0 0 12px">Marcos de 7, 14, 30 dias e 3 meses, mais as conquistas que você mesmo criar. Cada conquista de dias seguidos também guarda o seu <b>recorde pessoal</b> (troféu): a maior sequência que você já alcançou naquela conquista. Ele só sobe e não é perdido quando a sequência atual quebra. Contam só os seus registros reais (os dados de exemplo ficam de fora). Um dia só vale depois de terminar; dia sem medição não conta e interrompe a sequência. Ao interromper, a contagem volta a zero e os selos ficam bloqueados até a conquista acontecer de novo. ${total ? (nGot ? `Você já tem <b>${nGot}</b> de ${total} conquistas ativas.` : 'Você ainda não tem conquistas ativas alcançadas — a primeira dos marcos padrão sai com 7 dias seguidos.') : 'Todas estão desativadas.'} É um incentivo baseado no que você registra, não um diagnóstico nem uma orientação de tratamento. Metas e ajustes ficam com a sua equipe médica. O aviso de comemoração pode ser ligado ou desligado em Alertas (“Avisar conquistas”).</p>`);
   return banners() + sum + how + `<div style="height:12px"></div>${master}${std}${mine}`;
 }
 
@@ -198,12 +240,13 @@ document.addEventListener('click', async e => {
     const gl = +document.getElementById('cw-goal').value; if (!(gl >= 1)) { toast('Informe a meta (um número maior que zero).'); return; }
     if (c.type !== 'hab') { const lo = document.getElementById('cw-lo').value, hi = document.getElementById('cw-hi').value, cm = document.getElementById('cw-cm').value; if ((cm !== 'hi' && !(+lo >= 20)) || (cm !== 'lo' && !(+hi >= 20))) { toast('Informe valores de glicemia em mg/dL (de 20 a 600).'); return; } if (cm === 'both' && +lo >= +hi) { toast('O valor inicial precisa ser menor que o final.'); return; } }
     c.u = Date.now(); const L = cwList(), i = L.findIndex(x => x.id === c.id);
+    const ruleChanged = i >= 0 && rwRecSigOf(L[i]) !== rwRecSigOf(c) && c.type !== 'cont' && !!(rwState().rec || {})[rwKeyOf(c.id)];
     if (i >= 0) L[i] = c; else { if (L.length >= CW_MAX) { toast('Limite de ' + CW_MAX + ' conquistas personalizadas.'); return; } L.push(c); }
-    await cwDone(i >= 0 ? 'Conquista atualizada.' : 'Conquista criada.');
+    await cwDone(i >= 0 ? (ruleChanged ? 'Conquista atualizada. Como a regra de contagem mudou, o recorde foi recalculado.' : 'Conquista atualizada.') : 'Conquista criada.');
   }
   else if (act === 'cw-del') {
     if (el.dataset.armed !== '1') { el.dataset.armed = '1'; el.textContent = 'Toque de novo para excluir'; setTimeout(() => { if (el.isConnected) { el.dataset.armed = ''; el.textContent = 'Excluir'; } }, 4000); return; }
-    const s = rwState(), key = rwKeyOf(id); s.cust = cwList().filter(c => c.id !== id); delete s.got[key]; if (s.off) delete s.off[key]; if (s.pause) delete s.pause[key]; if (s.hist) s.hist = s.hist.filter(h => h.k !== key); if (s.last && s.last.k === key) delete s.last;
+    const s = rwState(), key = rwKeyOf(id); s.cust = cwList().filter(c => c.id !== id); delete s.got[key]; if (s.rec) delete s.rec[key]; if (s.off) delete s.off[key]; if (s.pause) delete s.pause[key]; if (s.hist) s.hist = s.hist.filter(h => h.k !== key); if (s.last && s.last.k === key) delete s.last;
     await cwDone('Conquista excluída.');
   }
   else if (act === 'cw-tgl') { const k = el.dataset.k; rwSetOn(k, !rwOn(k)); await rwSave(); render(); rewardSoon(); }
@@ -226,6 +269,13 @@ function cwRestore(r, replace) {
   const take = k => replace || fresh.has(k) || (!cur.pause[k] && !cur.off[k]); /* na mescla, o estado de uma conquista que nunca foi ligada/desligada aqui vem do backup */
   for (const k of Object.keys(offIn)) if (offIn[k] && validKey(k) && take(k)) cur.off[k] = 1;
   for (const k of Object.keys(pauseIn)) if (validKey(k) && (replace || fresh.has(k) || !cur.pause[k])) { const iv = okIv(pauseIn[k]); if (iv.length) cur.pause[k] = iv; }
+  /* recordes: nunca diminuem. Mesma regra de contagem: vale o maior; regra diferente: vale o gravado mais recentemente. */
+  { cur.rec = replace || !cur.rec || typeof cur.rec !== 'object' ? {} : cur.rec; const recIn = r.rec && typeof r.rec === 'object' ? r.rec : {};
+    for (const [k, v] of Object.entries(recIn)) {
+      if (!validKey(k) || !v || !Number.isInteger(v.n) || v.n < 1 || v.n > 36500) continue;
+      const nv = { n: v.n, end: /^\d{4}-\d{2}-\d{2}$/.test(v.end || '') ? v.end : null, sig: String(v.sig || '').slice(0, 80), u: +v.u || 0 }, lo = cur.rec[k];
+      if (!lo || ((lo.sig || '') === nv.sig ? nv.n > lo.n : nv.u > (lo.u || 0))) cur.rec[k] = nv;
+    } }
   const ids = new Set(cwList().map(c => rwKeyOf(c.id)));
   for (const [k, d] of Object.entries(r.got || {})) if (/^c:[\w-]+$/.test(k) && ids.has(k) && typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && (!cur.got[k] || d < cur.got[k])) cur.got[k] = d;
 }

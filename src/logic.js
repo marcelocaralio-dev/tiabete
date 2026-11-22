@@ -892,21 +892,21 @@ function rewardEval(records, todayIso, skip) {
   for (const [k, c] of Object.entries(RW_CATS)) {
     const byDay = new Map(), sk = skip && skip[k];
     for (const r of real) { const d = dayNum(r.date); if (d > t || !c.rel(r) || (sk && sk.has(d))) continue; const e = byDay.get(d) || { n: 0, bad: 0 }; e.n++; if (c.bad(r)) e.bad++; byDay.set(d, e); }
-    if (!byDay.size) { out[k] = { streak: 0, ach: {}, n: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0 }; continue; }
+    if (!byDay.size) { out[k] = { streak: 0, ach: {}, n: 0, state: 'aguardando', today: 'empty', prev: 0, brokeOn: null, cycles: 0, best: 0, bestEnd: null }; continue; }
     const first = Math.min(...byDay.keys());
-    let run = 0, prev = 0, brokeOn = null, cycles = 0, n = 0;
+    let run = 0, prev = 0, brokeOn = null, cycles = 0, n = 0, best = 0, bestEnd = null; /* best/bestEnd: maior sequência de dias válidos de todo o histórico (recorde) e o último dia dela */
     for (const e of byDay.values()) n += e.n;
     for (let d = first; d < t; d++) {
       if (sk && sk.has(d)) continue; /* dia com a conquista desativada: não conta nem quebra */
       const e = byDay.get(d);
-      if (e && !e.bad) run++;
+      if (e && !e.bad) { run++; if (run > best) { best = run; bestEnd = d; } }
       else { if (run > 0) { prev = run; brokeOn = d; cycles++; } run = 0; }
     }
     const te = byDay.get(t), today = !te ? 'empty' : te.bad ? 'bad' : 'pending';
     if (today === 'bad') { if (run > 0) { prev = run; brokeOn = t; cycles++; } run = 0; }
     const ach = {}; for (const N of RW_STEPS) ach[N] = run >= N;
     const state = run > 0 ? (ach[RW_STEPS[RW_STEPS.length - 1]] ? 'concluida' : cycles > 0 ? 'reiniciada' : 'andamento') : (prev > 0 ? 'quebrada' : 'aguardando');
-    out[k] = { streak: run, ach, n, state, today, prev, brokeOn, cycles };
+    out[k] = { streak: run, ach, n, state, today, prev, brokeOn, cycles, best, bestEnd };
   }
   return out;
 }
