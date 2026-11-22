@@ -5,8 +5,8 @@ html, body { overscroll-behavior-y: contain; }
 #ptr svg { width: 24px; height: 24px; transform: rotate(-90deg); }
 #ptr circle { fill: none; stroke-width: 2.6; }
 #ptr .ptr-bg { stroke: var(--line); }
-#ptr .ptr-ar { stroke: var(--red); stroke-linecap: round; stroke-dasharray: 56.55; stroke-dashoffset: calc(56.55 * (1 - var(--p, 0))); }
-#ptr.rdy { border-color: var(--red); box-shadow: 0 6px 18px var(--shadow), 0 0 12px rgba(var(--red-rgb), .45); }
+#ptr .ptr-ar { stroke: var(--brand); stroke-linecap: round; stroke-dasharray: 56.55; stroke-dashoffset: calc(56.55 * (1 - var(--p, 0))); }
+#ptr.rdy { border-color: var(--brand); box-shadow: 0 6px 18px var(--shadow), 0 0 12px rgba(var(--brand-rgb), .45); }
 #ptr.spin svg { animation: ptr-s .8s linear infinite; }
 #ptr.spin .ptr-ar { stroke-dashoffset: 40; }
 @keyframes ptr-s { to { transform: rotate(270deg); } }

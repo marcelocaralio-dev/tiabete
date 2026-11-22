@@ -17,7 +17,7 @@
 .pr-m { color: var(--mut); font-size: 15px; }
 .pr-det summary { justify-content: space-between; list-style: none; }
 .pr-det summary::-webkit-details-marker { display: none; }
-.pr-det summary::after { content: "+"; font-family: var(--f-mono); color: var(--red-l); font-size: 18px; }
+.pr-det summary::after { content: "+"; font-family: var(--f-mono); color: var(--brand-l); font-size: 18px; }
 .pr-det[open] summary::after { content: "–"; }
 
 /* ---- etiquetas alinhadas (badges e chips desta tela): altura única, texto centralizado nos dois eixos ---- */

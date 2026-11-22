@@ -7,12 +7,12 @@ fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'i
 if (fs.existsSync(path.join(www, 'fonts'))) fs.cpSync(path.join(www, 'fonts'), path.join(out, 'fonts'), { recursive: true });
 for (const f of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) fs.copyFileSync(path.join(root, 'assets', 'pwa', f), path.join(out, 'icons', f));
 let html = fs.readFileSync(path.join(www, 'index.html'), 'utf8');
-const head = '<link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="TiaBete">';
+const head = '<link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="GLUXO">';
 const reg = '<script>if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>';
 html = html.replace('</head>', () => head + '</head>').replace('</body>', () => reg + '</body>');
 fs.writeFileSync(path.join(out, 'index.html'), html);
 fs.writeFileSync(path.join(out, 'manifest.webmanifest'), JSON.stringify({
-  name: 'TiaBete · Controle da glicose', short_name: 'TiaBete', description: 'Controle de glicemia e insulina. Os dados ficam só neste aparelho.', lang: 'pt-BR',
+  name: 'GLUXO · Controle da glicose', short_name: 'GLUXO', description: 'Controle de glicemia e insulina. Os dados ficam só neste aparelho.', lang: 'pt-BR',
   start_url: './index.html', scope: './', display: 'standalone', orientation: 'portrait', background_color: '#0a090c', theme_color: '#0a090c',
   icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }]
 }, null, 2));

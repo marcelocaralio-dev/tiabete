@@ -15,14 +15,14 @@ function anOpenSave() { try { localStorage.setItem(AN_LS, JSON.stringify([...anO
 /* ---------- modelo (calculado sob demanda e guardado) ---------- */
 function anModel() {
   const R = S.records, n = R.length, a = S.ana, now = Date.now(); let cs = 0; for (let i = 0; i < n; i++) cs = (cs * 31 + Math.round(R[i].glucose * 10) + (R[i].ts % 100003)) % 1000000007;
-  const key = [n, cs, a.range, a.agg, a.A.from, a.A.to, a.B.from, a.B.to, S.events.length, isoDate(new Date(now)), LIM.low, LIM.high].join('|');
+  const key = [n, cs, a.range, a.agg, a.A.from, a.A.to, a.B.from, a.B.to, S.events.length, isoDate(new Date(now)), LIM.low, LIM.high, JSON.stringify(anTmSet())].join('|');
   if (anMemo.key === key) return anMemo.M;
   const W = anWindows(R, a.range, now), cache = {}, lazy = (k, f) => () => (k in cache ? cache[k] : (cache[k] = f()));
   const rl = a.range === 'all' ? 'todo o histórico' : 'últimos ' + a.range + ' dias';
   const M = { now, range: a.range, rl, cur: W.cur, prev: W.prev, curR: W.curR, prevR: W.prevR, base: W.base, sum: anSummary(W.cur), psum: W.prev ? anSummary(W.prev) : null,
     slots: lazy('slots', () => anSlots(W.cur, W.prev)), blocks: lazy('blocks', () => anBlocks(W.cur, W.prev)), hypo: lazy('hypo', () => anHypo(W.cur)), hyper: lazy('hyper', () => anHyper(W.cur)),
     vari: lazy('vari', () => anVariability(W.cur)), rec: lazy('rec', () => anRecurrence(W.cur, MARKS)), assoc: lazy('assoc', () => anAssociations(W.cur, S.events)),
-    disc: lazy('disc', () => anDiscoveries(W.cur, W.prev, rl)), hist: lazy('hist', () => anHistory(R)) };
+    disc: lazy('disc', () => anDiscoveries(W.cur, W.prev, rl)), hist: lazy('hist', () => anHistory(R)), tm: lazy('tm', () => anTModel(W.base, anTmSet(), now, W)) };
   anMemo = { key, M }; return M;
 }
 
@@ -82,6 +82,7 @@ const anCorrTxt = r => { if (r == null) return ''; const a = Math.abs(r), w = a 
 const AN_ICONS = {
   visao: '<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/>', desc: '<path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/>', ctrl: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
   hipo: '<path d="M12 4v13M6 11l6 6 6-6"/>', hiper: '<path d="M12 20V7M6 13l6-6 6 6"/>', var: '<path d="M3 12h3l2-6 4 12 3-9 2 3h4"/>', hor: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  tmp: '<path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14M15 5v14"/>',
   ref: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>', comp: '<path d="M4 7h13M13 3l4 4-4 4M20 17H7M11 13l-4 4 4 4"/>', pad: '<path d="M4 6h4v4H4zM10 6h4v4h-4zM16 6h4v4h-4zM4 14h4v4H4zM10 14h4v4h-4z"/>',
   ass: '<circle cx="7" cy="8" r="2.5"/><circle cx="17" cy="16" r="2.5"/><path d="M9 9.5l6 5"/>', evo: '<path d="M3 17l6-6 4 4 8-9M15 6h6v6"/>'
 };
@@ -93,6 +94,7 @@ const AN_SECS = [
   { id: 'hiper', t: 'Hiperglicemias', n: 'Hipers', c: 5, sum: M => { const h = M.hyper(); return `<span class="an-sc-i"><b class="num">${h.highN}</b> acima da faixa</span>${h.max != null ? `<span class="an-sc-i">maior <b class="num">${f0(h.max)}</b></span>` : ''}`; }, body: anBodyHiper },
   { id: 'var', t: 'Variabilidade glicêmica', n: 'Variab.', c: 6, sum: M => { const v = M.vari(); return v.enough ? `<span class="an-sc-i">DP <b class="num">${fm(v.sd)}</b></span><span class="an-sc-i">CV <b class="num">${fn(v.cv, 0)}%</b></span>` : '<span class="an-sc-i dim">Precisa de 5 medições</span>'; }, body: anBodyVar },
   { id: 'hor', t: 'Análise por horário', n: 'Horário', c: 7, sum: M => { const s = M.slots().filter(x => x.enough); return s.length ? `<span class="an-sc-i"><b class="num">${s.length}</b> contexto${s.length > 1 ? 's' : ''} com dados</span>` : '<span class="an-sc-i dim">Poucos dados por contexto</span>'; }, body: anBodyHor },
+  { id: 'tmp', t: 'Horários e períodos do dia', n: 'Períodos', c: 13, sum: M => { const T = M.tm(); return T.total ? `<span class="an-sc-i"><b class="num">${T.groups.filter(g => g.s.enough).length}</b> ${T.groups.filter(g => g.s.enough).length === 1 ? 'período com média' : 'períodos com média'}</span><span class="an-sc-i"><b class="num">${T.total}</b> medições</span>` : '<span class="an-sc-i dim">Sem medições neste intervalo</span>'; }, body: anBodyTmp },
   { id: 'ref', t: 'Análise por refeição', n: 'Refeições', c: 8, sum: M => { const d = mealDeltas(M.cur).filter(x => x.n >= MIN_BUCKET); return d.length ? `<span class="an-sc-i"><b class="num">${d.length}</b> refeição${d.length > 1 ? 'ões' : ''} com variação medida</span>` : '<span class="an-sc-i dim">Sem pares antes/depois suficientes</span>'; }, body: anBodyRef },
   { id: 'comp', t: 'Comparação entre períodos', n: 'Comparar', c: 9, sum: M => { const c = anCmpPick(M); return c && c.enough ? `<span class="an-sc-i"><b class="num">${c.good}</b> melhoraram</span><span class="an-sc-i"><b class="num">${c.bad}</b> pioraram</span>` : '<span class="an-sc-i dim">Escolha dois períodos</span>'; }, body: anBodyComp },
   { id: 'pad', t: 'Padrões recorrentes', n: 'Padrões', c: 10, sum: M => { const r = M.rec(); return r.length ? `<span class="an-sc-i"><b class="num">${r.length}</b> padrão${r.length > 1 ? 'ões' : ''} identificado${r.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Nenhum padrão claro</span>'; }, body: anBodyPad },
@@ -183,6 +185,125 @@ function anBodyHor(M) {
     <h3 class="an-sub">Dia típico</h3>${typicalDayChart(M.cur)}${td.ok >= 6 ? anNote('Reúne todos os dias do período em um só dia de 24 horas. A linha é a mediana por horário e as faixas mostram onde ficou a maioria das medições. Só mostra o que aconteceu: não orienta tratamento.') : ''}
     <h3 class="an-sub">Mapa de calor · dia e horário</h3>${heatmapCard(M.cur).replace(/<h2 class="sec">[^<]*<\/h2>/, '').replace('<div class="card">', '<div class="an-inner">')}`;
 }
+/* 7b. Horários e períodos do dia (PROMPT 1) — cálculos em analise-core.js (anT*) */
+const AN_T_SHORT = { jejum: 'Jejum', poscafe: 'Pós-café', prealmoco: 'Pré-alm.', posalmoco: 'Pós-alm.', prejantar: 'Pré-jan.', posjantar: 'Pós-jan.', deitar: 'Dormir', madrugada: 'Madrug.', outros: 'Outros' };
+const AN_TM_LS = 'tb-ana-tm', AN_TM_RANGES = [['tela', 'Da tela'], ['7', '7 d'], ['14', '14 d'], ['30', '30 d'], ['90', '90 d'], ['180', '6 meses'], ['custom', 'Personalizado']];
+const AN_TM_HEAT = { high: ['Elevadas', 'ds-warn', 'acima da faixa'], ok: ['Na faixa', 'ds-pos', 'dentro da faixa'], low: ['Baixas', 'ds-neg', 'abaixo de ' + LIM.low], n: ['Quantidade', '', 'medições'] };
+let anTmDet = null;
+function anTmClean(o) {
+  const d = anTDefaults(); if (!o || typeof o !== 'object') return d;
+  if (o.src === 'ctx' || o.src === 'hora') d.src = o.src; if (AN_T_RANGES.includes(o.range)) d.range = o.range;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(o.from || '')) d.from = o.from; if (/^\d{4}-\d{2}-\d{2}$/.test(o.to || '')) d.to = o.to;
+  if (o.step === 'custom') d.step = 'custom'; else if (AN_T_STEPS.includes(+o.step)) d.step = +o.step;
+  if (typeof o.cuts === 'string' && anTParseCuts(o.cuts).ok) d.cuts = o.cuts.slice(0, 60); else if (d.step === 'custom') d.step = 4;
+  if (AN_TM_HEAT[o.heat]) d.heat = o.heat; if (Array.isArray(o.sel)) d.sel = o.sel.filter(x => typeof x === 'string').slice(0, 20);
+  return d;
+}
+function anTmSet() { if (!S.ana.tm) { let o = null; try { o = JSON.parse(localStorage.getItem(AN_TM_LS) || 'null'); } catch (e) { } S.ana.tm = anTmClean(o); } return S.ana.tm; }
+function anTmSave() { try { localStorage.setItem(AN_TM_LS, JSON.stringify(S.ana.tm)); } catch (e) { } }
+const anTmSeg = (act, items, cur, label) => `<div class="seg an-seg" role="group" aria-label="${label}">${items.map(([v, l]) => `<button type="button" data-act="${act}" data-v="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
+function anTmControls(st, T, M) {
+  const p = anTParseCuts(st.cuts), steps = AN_T_STEPS.map(x => [x, x + ' h']).concat([['custom', 'Personalizada']]);
+  const rng = T.W.curR ? anDay(T.W.curR[0]) + ' a ' + anDay(T.W.curR[1]) : '';
+  return `<div class="an-tmc">
+    <div><div class="fl">Agrupar por</div>${anTmSeg('an-tm-src', [['ctx', 'Contexto registrado'], ['hora', 'Faixa de horário']], st.src, 'Tipo de agrupamento')}
+    <p class="an-note">${st.src === 'ctx' ? '<b>Contexto</b> é o que você marcou ao registrar (jejum, depois do almoço…). A hora real da medição aparece dentro de cada cartão.' : '<b>Faixa de horário</b> usa só a hora real da medição, sem supor se foi antes ou depois de comer.'}</p></div>
+    ${st.src === 'hora' ? `<div><div class="fl">Tamanho das faixas</div>${anTmSeg('an-tm-step', steps, st.step, 'Tamanho das faixas de horário')}${st.step === 'custom' ? `<div class="an-tm-cuts"><label class="fl" for="an-tm-cuts">Horas de corte (de 1 a 23, separadas por vírgula)</label><div class="row" style="gap:8px"><input class="in" id="an-tm-cuts" inputmode="numeric" maxlength="60" value="${esc(st.cuts || '6, 10, 14, 18, 22')}" aria-describedby="an-tm-err"><button type="button" class="btn sm" data-act="an-tm-cuts">Aplicar</button></div><p class="an-note" id="an-tm-err" role="status">${p.ok ? 'Faixas: ' + anTBands(st).map(b => b.t).join(' · ') : esc(p.err)}</p></div>` : ''}</div>` : ''}
+    <div><div class="fl">Intervalo</div>${anTmSeg('an-tm-range', AN_TM_RANGES, st.range, 'Intervalo da análise por horário')}
+    ${st.range === 'custom' ? `<div class="form-grid an-tm-dates"><div class="field"><label class="fl" for="an-tm-from">De</label><input class="in" type="date" id="an-tm-from" data-tm="from" value="${esc(st.from)}"></div><div class="field"><label class="fl" for="an-tm-to">Até</label><input class="in" type="date" id="an-tm-to" data-tm="to" value="${esc(st.to)}"></div></div>${T.W.invalid ? '<p class="an-warn">Informe as duas datas, com a data inicial antes da final.</p>' : ''}` : ''}
+    <p class="an-note">${st.range === 'tela' ? `Segue o intervalo escolhido no topo da Análise (${esc(M.rl)}).` : ''}${rng ? ` Período atual: <b>${rng}</b>.` : ''}${T.W.prev ? ` Comparado com o período anterior de mesmo tamanho (${anDay(T.W.prevR[0])} a ${anDay(T.W.prevR[1])}).` : ' Sem período anterior para comparar.'}</p></div>
+    <div><div class="fl">Mostrar</div><div class="an-chips" role="group" aria-label="Períodos exibidos"><button type="button" class="an-ct" data-act="an-tm-sel" data-v="*" aria-pressed="${!st.sel.length}">Todos</button>${T.all.map(g => `<button type="button" class="an-ct" data-act="an-tm-sel" data-v="${g.k}" aria-pressed="${st.sel.includes(g.k)}">${g.t}<small>${g.s.n}</small></button>`).join('')}</div></div></div>`;
+}
+function anTmFlags(s) { return [s.n && !s.enough ? `menos de ${AN_MIN} medições` : '', s.small ? 'amostra pequena' : '', s.fewDays ? 'poucos dias' : '', s.concentrated && !s.fewDays ? 'concentrado em poucos dias' : ''].filter(Boolean); }
+function anTmCross(g, st, T) {
+  const c = T.cross[g.k]; if (!c) return '';
+  const nm = o => st.src === 'hora' ? (o === 'outros' ? 'Outros contextos' : (AN_SLOTS.find(x => x.k === o) || { t: o }).t) : (o === 'x' ? 'sem horário' : TIME_BLOCKS[+o].label);
+  const items = Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([o, n]) => `<span>${nm(o)} <b class="num">${n}</b></span>`).join('');
+  return `<p class="an-tp-x"><span>${st.src === 'hora' ? 'Contextos marcados nestas medições' : 'Horas reais em que foram medidas (faixas de 4 h)'}</span><span class="an-tp-xl">${items}</span></p>`;
+}
+function anTmCard(g, st, T) {
+  const s = g.s;
+  if (!s.n) return `<div class="an-tp off"><div class="an-tp-s"><span class="an-slot-t">${g.t}</span><span class="an-slot-e">sem registros neste intervalo</span></div></div>`;
+  const tone = s.enough ? anTone(s.mean, 0, g.k === 'jejum' ? FAST.high : LIM.high) : '', fl = anTmFlags(s), q = (l, v, u) => `<div><span>${l}</span><b class="num">${v}${u ? `<small>${u}</small>` : ''}</b></div>`;
+  const dlt = g.dMean != null ? `<span class="an-tp-d">${anChip(g.dMean, anPct(g.dMean, g.p.mean), 'mg/dL', 0, 0)}<small>vs. período anterior</small></span>` : '';
+  return `<details class="an-tp${tone ? ' k-' + tone : ''}" data-k="${g.k}"><summary><span class="an-tp-s"><span class="an-slot-t">${g.t}</span><span class="an-tp-v num">${s.enough ? f0(s.mean) : '—'}<small>${s.enough ? 'mg/dL · ' : ''}n=${s.n}</small></span></span>${anStack(s.bc, s.n)}${fl.length ? `<span class="an-tp-f">${fl.map(x => `<i>${x}</i>`).join('')}</span>` : ''}<span class="an-h-chev" aria-hidden="true">›</span></summary>
+    <div class="an-tp-b">${s.enough ? anRange(s.min, s.mean, s.max) : ''}<div class="an-tp-g">${q('Média', s.enough ? fm(s.mean) : '—', 'mg/dL')}${q('Mediana', s.enough ? fm(s.median) : '—', 'mg/dL')}${q('Menor', f0(s.min), 'mg/dL')}${q('Maior', f0(s.max), 'mg/dL')}${q('Medições', s.n)}${q('Dias', s.days)}${q('Desvio-padrão', s.sdOk ? fm(s.sd) : '—', s.sdOk ? 'mg/dL' : '')}${q('Coef. de variação', s.sdOk && s.cv != null ? fn(s.cv, 0) : '—', s.sdOk ? '%' : '')}${q('Baixas', s.lowN, `${fn(s.lowPct, 0)}%`)}${q('Elevadas', s.highN, `${fn(s.highPct, 0)}%`)}</div>
+    ${s.sdOk ? '' : `<p class="an-note">Desvio-padrão e coeficiente de variação precisam de 5 ou mais medições.</p>`}${anBandLegend(s.bc, s.n).replace('class="an-bl"', 'class="an-bl compact"')}
+    ${g.times ? `<p class="an-note">Hora real das medições: mediana <b class="num">${g.times.med}</b>; a maioria entre <b class="num">${g.times.p10}</b> e <b class="num">${g.times.p90}</b>.</p>` : ''}${anTmCross(g, st, T)}${dlt}
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="an-tm-rec" data-kind="g" data-k="${g.k}">Ver os ${s.n} registros</button>${g.hist ? `<button type="button" class="btn sm" data-act="an-tm-hist" data-k="${g.k}">Ver no histórico</button>` : ''}</div></div></details>`;
+}
+function anTmHL(h) {
+  return `<article class="an-card t-${h.tone}"><h3>${h.title}</h3><p class="an-card-t">${esc(h.text)}</p><details class="an-ev"><summary>Evidências usadas</summary><ul>${h.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></details><div><button type="button" class="btn sm an-hbtn" data-act="an-tm-rec" data-kind="hl" data-v="${h.id}">Ver registros (${h.recIds.length})</button></div></article>`;
+}
+function anTmLine(e) {
+  if (!e || !e.pts.length) return '';
+  const W = 320, H = 170, L = 34, B = 24, T = 10, R = 10, xs = e.pts.map(p => p.ts), x0 = Math.min(...xs), x1 = Math.max(...xs), ys = e.pts.map(p => p.v), y0 = Math.min(40, ...ys), y1 = Math.max(200, ...ys);
+  const X = t => L + (x1 === x0 ? .5 : Math.max(0, Math.min(1, (t - x0) / (x1 - x0)))) * (W - L - R), Y = v => H - B - (v - y0) / (y1 - y0) * (H - B - T), ok = e.buckets.filter(b => b.ok), paths = [];
+  let cur = [];
+  e.buckets.forEach((b, i) => { if (!b.ok) { if (cur.length) paths.push(cur); cur = []; return; } const pb = e.buckets[i - 1], adj = pb && pb.ok && Math.round((b.t - pb.t) / DAY) === 7; if (!adj && cur.length) { paths.push(cur); cur = []; } cur.push([X(b.t + 3.5 * DAY), Y(b.mean)]); });
+  if (cur.length) paths.push(cur);
+  const line = paths.filter(p => p.length > 1).map(p => `<polyline class="an-ln-l" points="${p.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}"/>`).join('');
+  return `<svg class="an-ln" viewBox="0 0 ${W} ${H}" role="img" aria-label="Medições de ${esc(e.t)} ao longo do tempo: ${e.pts.length} pontos${ok.length ? ' e ' + ok.length + ' médias semanais' : ''}."><rect class="an-ln-ok" x="${L}" y="${Y(LIM.high).toFixed(1)}" width="${W - L - R}" height="${(Y(LIM.low) - Y(LIM.high)).toFixed(1)}"/><line class="an-ax" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/><line class="an-ax" x1="${L}" y1="${T}" x2="${L}" y2="${H - B}"/>${[LIM.low, LIM.high].map(v => `<text class="an-at" x="${L - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">${v}</text>`).join('')}${e.pts.slice(-300).map(p => `<circle class="an-ln-d" cx="${X(p.ts).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.3"/>`).join('')}${line}${ok.map(b => `<circle class="an-ln-m" cx="${X(b.t + 3.5 * DAY).toFixed(1)}" cy="${Y(b.mean).toFixed(1)}" r="4"/>`).join('')}<text class="an-at" x="${L}" y="${H - 8}">${fmDMY(x0)}</text><text class="an-at" x="${W - R}" y="${H - 8}" text-anchor="end">${fmDMY(x1)}</text></svg>`;
+}
+function anTmHeat(st, T) {
+  const h = T.heat, m = AN_TM_HEAT[st.heat], lvl = c => { if (!c.enough) return -1; const p = st.heat === 'n' ? c.pN : st.heat === 'high' ? c.pHigh : st.heat === 'low' ? c.pLow : c.pOk; return p == null || p <= 0 ? 0 : p < 25 ? 1 : p < 50 ? 2 : p < 75 ? 3 : 4; };
+  const val = c => st.heat === 'n' ? c.n : fn(st.heat === 'high' ? c.pHigh : st.heat === 'low' ? c.pLow : c.pOk, 0) + '%';
+  const rows = h.rows.map((row, d) => `<tr><th scope="row">${AN_T_WD[d]}</th>${row.map(c => { const l = lvl(c); if (!c.n) return '<td class="an-hm2-e" title="Nenhuma medição">—</td>'; if (l < 0) return `<td><button type="button" class="hm2 l-1" data-act="an-tm-rec" data-kind="heat" data-wd="${c.wd}" data-bi="${c.bi}" title="${c.n} medição(ões): poucas para mostrar proporção" aria-label="${AN_T_WD[d]} ${h.bands[c.bi].t}: ${c.n} medições, poucas para mostrar proporção">·<i>${c.n}</i></button></td>`; return `<td><button type="button" class="hm2 l${l}" data-act="an-tm-rec" data-kind="heat" data-wd="${c.wd}" data-bi="${c.bi}" title="${c.n} medições; ${fn(c.pHigh, 0)}% elevadas, ${fn(c.pOk, 0)}% na faixa, ${fn(c.pLow, 0)}% baixas" aria-label="${AN_T_WD[d]} ${h.bands[c.bi].t}: ${st.heat === 'n' ? c.n + ' medições' : val(c) + ' das ' + c.n + ' medições ' + m[2]}"><b>${val(c)}</b><i>${st.heat === 'n' ? '' : 'n=' + c.n}</i></button></td>`; }).join('')}</tr>`).join('');
+  return `${anTmSeg('an-tm-heat', Object.entries(AN_TM_HEAT).map(([k, v]) => [k, v[0]]), st.heat, 'Categoria mostrada no mapa de calor')}
+    <div class="tbl-wrap hm-wrap an-hm2w" tabindex="0" role="region" aria-label="Mapa de calor por dia da semana e faixa de horário. Área com rolagem horizontal"><table class="an-hm2 ${st.heat}"><thead><tr><th></th>${h.bands.map(b => `<th>${b.t}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="an-note"><b>Como ler:</b> cada quadro mostra ${st.heat === 'n' ? 'quantas medições foram feitas' : `que parte das medições daquele dia da semana e faixa de horário ficou <b>${m[2]}</b>`}${st.heat === 'n' ? '' : ' (e o n, a quantidade usada)'}. Cor mais forte = ${st.heat === 'n' ? 'mais medições' : 'maior proporção'}. “—” sem medições; “·” menos de ${AN_MIN}. Cada quadro é independente: <b>não</b> indica o que a glicemia fez entre eles. Toque em um quadro para ver os registros.</p>`;
+}
+function anTmCmpPair(st, T) {
+  const ok = T.groups.filter(g => g.s.enough); if (ok.length < 2) return anEmpty('Escolha ao menos dois períodos com dados', `São necessários dois períodos com ${AN_MIN} ou mais medições cada. Use “Mostrar” para incluir mais períodos.`);
+  const top = ok.slice().sort((a, b) => b.s.n - a.s.n), A = ok.find(g => g.k === st.cmpA) || top[0], B = ok.find(g => g.k === st.cmpB && g.k !== A.k) || top.find(g => g.k !== A.k), opt = (cur) => ok.map(g => `<option value="${g.k}"${g.k === cur.k ? ' selected' : ''}>${g.t}</option>`).join('');
+  const r = (t, a, b, d) => `<tr><td>${t}</td><td>${a}</td><td>${b}</td><td>${d}</td></tr>`, sa = A.s, sb = B.s, df = (x, y, dec, u) => x != null && y != null ? fsign(x - y, dec) + (u || '') : '—';
+  return `<div class="form-grid"><div class="field"><label class="fl" for="an-tm-ca">Período A</label><select class="in" id="an-tm-ca" data-tm="cmpA">${opt(A)}</select></div><div class="field"><label class="fl" for="an-tm-cb">Período B</label><select class="in" id="an-tm-cb" data-tm="cmpB">${opt(B)}</select></div></div>
+    <div class="tbl-wrap tw-hint" tabindex="0" role="region" aria-label="Tabela com rolagem horizontal"><table class="t"><thead><tr><th></th><th>${A.t}</th><th>${B.t}</th><th>A − B</th></tr></thead><tbody>${r('Média (mg/dL)', fm(sa.mean), fm(sb.mean), df(sa.mean, sb.mean, 1))}${r('Mediana (mg/dL)', fm(sa.median), fm(sb.median), df(sa.median, sb.median, 1))}${r('Menor–maior', f0(sa.min) + '–' + f0(sa.max), f0(sb.min) + '–' + f0(sb.max), '')}${r('Medições', sa.n, sb.n, df(sa.n, sb.n, 0))}${r('Dias', sa.days, sb.days, df(sa.days, sb.days, 0))}${r('Desvio-padrão', sa.sdOk ? fm(sa.sd) : '—', sb.sdOk ? fm(sb.sd) : '—', sa.sdOk && sb.sdOk ? df(sa.sd, sb.sd, 1) : '—')}${r('Coef. de variação (%)', sa.sdOk ? fn(sa.cv, 0) : '—', sb.sdOk ? fn(sb.cv, 0) : '—', sa.sdOk && sb.sdOk ? df(sa.cv, sb.cv, 0) : '—')}${r('Baixas', `${sa.lowN}<small>${fn(sa.lowPct, 0)}%</small>`, `${sb.lowN}<small>${fn(sb.lowPct, 0)}%</small>`, df(sa.lowPct, sb.lowPct, 0, ' pp'))}${r('Elevadas', `${sa.highN}<small>${fn(sa.highPct, 0)}%</small>`, `${sb.highN}<small>${fn(sb.highPct, 0)}%</small>`, df(sa.highPct, sb.highPct, 0, ' pp'))}${r('Na faixa', fn(sa.pIn, 0) + '%', fn(sb.pIn, 0) + '%', df(sa.pIn, sb.pIn, 0, ' pp'))}</tbody></table></div>
+    <div class="an-2s"><div><b>A</b>${anStack(sa.bc, sa.n)}<small class="num">n=${sa.n}</small></div><div><b>B</b>${anStack(sb.bc, sb.n)}<small class="num">n=${sb.n}</small></div></div>
+    ${Math.max(sa.n, sb.n) / Math.min(sa.n, sb.n) >= 2 ? `<p class="an-warn">As quantidades de medições são bem diferentes (${sa.n} e ${sb.n}). Compare pelas proporções.</p>` : ''}<p class="an-note"><b>A − B</b>: diferença entre A e B; <b>pp</b> = pontos percentuais. As proporções são de medições, não de tempo. Sem julgamento de melhor ou pior.</p>`;
+}
+function anTmPrev(T) {
+  if (!T.W.prev) return anNote('Não há período anterior para comparar. Escolha um intervalo de 7, 14, 30, 90 ou 180 dias, ou datas personalizadas.');
+  const rows = T.groups.filter(g => g.s.n || (g.p && g.p.n));
+  if (!rows.length) return anNote('Sem medições para comparar.');
+  const d = (a, b) => `${a} → ${b}`;
+  return `<div class="an-cmp">${rows.map(g => { const s = g.s, p = g.p, both = s.enough && p && p.enough, big = both && Math.max(s.n, p.n) / Math.min(s.n, p.n) >= 2;
+    return `<div class="an-cr neu"><span class="an-cr-t">${g.t}</span>${both ? `<span class="an-cr-v"><span class="b num">Antes ${fm(p.mean)}<small>n=${p.n}</small></span><span class="a num">Agora ${fm(s.mean)}<small>n=${s.n}</small></span></span>${anDumb(s.mean, p.mean, 300)}<span class="an-cr-d num">${fsign(s.mean - p.mean, 1)} mg/dL${s.n >= AN_T_MIN_HL && p.n >= AN_T_MIN_HL && p.mean > 0 ? `<small>${fsign((s.mean - p.mean) / p.mean * 100, 0)}%</small>` : ''}</span>
+      <span class="an-cr-x">Baixas: ${d(`${p.lowN} (${fn(p.lowPct, 0)}%)`, `${s.lowN} (${fn(s.lowPct, 0)}%)`)} · Elevadas: ${d(`${p.highN} (${fn(p.highPct, 0)}%)`, `${s.highN} (${fn(s.highPct, 0)}%)`)} · Medições: ${d(p.n, s.n)}</span>${big ? '<span class="an-cr-x warn">Quantidades de medições bem diferentes: compare as proporções.</span>' : ''}` : `<span class="an-slot-e">${!s.n && !(p && p.n) ? 'sem registros' : `Dados insuficientes para comparar (agora ${s.n}, antes ${p ? p.n : 0}; mínimo ${AN_MIN} em cada)`}</span>`}</div>`; }).join('')}</div>${anNote('Descreve como os números mudaram entre os dois períodos. <b>Não</b> indica melhora ou piora clínica nem a causa: isso depende do contexto, das medições feitas e do que mudou na rotina. A variação percentual só aparece com 5 ou mais medições nos dois períodos.')}`;
+}
+function anBodyTmp(M) {
+  const st = anTmSet(), T = M.tm(), vis = T.groups, withData = vis.filter(g => g.s.n);
+  let h = anTmControls(st, T, M);
+  if (T.W.invalid) return h + '<div id="an-tm-det" class="an-tm-det"></div>';
+  if (!T.W.cur.length) return h + anEmpty('Sem medições neste intervalo', 'Escolha outro intervalo para ver a análise por horário.') + '<div id="an-tm-det" class="an-tm-det"></div>';
+  h += `<p class="an-tm-sum"><b class="num">${T.total}</b> medições em <b class="num">${T.days}</b> dia${T.days === 1 ? '' : 's'}${T.W.prev ? ` · período anterior: <b class="num">${T.W.prev.length}</b>` : ''}${T.noTimeN && st.src === 'hora' ? ` · ${T.noTimeN} sem horário` : ''}</p>`;
+  if (T.quality.length) h += `<details class="an-ev an-q" ${T.quality.length <= 2 ? 'open' : ''}><summary>Qualidade dos dados (${T.quality.length} aviso${T.quality.length > 1 ? 's' : ''})</summary><ul class="an-wl" role="note">${T.quality.map(q => `<li>${esc(q)}</li>`).join('')}</ul></details>`;
+  if (!withData.length) return h + anEmpty('Nenhum período com medições', 'Os períodos selecionados não têm registros neste intervalo.') + '<div id="an-tm-det" class="an-tm-det"></div>';
+  h += `<h3 class="an-sub">Períodos que merecem atenção</h3>${T.hl.length ? `<div class="an-cards">${T.hl.map(anTmHL).join('')}</div>` : anEmpty('Nenhum destaque claro', 'Destaques exigem períodos com ao menos 5 medições em 2 ou mais dias, e mais de uma ocorrência. Uma medição isolada nunca é destacada.')}`;
+  h += `<h3 class="an-sub">Cartões por período</h3><div class="an-tps">${vis.map(g => anTmCard(g, st, T)).join('')}</div>`;
+  h += `<h3 class="an-sub">Distribuição das medições por faixa</h3><div class="an-dist">${withData.map(g => `<div class="an-dr"><span>${g.t}</span>${anStack(g.s.bc, g.s.n)}<b class="num">n=${g.s.n}</b></div>`).join('')}</div><ul class="an-bl compact an-bl-k">${AN_BANDS.map(b => `<li><i class="an-sw an-b-${b[0]}"></i><span>${b[1]}</span></li>`).join('')}</ul>${anNote('Proporção das <b>medições</b> em cada faixa; isto não é o tempo real dentro da faixa.')}`;
+  h += `<h3 class="an-sub">Média comparada entre períodos</h3>${anCols(vis.map(g => ({ label: AN_T_SHORT[g.k] || g.t.replace('h', ''), v: g.s.enough ? Math.round(g.s.mean) : 0, sub: g.s.n ? 'n=' + g.s.n : '', show: g.s.enough ? f0(g.s.mean) : (g.s.n ? '·' : '—'), cls: g.s.enough ? 'c-' + (anTone(g.s.mean, 0, g.k === 'jejum' ? FAST.high : LIM.high) || 'ok') : '', title: g.s.enough ? `Média ${fm(g.s.mean)} mg/dL em ${g.s.n} medições` : 'Medições insuficientes' })), { label: 'Média de glicemia por período', min: 100 })}${anNote(`Colunas coloridas pela faixa da média (verde na faixa, âmbar elevada, vermelha baixa). Períodos com menos de ${AN_MIN} medições não mostram média.`)}
+    <div class="an-rows">${vis.filter(g => g.s.enough).map(g => `<div class="an-mr"><span>${g.t}</span>${anRange(g.s.min, g.s.mean, g.s.max)}<b class="num">${f0(g.s.min)}–${f0(g.s.max)}</b></div>`).join('')}</div>${anNote('Cada barra cinza vai do menor ao maior valor; o traço branco é a média; a faixa verde é de ' + LIM.low + ' a ' + LIM.high + ' mg/dL.')}`;
+  const vr = vis.filter(g => g.s.sdOk && g.s.cv != null), mxCv = Math.max(...vr.map(g => g.s.cv), 36);
+  h += `<h3 class="an-sub">Variabilidade por período</h3>${vr.length ? `<div class="an-rows">${vr.map(g => `<div class="an-vr"><span>${g.t}</span><span class="an-gb" aria-hidden="true"><i class="an-gb-f" style="width:${Math.min(100, g.s.cv / (mxCv * 1.15) * 100).toFixed(0)}%"></i><i class="an-gb-t" style="left:${(36 / (mxCv * 1.15) * 100).toFixed(1)}%"></i></span><b class="num">${fn(g.s.cv, 0)}%<small>DP ${f0(g.s.sd)}</small></b></div>`).join('')}</div>${anNote('Coeficiente de variação (desvio-padrão ÷ média). O traço marca 36%, referência usada com sensores contínuos; com poucas medições é só indicativo. Períodos com menos de 5 medições ficam de fora.')}` : anEmpty('Variabilidade indisponível', 'Precisa de 5 ou mais medições em um período.')}`;
+  h += `<h3 class="an-sub">Mapa de calor · dia da semana e horário</h3>${anTmHeat(st, T)}`;
+  const ev = T.evo, opts = withData.map(g => `<option value="${g.k}"${g.k === T.evoK ? ' selected' : ''}>${g.t}</option>`).join('');
+  h += `<h3 class="an-sub">Evolução ao longo do tempo</h3><div class="field"><label class="fl" for="an-tm-ev">Período</label><select class="in" id="an-tm-ev" data-tm="evo">${opts}</select></div>${ev ? anTmLine(ev) : ''}${ev && ev.okN >= 2 ? '' : anNote('Poucas semanas com 3 ou mais medições neste período do dia: a linha das médias não é desenhada. Os pontos são as medições.')}${anNote('Pontos = medições; círculos maiores e linha = média semanal, só em semanas com 3 ou mais medições. A linha não atravessa semanas sem dados.')}`;
+  h += `<details class="an-ev"><summary>Comparar dois períodos do dia</summary>${anTmCmpPair(st, T)}</details><details class="an-ev"><summary>Evolução de cada período em relação ao anterior</summary>${anTmPrev(T)}</details>`;
+  h += anNote('Esta análise descreve onde ficam os números dos seus registros. Medições capilares são pontuais: nada é preenchido ou ligado entre elas. Não indica causa, diagnóstico nem mudança de tratamento: converse com sua equipe de saúde.') + '<div id="an-tm-det" class="an-tm-det" aria-live="polite"></div>';
+  return h;
+}
+function anTmListHTML(d) {
+  const a = anRecs(d.ids).sort((x, y) => y.ts - x.ts), sh = a.slice(0, d.shown);
+  return `<div class="an-tm-dh"><b>${esc(d.title)}</b><span class="num">${a.length} registro${a.length === 1 ? '' : 's'}</span><button type="button" class="btn sm" data-act="an-tm-close">Fechar</button></div>${a.length ? '<div class="an-tm-dl">' + sh.map(r => `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-act="open" data-id="${r.id}"><span class="tm num"><b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips"><span class="tag">${fmtDate(r.date).slice(0, 5)}</span>${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`).join('') + '</div>' + (a.length > sh.length ? `<button type="button" class="btn sm full" data-act="an-tm-more">Mostrar mais (${a.length - sh.length})</button>` : '') : '<p class="an-note">Nenhum registro.</p>'}`;
+}
+function anTmRefresh() {
+  anTmSave(); const sec = document.getElementById('an-tmp'), s = AN_SECS.find(x => x.id === 'tmp'); if (!sec || !s) return;
+  const f = document.activeElement, fa = f && f.dataset && f.dataset.act ? `[data-act="${f.dataset.act}"]${f.dataset.v != null ? `[data-v="${f.dataset.v}"]` : ''}` : (f && f.id ? '#' + f.id : ''), M = anModel(), b = sec.querySelector('.an-b');
+  sec.querySelector('.an-h-s').innerHTML = s.sum(M); b.innerHTML = s.body(M); anTmDet = null;
+  if (fa) { try { const n = b.querySelector(fa); if (n) n.focus({ preventScroll: true }); } catch (e) { } }
+}
+function anTmShow(d) { anTmDet = d; const el = document.getElementById('an-tm-det'); if (!el) return; el.innerHTML = anTmListHTML(d); el.classList.add('on'); const red = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({ block: 'nearest', behavior: red ? 'auto' : 'smooth' }); }
 /* 8. Refeição */
 function anBodyRef(M) {
   const recs = M.cur;
@@ -301,4 +422,39 @@ document.addEventListener('click', e => {
     else { const d = new Date(now), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), p0 = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime(); A = [m0, now]; B = [p0, m0 - DAY]; }
     S.ana.A = { from: iso(A[0]), to: iso(A[1]) }; S.ana.B = { from: iso(B[0]), to: iso(B[1]) }; anMemo = { key: '', M: null }; const c = document.getElementById('cmp'); if (c) c.innerHTML = compareCardHTML();
   }
+});
+
+/* ---- Horários e períodos do dia: eventos ---- */
+document.addEventListener('click', e => {
+  const el = e.target.closest && e.target.closest('[data-act^="an-tm-"]'); if (!el || S.route !== 'analise') return;
+  const a = el.dataset.act, v = el.dataset.v, st = anTmSet(), reset = () => { st.sel = []; st.evo = ''; st.cmpA = ''; st.cmpB = ''; };
+  if (a === 'an-tm-src') { if (st.src !== v) { st.src = v === 'hora' ? 'hora' : 'ctx'; reset(); } anTmRefresh(); }
+  else if (a === 'an-tm-step') { if (v === 'custom') { st.step = 'custom'; if (!anTParseCuts(st.cuts).ok) st.cuts = '6, 10, 14, 18, 22'; } else st.step = +v; reset(); anTmRefresh(); }
+  else if (a === 'an-tm-cuts') {
+    const inp = document.getElementById('an-tm-cuts'), msg = document.getElementById('an-tm-err'), p = anTParseCuts(inp ? inp.value : '');
+    if (!p.ok) { if (msg) { msg.textContent = p.err; msg.classList.add('bad'); } return; } st.cuts = p.cuts.join(', '); st.step = 'custom'; reset(); anTmRefresh();
+  } else if (a === 'an-tm-range') {
+    st.range = AN_T_RANGES.includes(v) ? v : 'tela';
+    if (st.range === 'custom' && (!st.from || !st.to)) { const now = Date.now(); st.from = isoDate(new Date(addDays(now, -29))); st.to = isoDate(new Date(now)); }
+    anTmRefresh();
+  } else if (a === 'an-tm-sel') { if (v === '*') st.sel = []; else { const i = st.sel.indexOf(v); if (i >= 0) st.sel.splice(i, 1); else st.sel.push(v); } st.evo = ''; st.cmpA = ''; st.cmpB = ''; anTmRefresh(); }
+  else if (a === 'an-tm-heat') { st.heat = AN_TM_HEAT[v] ? v : 'high'; anTmRefresh(); }
+  else if (a === 'an-tm-rec') {
+    const T = anModel().tm(), kind = el.dataset.kind; let ids = [], title = '';
+    if (kind === 'g') { const g = T.all.find(x => x.k === el.dataset.k); if (g) { ids = g.ids; title = g.t; } }
+    else if (kind === 'hl') { const h = T.hl.find(x => x.id === v); if (h) { ids = h.recIds; title = h.title + ' · ' + h.t; } }
+    else if (kind === 'heat') { const c = T.heat.rows[+el.dataset.wd] && T.heat.rows[+el.dataset.wd][+el.dataset.bi]; if (c) { ids = c.ids; title = AN_T_WD[c.wd] + ' · ' + T.heat.bands[c.bi].t; } }
+    anTmShow({ title, ids, shown: 20 });
+  } else if (a === 'an-tm-more') { if (anTmDet) { anTmDet.shown += 20; const d = document.getElementById('an-tm-det'); if (d) d.innerHTML = anTmListHTML(anTmDet); } }
+  else if (a === 'an-tm-close') { anTmDet = null; const d = document.getElementById('an-tm-det'); if (d) { d.innerHTML = ''; d.classList.remove('on'); } }
+  else if (a === 'an-tm-hist') {
+    const T = anModel().tm(), g = T.all.find(x => x.k === el.dataset.k), f = g && g.hist; if (!f) return;
+    Object.assign(S.hist, { q: '', from: '', to: '', band: '', ctx: f.ctx || '', meal: f.meal || '', mark: '', limit: 60 });
+    if (T.W.curR) { S.hist.from = isoDate(new Date(T.W.curR[0])); S.hist.to = isoDate(new Date(T.W.curR[1])); } go('historico');
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t || !t.dataset || !t.dataset.tm || S.route !== 'analise') return;
+  const st = anTmSet(), k = t.dataset.tm; if (!['from', 'to', 'evo', 'cmpA', 'cmpB'].includes(k)) return;
+  st[k] = t.value; anTmRefresh();
 });

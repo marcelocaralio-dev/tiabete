@@ -329,10 +329,10 @@ i.b-vlow { background: #7D1020; } i.b-low1 { background: #E5586A; } i.b-ok { bac
 /* ================= Folha de metas ================= */
 .mt-opts { display: flex; flex-direction: column; gap: 8px; }
 .mt-opt { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 14px; border: 1px solid var(--line); cursor: pointer; min-height: 56px; }
-.mt-opt input { margin-top: 3px; accent-color: var(--red); width: 18px; height: 18px; flex: none; }
+.mt-opt input { margin-top: 3px; accent-color: var(--brand); width: 18px; height: 18px; flex: none; }
 .mt-opt span { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .mt-opt small { font-size: 12.5px; color: var(--mut); line-height: 1.4; }
-.mt-opt:has(input:checked) { border-color: var(--red); background: rgba(var(--red-rgb), .08); }
+.mt-opt:has(input:checked) { border-color: var(--brand); background: rgba(var(--brand-rgb), .08); }
 
 /* ================= Telas estreitas e movimento reduzido ================= */
 @media (max-width: 380px) {

@@ -34,11 +34,11 @@
   --g-prog: rgba(255, 82, 100, .55); --g-nav-t: rgba(255, 82, 100, .38);
   --g-spark-p: 55%;
   /* ícone ativo da navegação e mostradores (gauge.css) */
-  --g-navic: drop-shadow(0 0 6px rgba(var(--red-rgb), .7));
+  --g-navic: drop-shadow(0 0 6px rgba(var(--brand-rgb), .7));
   --g-gz-num-p: 42%; --g-gz-lit-p: 38%;
   /* botões principais: sombra base, brilho ao tocar (a) e ao passar o mouse (h) */
-  --g-btn-sh: rgba(var(--red-rgb), .32); --g-btn-a: rgba(255, 82, 100, .50); --g-btn-h: rgba(255, 82, 100, .38);
-  --g-fab-sh: rgba(var(--red-rgb), .5); --g-fab-sh-h: rgba(var(--red-rgb), .5); --g-fab-a: rgba(255, 82, 100, .55); --g-fab-h: rgba(255, 82, 100, .40);
+  --g-btn-sh: rgba(var(--brand-rgb), .32); --g-btn-a: rgba(255, 82, 100, .50); --g-btn-h: rgba(255, 82, 100, .38);
+  --g-fab-sh: rgba(var(--brand-rgb), .5); --g-fab-sh-h: rgba(var(--brand-rgb), .5); --g-fab-a: rgba(255, 82, 100, .55); --g-fab-h: rgba(255, 82, 100, .40);
   --g-rw-sh: rgba(22, 163, 74, .4); --g-rw-sh-h: rgba(22, 163, 74, .4); --g-rw-a: rgba(54, 201, 120, .5); --g-rw-h: rgba(54, 201, 120, .4);
 }
 /* ---------- Tokens de efeito · TEMA CLARO ----------

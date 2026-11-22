@@ -3,12 +3,12 @@
 /* Tema antes da primeira pintura: sem "flash" escuro para quem escolheu o tema claro. Mesma regra de applyTheme() (extras.js): preferência salva em tb-theme; padrão escuro; "auto" segue o sistema. */
 (function () { try { var v = localStorage.getItem('tb-theme'), l = v === 'light' || (v === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches), d = document.documentElement; d.setAttribute('data-theme', l ? 'light' : 'dark'); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', l ? '#F6F2F0' : '#08070A'); } catch (e) { } })();
 </script>
-<title>TiaBete</title>
+<title>GLUXO</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
 {{CSS}}
 </style>
-<div class="top"><div class="top-in"><button class="thm pf-av" id="pfb" type="button" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" title="Menu"></button><div class="logo" id="logo-home" role="link" tabindex="0" aria-label="TiaBete. Ir para o Início" title="Ir para o Início"><svg viewBox="0 0 100 100" width="31" height="31" aria-hidden="true"><path d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="var(--red)"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/></svg><span class="lw"><span class="ln">Tia<b>Bete</b></span><span class="ls">CONTROLE DA GLICOSE</span></span></div></div></div>
+<div class="top"><div class="top-in"><button class="thm pf-av" id="pfb" type="button" aria-label="Abrir menu de navegação" aria-haspopup="dialog" aria-expanded="false" title="Menu"></button><div class="logo" id="logo-home" role="link" tabindex="0" aria-label="GLUXO. Ir para o Início" title="Ir para o Início"><span class="gx-plate"><img class="gx-logo" id="gx-hdr" alt="GLUXO · Controle da glicose" width="94" height="34" decoding="async"></span></div></div></div>
 <main class="wrap" id="view" aria-live="polite"></main>
 <nav class="nav" id="nav" aria-label="Navegação principal"></nav>
 <script>

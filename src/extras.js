@@ -1292,7 +1292,7 @@ function pfLine() {
   return parts.join('  ·  ');
 }
 /* ---- avatar (cabeçalho e página do perfil) ---- */
-const PF_DEF = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="var(--red-d, #3a1a1c)"/><circle cx="20" cy="15" r="6.5" fill="var(--red)"/><path d="M7 35c1.500-7 6.500-10.500 13-10.500S31.500 28 33 35a20 20 0 0 1-26 0z" fill="var(--red)"/></svg>';
+const PF_DEF = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="var(--brand-d, #3a1a1c)"/><circle cx="20" cy="15" r="6.5" fill="var(--brand)"/><path d="M7 35c1.500-7 6.500-10.500 13-10.500S31.500 28 33 35a20 20 0 0 1-26 0z" fill="var(--brand)"/></svg>';
 const pfAvatarHTML = () => S.profile && S.profile.photo ? `<img class="pf-img" src="${S.profile.photo}" alt="">` : PF_DEF;
 function pfSync() { const b = document.getElementById('pfb'); if (!b) return; b.innerHTML = pfAvatarHTML(); const n = S.profile && S.profile.name; b.setAttribute('aria-label', 'Abrir menu de navegação' + (n ? ' · ' + n : '')); b.title = 'Menu'; }
 

@@ -2,8 +2,8 @@
 :root { --amb: #F0B04A; --amb-d: #3A2A0C; --amb-l: #FFD58A; --amb-ink: #1C1305; }
 :root[data-theme="light"] { --amb: #9A6000; --amb-d: #FBEBCB; --amb-l: #8A5300; --amb-ink: #fff; }
 /* menus: Razão (vermelho do TiaBete) e Alimentos (âmbar); mesmo tamanho dos demais */
-.bl-tabs .seg-b.bl-t-rz { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--s2)); color: var(--red-l); }
-.bl-tabs .seg-b.bl-t-rz.on { background: var(--red); border-color: var(--red); color: #fff; }
+.bl-tabs .seg-b.bl-t-rz { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--s2)); color: var(--brand-l); }
+.bl-tabs .seg-b.bl-t-rz.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .bl-tabs .seg-b.bl-t-al { border-color: var(--amb); background: var(--amb-d); color: var(--amb-l); }
 .bl-tabs .seg-b.bl-t-al.on { background: var(--amb); border-color: var(--amb); color: var(--amb-ink); }
 /* etiqueta nutricional */
@@ -43,5 +43,5 @@
 .bl-flt { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; } .bl-fmeals .bl-flt { margin: 6px 0 0; }
 .bl-fb { padding: 7px 12px; min-height: 36px; border-radius: 99px; border: 1px solid var(--line); background: var(--s2); color: var(--mut); font-size: 13.5px; font-weight: 600; }
 .bl-fb.on { background: var(--amb-d); border-color: var(--amb); color: var(--amb-l); }
-.bl-edit > summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: var(--red-l); padding: 6px 0; }
+.bl-edit > summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: var(--brand-l); padding: 6px 0; }
 @media (max-width: 340px) { .bl-fm-g { grid-template-columns: 1fr; } }

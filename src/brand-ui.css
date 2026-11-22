@@ -1,0 +1,30 @@
+/* ================= GLUXO · Aplicação da identidade (carregado por último) =================
+   Usa só tokens de src/brand.css. Nenhuma regra aqui altera estrutura, medidas de layout ou cores clínicas. */
+/* ---- logotipo (imagens oficiais: nunca redesenhadas; no tema claro vão sobre placa escura) ---- */
+.gx-plate { display: inline-flex; align-items: center; border-radius: 12px; }
+:root[data-theme="light"] .gx-plate { background: #08070A; padding: 4px 10px; box-shadow: 0 2px 10px rgba(28, 23, 25, .18); }
+.gx-logo { display: block; height: 30px; width: auto; user-select: none; -webkit-user-drag: none; }
+.logo .gx-logo { height: 40px; margin-block: -4px; }  /* maior que o antigo, mas sem aumentar a altura do topo */
+:root[data-theme="light"] .logo .gx-plate { margin: -4px 0 -4px -10px; }
+:root[data-theme="light"] .logo .gx-logo { height: 34px; margin-block: 0; }  /* a placa do tema claro não altera a altura do topo */
+.about-gx { display: flex; justify-content: center; padding: 6px 0 2px; } .about-gx .gx-logo { height: 64px; }
+.gx-hero { width: min(78vw, 380px); height: auto; }
+
+/* ---- botão principal e seleção: gradiente institucional, realce de topo luminoso ---- */
+.btn.pri, .seg button[aria-pressed="true"] { background: var(--brand-grad); border-color: var(--brand); color: var(--brand-on); }
+.btn.pri { box-shadow: 0 6px 20px var(--brand-sh), inset 0 1px 0 rgba(255, 255, 255, .22); }
+.nav .fab { background: var(--brand-grad); box-shadow: 0 8px 28px var(--brand-sh-fab), 0 0 0 5px var(--bg), inset 0 1px 0 rgba(255, 255, 255, .24); }
+@media (hover: hover) { .btn.pri:not(:disabled):hover { filter: brightness(1.06) saturate(1.05); } }
+.btn:disabled, .btn[aria-disabled="true"] { cursor: not-allowed; }
+.btn.pri:disabled, .btn.pri[aria-disabled="true"] { background: var(--brand-disabled); border-color: transparent; box-shadow: none; color: color-mix(in srgb, var(--brand-on) 70%, transparent); filter: none; }
+
+/* ---- movimento da marca: entrada, confirmação, carregamento ---- */
+@keyframes gx-rise { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes gx-sheen { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(120%); } }
+@keyframes gx-pop { 0% { transform: scale(.94); } 55% { transform: scale(1.03); } 100% { transform: scale(1); } }
+.gx-rise { animation: gx-rise var(--gx-t-slow) var(--gx-ease) both; }
+.gx-pop { animation: gx-pop var(--gx-t) var(--gx-ease) both; }
+@media (prefers-reduced-motion: reduce) { .gx-rise, .gx-pop { animation: none; } }
+
+/* ---- cores clínicas preservadas: ícones dos cartões de alerta/estado ruim continuam no vermelho clínico ---- */
+.pn-c.alert .pn-ic, .pn-c.st-bad .pn-ic { stroke: var(--red-l); }

@@ -1,7 +1,7 @@
 /* ===== Textos longos retráteis ("Ler mais") ===== */
 .rm-t { margin-top: 12px; overflow: hidden; transition: max-height .2s ease; }
-.rm-b { display: inline-flex; align-items: center; gap: 6px; margin: -2px 0 0; padding: 4px 0; background: none; border: 0; color: var(--red-l); font: 700 13.5px var(--f-body); letter-spacing: .01em; cursor: pointer; min-height: 32px; }
+.rm-b { display: inline-flex; align-items: center; gap: 6px; margin: -2px 0 0; padding: 4px 0; background: none; border: 0; color: var(--brand-l); font: 700 13.5px var(--f-body); letter-spacing: .01em; cursor: pointer; min-height: 32px; }
 .rm-b::after { content: ''; width: 6px; height: 6px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); transition: transform .2s ease; }
 .rm-b[aria-expanded="true"]::after { transform: rotate(225deg) translateY(-1px); }
-.rm-b:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; border-radius: 6px; }
+.rm-b:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .rm-t, .rm-b::after { transition: none; } }

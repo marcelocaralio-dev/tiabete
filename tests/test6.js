@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'); let ok = true; const chk = (c, m) => { console.log((c ? 'OK   ' : 'FALHA ') + m); if (!c) ok = false; };
 const root = path.join(__dirname, '..'), cfg = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8'));
 chk(cfg.plugins && cfg.plugins.LocalNotifications && cfg.plugins.LocalNotifications.smallIcon === 'ic_stat_tiabete', 'smallIcon configurado');
-chk(/^#FF2E3E$/i.test(cfg.plugins.LocalNotifications.iconColor), 'cor de destaque = vermelho da gota oficial');
+chk(/^#E50308$/i.test(cfg.plugins.LocalNotifications.iconColor), 'cor de destaque = vermelho principal da marca GLUXO');
 const sizes = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 };
 for (const [d, s] of Object.entries(sizes)) {
   const b = fs.readFileSync(path.join(root, 'assets', 'notification', `ic_stat_tiabete-${d}.png`));

@@ -6,7 +6,7 @@
    - sem amostra suficiente a função devolve null/lista vazia: a tela explica o que falta em vez de inventar um resultado;
    - nada aqui sugere dose, ajuste de tratamento ou diagnóstico. */
 const ANC = (typeof module !== 'undefined' && typeof require === 'function') ? require('./logic.js') : {
-  TIME_BLOCKS, MIN_BUCKET, CONTEXTS, MEALS, groupBy, weekStart, monthStart, stats, bandOf, bandCounts, inRange, startOfDay, endOfDay, addDays, mkTs, isoDate, hypoEpisodes, LIM, FAST, DAY
+  TIME_BLOCKS, MIN_BUCKET, CONTEXTS, MEALS, groupBy, weekStart, monthStart, stats, bandOf, bandCounts, inRange, startOfDay, endOfDay, addDays, mkTs, isoDate, hypoEpisodes, LIM, FAST, DAY, pctl
 };
 const AN_MIN = ANC.MIN_BUCKET;   /* mínimo de medições para mostrar uma média (3, igual ao resto do app) */
 const AN_MIN_FIND = 10;           /* mínimo de medições para uma descoberta/associação aparecer */
@@ -250,4 +250,144 @@ function anHistory(records) {
   return { n: s.n, first: Math.min(...ts), last: Math.max(...ts), days: s.days, months, best: weeks.length >= 2 ? best : null, worst: weeks.length >= 2 ? worst : null, hi, lo };
 }
 
-if (typeof module !== 'undefined') module.exports = { AN_MIN, AN_MIN_FIND, AN_RANGES, AN_SLOTS, anReal, anBase, anWindows, anSummary, anDelta, anSlots, anSlotOf, anBlocks, anGroupStats, anHypo, anHyper, anVariability, anCompare, anRecurrence, anPairs, anAssociations, anDiscoveries, anHistory, anCorr, anBlockOf };
+/* ================= Análise temporal por horário e período do dia (PROMPT 1) =================
+   Tudo aqui é descritivo e usa os mesmos limites e funções do resto da Análise (stats, bandOf, bandCounts…).
+   - "Contexto" é o que a pessoa registrou (jejum, pós-almoço…); "faixa de horário" é a hora efetiva da medição. Os dois agrupamentos
+     são independentes: nenhuma medição vira pós-prandial só por causa da hora em que foi feita;
+   - proporções são de MEDIÇÕES (não é tempo na faixa) e nada é interpolado entre medições;
+   - um período só é destacado com amostra mínima (n ≥ 5, ≥ 2 dias e, conforme o caso, ≥ 2 ou 3 ocorrências), nunca por uma medição isolada;
+   - diferenças entre períodos são descritas sem dizer se "melhorou" ou "piorou" clinicamente. */
+const AN_T_MIN_HL = 5;      /* medições mínimas para um período entrar nos destaques */
+const AN_T_STEPS = [2, 3, 4, 6];
+const AN_T_RANGES = ['tela', '7', '14', '30', '90', '180', 'custom'];
+const AN_T_WD = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+/* Filtro do histórico equivalente a cada contexto (para o botão "Ver no histórico"). */
+const AN_T_HIST = { jejum: { ctx: 'jejum' }, poscafe: { ctx: 'depois', meal: 'cafe' }, prealmoco: { ctx: 'antes', meal: 'almoco' }, posalmoco: { ctx: 'depois', meal: 'almoco' }, prejantar: { ctx: 'antes', meal: 'jantar' }, posjantar: { ctx: 'depois', meal: 'jantar' }, deitar: { ctx: 'deitar' }, madrugada: { ctx: 'madrugada' } };
+const anTDefaults = () => ({ src: 'ctx', range: 'tela', from: '', to: '', step: 4, cuts: '', sel: [], heat: 'high', evo: '', cmpA: '', cmpB: '' });
+const anTPad = n => String(n).padStart(2, '0');
+const anTLabel = (a, b) => anTPad(a) + '–' + anTPad(b) + 'h';
+/* "6, 10 14;18" → [6,10,14,18]. Horas inteiras de 1 a 23, sem repetição, no máximo 11 cortes. */
+function anTParseCuts(txt) {
+  const parts = String(txt || '').split(/[\s,;]+/).filter(Boolean);
+  if (!parts.length) return { ok: false, cuts: [], err: 'Informe as horas de corte, por exemplo: 6, 10, 14, 18, 22.' };
+  const out = [];
+  for (const p of parts) { if (!/^\d{1,2}$/.test(p)) return { ok: false, cuts: [], err: '“' + p + '” não é uma hora válida. Use números inteiros de 1 a 23.' }; const h = +p; if (h < 1 || h > 23) return { ok: false, cuts: [], err: 'Use horas de 1 a 23 (o corte de meia-noite já existe).' }; out.push(h); }
+  const cuts = [...new Set(out)].sort((a, b) => a - b);
+  if (cuts.length > 11) return { ok: false, cuts: [], err: 'No máximo 11 horas de corte (12 faixas).' };
+  return { ok: true, cuts, err: '' };
+}
+/* Faixas de horário: passo fixo (2, 3, 4 ou 6 h) ou cortes definidos pela pessoa. */
+function anTBands(st) {
+  let edges = [0];
+  if (st.step === 'custom') { const p = anTParseCuts(st.cuts); edges = edges.concat(p.ok ? p.cuts : [4, 8, 12, 16, 20]); }
+  else { const s = AN_T_STEPS.includes(+st.step) ? +st.step : 4; for (let h = s; h < 24; h += s) edges.push(h); }
+  edges.push(24);
+  return edges.slice(0, -1).map((a, i) => ({ k: 'h' + a, t: anTLabel(a, edges[i + 1]), a, b: edges[i + 1] }));
+}
+/* Definições dos grupos e função que devolve a chave do grupo de uma medição (uma passada só, mesmo com histórico longo). */
+function anTDefs(st) {
+  if (st.src === 'hora') {
+    const bands = anTBands(st), idx = new Array(24).fill(-1); bands.forEach((b, i) => { for (let h = b.a; h < b.b; h++) idx[h] = i; });
+    return { defs: bands, keyOf: r => { const h = anHour(r); return h == null || h < 0 || h > 23 ? null : bands[idx[h]].k; } };
+  }
+  const defs = AN_SLOTS.concat([{ k: 'outros', t: 'Outros contextos' }]);
+  return { defs, keyOf: r => anSlotOf(r) };
+}
+/* Janela do intervalo escolhido na seção e o período anterior de mesmo tamanho. "tela" segue o intervalo da Análise. */
+function anTWindow(base, st, now, scr) {
+  const r = st.range;
+  if (r === 'tela') return { cur: scr.cur, prev: scr.prev, curR: scr.curR, prevR: scr.prevR, invalid: false };
+  let c0, c1;
+  if (r === 'custom') {
+    if (!st.from || !st.to || st.from > st.to) return { cur: [], prev: null, curR: null, prevR: null, invalid: true };
+    c0 = ANC.mkTs(st.from, '00:00'); c1 = ANC.endOfDay(ANC.mkTs(st.to, '00:00'));
+  } else { const d = AN_T_RANGES.includes(r) ? +r : 30; c0 = ANC.startOfDay(ANC.addDays(now, -(d - 1))); c1 = ANC.endOfDay(now); }
+  const nd = Math.max(1, Math.round((c1 + 1 - c0) / ANC.DAY)), p1 = c0 - 1, p0 = ANC.startOfDay(ANC.addDays(c0, -nd));
+  return { cur: ANC.inRange(base, c0, c1), prev: ANC.inRange(base, p0, p1), curR: [c0, c1], prevR: [p0, p1], invalid: false, nd };
+}
+/* Indicadores completos de um grupo de medições. */
+function anTStats(recs) {
+  const n = recs.length, s = ANC.stats(recs), v = recs.map(r => r.glucose).sort((a, b) => a - b), bc = ANC.bandCounts(recs);
+  const byDay = new Map(); recs.forEach(r => byDay.set(r.date, (byDay.get(r.date) || 0) + 1));
+  const days = byDay.size, top = n ? Math.max(...byDay.values()) : 0;
+  const lowN = recs.filter(r => r.glucose < ANC.LIM.low).length, highN = recs.filter(r => r.glucose > anHi(r)).length;
+  return { n, days, mean: s.mean, median: n ? ANC.pctl(v, .5) : null, min: s.min, max: s.max, sd: n >= 2 ? s.sd : null, cv: s.sd != null && s.mean > 0 ? s.sd / s.mean * 100 : null,
+    bc, pIn: anPct(bc.ok, n), lowN, highN, lowPct: anPct(lowN, n), highPct: anPct(highN, n),
+    enough: n >= AN_MIN, sdOk: n >= 5, small: n >= AN_MIN && n < AN_MIN_FIND, fewDays: n >= AN_MIN && days < 3, concentrated: n >= 6 && top / n >= 0.5, topDayShare: n ? top / n : null };
+}
+/* Horário efetivo das medições (mediana e faixa central), para mostrar quando elas realmente acontecem dentro de um contexto. */
+function anTTimes(recs) {
+  const m = recs.filter(r => !r.noTime && r.time).map(r => +r.time.slice(0, 2) * 60 + +r.time.slice(3, 5)).filter(x => isFinite(x)).sort((a, b) => a - b);
+  if (m.length < 5) return null;
+  const hh = x => anTPad(Math.floor(x / 60)) + ':' + anTPad(Math.round(x % 60));
+  return { n: m.length, med: hh(ANC.pctl(m, .5)), p10: hh(ANC.pctl(m, .1)), p90: hh(ANC.pctl(m, .9)) };
+}
+/* Quantos registros de cada contexto caem em uma faixa de horário (e o inverso), para não confundir hora com classificação. */
+function anTCross(recs, st, defs, keyOf) {
+  const out = {};
+  recs.forEach(r => { const k = keyOf(r); if (k == null) return; const o = st.src === 'hora' ? anSlotOf(r) : (anBlockOf(r) < 0 ? 'x' : String(anBlockOf(r))); (out[k] = out[k] || {})[o] = (out[k][o] || 0) + 1; });
+  return out;
+}
+function anTHighlights(groups) {
+  const out = [], f0 = x => Math.round(x).toLocaleString('pt-BR'), el = groups.filter(g => g.s.n >= AN_T_MIN_HL && g.s.days >= 2), why = [];
+  const mk = (id, tone, title, g, text, ev, ids) => out.push({ id, tone, title, k: g.k, t: g.t, text, evidence: ev, recIds: ids });
+  const lows = el.filter(g => g.s.lowN >= 2).sort((a, b) => b.s.lowPct - a.s.lowPct || b.s.lowN - a.s.lowN)[0];
+  if (lows) mk('baixas', 'low', 'Mais resultados baixos', lows, `${lows.t}: ${lows.s.lowN} de ${lows.s.n} medições (${f0(lows.s.lowPct)}%) ficaram abaixo de ${ANC.LIM.low} mg/dL.`, [`${lows.s.days} dias com medição nesse período`, 'Só entram períodos com ao menos 5 medições, 2 dias e 2 valores baixos'], lows.recLow);
+  const highs = el.filter(g => g.s.highN >= 3).sort((a, b) => b.s.highPct - a.s.highPct || b.s.highN - a.s.highN)[0];
+  if (highs) mk('altas', 'high', 'Mais resultados elevados', highs, `${highs.t}: ${highs.s.highN} de ${highs.s.n} medições (${f0(highs.s.highPct)}%) ficaram acima da faixa.`, [`${highs.s.days} dias com medição nesse período`, 'Só entram períodos com ao menos 5 medições, 2 dias e 3 valores elevados'], highs.recHigh);
+  const cvs = el.filter(g => g.s.sdOk && g.s.days >= 3 && g.s.cv != null).sort((a, b) => b.s.cv - a.s.cv);
+  if (cvs.length >= 2 && cvs[0].s.cv - cvs[cvs.length - 1].s.cv >= 5) mk('variab', 'info', 'Maior variabilidade', cvs[0], `${cvs[0].t}: coeficiente de variação de ${f0(cvs[0].s.cv)}% (desvio-padrão ${f0(cvs[0].s.sd)} mg/dL), contra ${f0(cvs[cvs.length - 1].s.cv)}% em ${cvs[cvs.length - 1].t}.`, [`${cvs[0].s.n} medições em ${cvs[0].s.days} dias`], cvs[0].ids);
+  const best = el.filter(g => g.s.days >= 3).sort((a, b) => b.s.pIn - a.s.pIn || (a.s.cv || 0) - (b.s.cv || 0))[0];
+  if (best && el.filter(g => g.s.days >= 3).length >= 2) mk('melhor', 'good', 'Melhor resultado médio', best, `${best.t}: ${f0(best.s.pIn)}% das medições na faixa, média ${f0(best.s.mean)} mg/dL.`, [`${best.s.n} medições em ${best.s.days} dias`, 'Critério: maior proporção de medições na faixa (não é tempo na faixa)'], best.ids);
+  const most = groups.filter(g => g.s.n).sort((a, b) => b.s.n - a.s.n)[0];
+  if (most) mk('mais', 'info', 'Mais registros', most, `${most.t} concentra ${most.s.n} medições em ${most.s.days} dia${most.s.days > 1 ? 's' : ''}.`, ['Mostra onde há mais medições, não onde a glicemia é pior'], most.ids);
+  const ch = groups.filter(g => g.p && g.s.n >= AN_T_MIN_HL && g.p.n >= AN_T_MIN_HL && g.s.mean != null && g.p.mean != null && Math.abs(g.s.mean - g.p.mean) >= 10).sort((a, b) => Math.abs(b.s.mean - b.p.mean) - Math.abs(a.s.mean - a.p.mean))[0];
+  if (ch) { const d = ch.s.mean - ch.p.mean; mk('mudanca', 'info', 'Maior mudança na média', ch, `${ch.t}: média ${d > 0 ? 'subiu' : 'caiu'} ${f0(Math.abs(d))} mg/dL (de ${f0(ch.p.mean)} para ${f0(ch.s.mean)}) em relação ao período anterior.`, [`período atual: ${ch.s.n} medições; anterior: ${ch.p.n}`, 'Descrição de números; não indica melhora nem piora clínica nem a causa.'], ch.ids); }
+  return out;
+}
+/* Avisos de dados insuficientes ou pouco representativos. */
+function anTQuality(groups, total, days, W, noTimeN, st) {
+  const out = [], nm = a => { const t = a.slice(0, 5).map(g => g.t).join(', '); return a.length > 5 ? t + ' e mais ' + (a.length - 5) : t; };
+  if (total < AN_MIN_FIND) out.push(`Poucas medições no intervalo (${total}): os números mostram o que foi registrado, mas podem não representar a rotina.`);
+  if (total >= AN_MIN && days < 5) out.push(`As medições estão em apenas ${days} dia${days > 1 ? 's' : ''}.`);
+  const empty = groups.filter(g => !g.s.n); if (empty.length) out.push(`Sem registros em: ${nm(empty)}.`);
+  const few = groups.filter(g => g.s.n > 0 && g.s.n < AN_MIN); if (few.length) out.push(`Menos de ${AN_MIN} medições (sem média): ${nm(few)}.`);
+  const fd = groups.filter(g => g.s.fewDays || g.s.concentrated); if (fd.length) out.push(`Registros concentrados em poucos dias: ${nm(fd)}.`);
+  const have = groups.filter(g => g.s.n >= AN_MIN);
+  if (have.length >= 2) { const mx = Math.max(...have.map(g => g.s.n)), mn = Math.min(...have.map(g => g.s.n)); if (mx / mn >= 4) out.push(`Grande diferença na quantidade de medições entre os períodos do dia (de ${mn} a ${mx}). Compare pelas proporções, não pelas contagens.`); }
+  if (W.prev) { const a = W.cur.length, b = W.prev.length; if (a && b && Math.max(a, b) / Math.min(a, b) >= 2) out.push(`As quantidades de medições dos dois intervalos são bem diferentes (${a} e ${b}), o que limita a comparação.`); else if (!b) out.push('Não há medições no período anterior para comparar.'); }
+  if (noTimeN && st.src === 'hora') out.push(`${noTimeN} medição${noTimeN > 1 ? 'ões' : ''} sem horário ficaram fora das faixas de horário.`);
+  return out;
+}
+/* Mapa de calor: dia da semana × faixa de horário. Cada célula guarda a CONTAGEM de medições por faixa glicêmica (nada de média contínua). */
+function anTHeat(recs, st) {
+  const bands = anTBands(st), cells = AN_T_WD.map(() => bands.map(() => []));
+  recs.forEach(r => { const h = anHour(r); if (h == null || h < 0 || h > 23) return; const wd = (new Date(r.ts).getDay() + 6) % 7, bi = bands.findIndex(b => h >= b.a && h < b.b); if (bi >= 0) cells[wd][bi].push(r); });
+  const mxN = Math.max(1, ...cells.map(row => Math.max(...row.map(c => c.length))));
+  const rows = cells.map((row, d) => row.map((rs, bi) => { const n = rs.length, bc = ANC.bandCounts(rs); return { wd: d, bi, n, enough: n >= AN_MIN, ids: rs.map(r => r.id), bc, pLow: anPct(bc.low + bc.vlow, n), pOk: anPct(bc.ok, n), pHigh: anPct(bc.high + bc.vhigh, n), pN: n / mxN * 100 }; }));
+  return { bands, rows, maxN: mxN };
+}
+/* Evolução ao longo do tempo de um grupo: pontos (medições) e médias semanais só onde há ≥ 3 medições; nunca liga semanas vazias. */
+function anTEvo(recs, span) {
+  const pts = recs.slice().sort((a, b) => a.ts - b.ts).map(r => ({ ts: r.ts, v: r.glucose })), weekly = span >= 21;
+  const g = ANC.groupBy(recs, r => ANC.weekStart(r.ts)), buckets = weekly ? [...g.entries()].sort((a, b) => a[0] - b[0]).map(([t, rs]) => ({ t, n: rs.length, mean: anMean(rs.map(r => r.glucose)), ok: rs.length >= AN_MIN })) : [];
+  return { pts, buckets, weekly, okN: buckets.filter(b => b.ok).length };
+}
+/* Modelo completo da seção. W = janelas (atual e anterior). */
+function anTModel(base, st, now, scr) {
+  const W = anTWindow(base, st, now, scr), { defs, keyOf } = anTDefs(st), byK = {}, byKp = {}; defs.forEach(d => { byK[d.k] = []; byKp[d.k] = []; });
+  let noTimeN = 0; W.cur.forEach(r => { const k = keyOf(r); if (k == null) noTimeN++; else byK[k].push(r); });
+  if (W.prev) W.prev.forEach(r => { const k = keyOf(r); if (k != null) byKp[k].push(r); });
+  const sel = new Set((st.sel || []).filter(k => defs.some(d => d.k === k))), all = defs.map(d => {
+    const mine = byK[d.k], s = anTStats(mine), p = W.prev ? anTStats(byKp[d.k]) : null;
+    return { k: d.k, t: d.t, a: d.a, b: d.b, s, p, ids: mine.map(r => r.id), recLow: mine.filter(r => r.glucose < ANC.LIM.low).map(r => r.id), recHigh: mine.filter(r => r.glucose > anHi(r)).map(r => r.id), times: st.src === 'ctx' ? anTTimes(mine) : null, recs: mine,
+      dMean: s.enough && p && p.enough ? s.mean - p.mean : null, hist: st.src === 'ctx' ? AN_T_HIST[d.k] || null : null };
+  }), groups = sel.size ? all.filter(g => sel.has(g.k)) : all, used = groups.reduce((a, g) => a.concat(g.recs), []);
+  const total = used.length, days = new Set(used.map(r => r.date)).size, cross = anTCross(used, st, defs, keyOf);
+  const heatBase = W.cur.filter(r => anHour(r) != null), heat = anTHeat(heatBase, st);
+  const evoK = groups.some(g => g.k === st.evo) ? st.evo : (groups.slice().sort((a, b) => b.s.n - a.s.n)[0] || {}).k, evoG = groups.find(g => g.k === evoK);
+  const span = W.curR ? Math.round((W.curR[1] + 1 - W.curR[0]) / ANC.DAY) : (W.cur.length ? Math.round((Math.max(...W.cur.map(r => r.ts)) - Math.min(...W.cur.map(r => r.ts))) / ANC.DAY) + 1 : 0);
+  return { W, defs, all, groups, total, days, noTimeN, cross, heat, span, hl: anTHighlights(groups), quality: anTQuality(groups, total, days, W, noTimeN, st), evoK, evo: evoG ? { ...anTEvo(evoG.recs, span), k: evoG.k, t: evoG.t } : null };
+}
+
+if (typeof module !== 'undefined') module.exports = { AN_MIN, AN_MIN_FIND, AN_RANGES, AN_SLOTS, anReal, anBase, anWindows, anSummary, anDelta, anSlots, anSlotOf, anBlocks, anGroupStats, anHypo, anHyper, anVariability, anCompare, anRecurrence, anPairs, anAssociations, anDiscoveries, anHistory, anCorr, anBlockOf, AN_T_MIN_HL, AN_T_STEPS, AN_T_RANGES, AN_T_WD, AN_T_HIST, anTDefaults, anTParseCuts, anTBands, anTDefs, anTWindow, anTStats, anTTimes, anTHighlights, anTQuality, anTHeat, anTEvo, anTModel };

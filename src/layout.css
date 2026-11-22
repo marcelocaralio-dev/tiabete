@@ -16,14 +16,14 @@
 .bl-sv { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
 .bl-sv .menu-item { padding: 10px 12px; border-radius: 14px; font-size: 14.5px; }
 .bl-sv .menu-item span { font-size: 13px; overflow-wrap: anywhere; }
-.bl-more > summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: var(--red-l); padding: 10px 2px 2px; }
+.bl-more > summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: var(--brand-l); padding: 10px 2px 2px; }
 .bl-gctl { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
 .bl-flist { gap: 8px; }
 .bl-grp { background: var(--s1); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .bl-grp[hidden] { display: none; }
 .bl-gs { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 10px 14px; cursor: pointer; list-style: none; font-weight: 700; font-size: 15px; }
 .bl-gs::-webkit-details-marker { display: none; }
-.bl-gs::after { content: "▾"; color: var(--red-l); margin-left: 4px; transition: transform .18s; }
+.bl-gs::after { content: "▾"; color: var(--brand-l); margin-left: 4px; transition: transform .18s; }
 .bl-grp[open] > .bl-gs::after { transform: rotate(180deg); }
 .bl-gs .bl-gn { flex: 1 1 auto; min-width: 0; }
 .bl-gc { font-family: var(--f-mono); font-size: 12.5px; font-weight: 500; color: var(--mut); border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; }

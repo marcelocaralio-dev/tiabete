@@ -36,7 +36,7 @@
 .gx-c.has-r { grid-template-columns: minmax(0, 1fr) auto; }
 button.gx-c { cursor: pointer; transition: transform var(--ds-t-fast, .12s) var(--ds-ease, ease), border-color var(--ds-t, .2s); }
 button.gx-c:active { transform: scale(.992); }
-button.gx-c:focus-visible { outline: 2px solid var(--red-l, #f55); outline-offset: 2px; }
+button.gx-c:focus-visible { outline: 2px solid var(--brand-l, #f55); outline-offset: 2px; }
 .gx-main { display: grid; gap: 4px; min-width: 0; }
 .gx-eyebrow { font: 500 12.5px/1.2 var(--f-mono); letter-spacing: .06em; color: var(--mut); }
 .gx-title { font-size: 16px; line-height: 1.3; font-weight: 700; overflow-wrap: anywhere; }
@@ -56,7 +56,7 @@ button.gx-c:focus-visible { outline: 2px solid var(--red-l, #f55); outline-offse
 .gx-e { display: grid; gap: 6px; }
 .gx-e .gx-mid .gx-v { font-size: 30px; line-height: 1.1; }
 .gx-prog { display: block; height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--fg) 10%, transparent); overflow: hidden; }
-.gx-prog i { display: block; height: 100%; border-radius: inherit; background: var(--tone, var(--red)); transition: width var(--ds-t-slow, .32s) var(--ds-ease, ease); }
+.gx-prog i { display: block; height: 100%; border-radius: inherit; background: var(--tone, var(--brand)); transition: width var(--ds-t-slow, .32s) var(--ds-ease, ease); }
 /* F · gráfico */
 .gx-f { display: grid; gap: 6px; }
 .gx-fr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%); gap: 10px; align-items: center; }
@@ -69,13 +69,13 @@ button.gx-c:focus-visible { outline: 2px solid var(--red-l, #f55); outline-offse
 .gx-seg i { display: block; min-width: 3px; background: var(--tone, var(--mut2)); }
 .gx-ring { position: relative; display: inline-grid; place-items: center; width: 56px; height: 56px; flex: none; }
 .gx-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-.gx-ring circle { fill: none; stroke-width: 3.4; } .gx-ring .t { stroke: color-mix(in srgb, var(--fg) 10%, transparent); } .gx-ring .v { stroke: var(--tone, var(--red)); stroke-linecap: round; }
+.gx-ring circle { fill: none; stroke-width: 3.4; } .gx-ring .t { stroke: color-mix(in srgb, var(--fg) 10%, transparent); } .gx-ring .v { stroke: var(--tone, var(--brand)); stroke-linecap: round; }
 .gx-ring b { font: 600 16px/1 var(--f-display); font-variant-numeric: tabular-nums; } .gx-ring small { position: absolute; bottom: 9px; font: 400 9px/1 var(--f-mono); color: var(--mut); }
 /* G · expansível */
 .gx-g { padding: 0; overflow: hidden; }
 .gx-g > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; min-height: 48px; padding: 10px 14px 10px var(--gx-bar-pad); cursor: pointer; list-style: none; }
 .gx-g > summary::-webkit-details-marker { display: none; }
-.gx-g > summary:focus-visible { outline: 2px solid var(--red-l, #f55); outline-offset: -2px; border-radius: var(--ds-r-lg, 20px); }
+.gx-g > summary:focus-visible { outline: 2px solid var(--brand-l, #f55); outline-offset: -2px; border-radius: var(--ds-r-lg, 20px); }
 .gx-g .gx-main small { font-size: 13.5px; color: var(--mut); }
 .gx-g:not(.gx-bar) > summary { padding-left: 14px; }
 .gx-chev { width: 8px; height: 8px; margin-right: 4px; border-right: 2px solid var(--mut); border-bottom: 2px solid var(--mut); transform: rotate(45deg); transition: transform var(--ds-t, .2s) var(--ds-ease, ease); }

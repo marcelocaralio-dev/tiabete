@@ -1,0 +1,41 @@
+/* ================= GLUXO · Identidade visual (tokens) =================
+   Fonte única da identidade. Carregado logo depois de style.css; os componentes só consomem estes tokens.
+   Famílias (não misturar):
+   1. INSTITUCIONAL  --gx-red-*  e  --brand*     → marca: botões, navegação, foco, destaques, logotipo, decoração.
+   2. CLÍNICO        --red, --red-l, --red-t, --red-d*, --ds-neg, --low-*  (definidos em style.css/ds.css, INALTERADOS)
+                     → glicemia baixa/alta/muito alta, alertas de saúde. Os aliases --clin-* abaixo só documentam o papel.
+   3. FUNCIONAL      --good*, --warn*, --ds-pos/-warn/-neg → sucesso, aviso, erro (mantidos).
+   Superfícies, bordas neutras, textos e verdes/amarelos não mudam. Veja docs/GUIA-IDENTIDADE-GLUXO.md. */
+:root {
+  /* paleta institucional (vermelhos do logotipo, avaliados para uso em interface) */
+  --gx-red: #E50308;          /* principal: botões, FAB, seleção, foco, marca (texto branco: contraste 4,8:1) */
+  --gx-red-deep: #BF0104;     /* profundidade: pressionado, fim de gradiente, bordas fortes */
+  --gx-red-dark: #910103;     /* escuro: base de gradientes e superfícies tingidas */
+  --gx-red-glow: #F71220;     /* luminoso: só brilho, realce de topo e hover; nunca fundo de texto */
+  --gx-logo-red: #FA0000;     /* vermelho do desenho do logotipo: referência; aparece apenas nas imagens oficiais */
+  /* papéis (tema escuro) */
+  --brand: var(--gx-red); --brand-rgb: 229, 3, 8; --brand-hi: var(--gx-red-glow); --brand-lo: var(--gx-red-deep);
+  --brand-d: #5D0306; --brand-d2: #2C0405;                 /* tons profundos para gradientes sobre as superfícies atuais */
+  --brand-l: #FF7276;         /* ícones e rótulos de destaque sobre superfície escura (contraste ≥ 6:1) */
+  --brand-t: #FF4A4D;         /* texto de marca sobre superfície escura */
+  --brand-bd: #7E1013; --brand-bd-soft: #4E1114;           /* bordas: de ação (btn.dark) e de cartão tingido */
+  --brand-on: #fff;
+  --brand-focus: var(--brand-l);                           /* anel de foco */
+  --brand-grad: linear-gradient(135deg, var(--gx-red), var(--gx-red-deep));
+  --brand-grad-d: linear-gradient(165deg, var(--brand-d) 0%, var(--brand-d2) 58%, var(--s1) 100%);
+  --brand-sh: rgba(var(--brand-rgb), .32); --brand-sh-fab: rgba(var(--brand-rgb), .5);
+  --brand-disabled: color-mix(in srgb, var(--brand) 32%, var(--s2));
+  /* clínico: aliases de leitura (apontam para os tokens clínicos originais; não redefinem nada) */
+  --clin-low: var(--red-l); --clin-high: var(--red); --clin-high-t: var(--red-t); --clin-vhigh: var(--red);
+  /* movimento: linguagem "fluxo" (entrada suave, sem repetição desnecessária) */
+  --gx-ease: cubic-bezier(.22, .9, .3, 1); --gx-t-fast: 140ms; --gx-t: 220ms; --gx-t-slow: 460ms;
+}
+:root[data-theme="light"] {
+  --brand: #D70207; --brand-rgb: 215, 2, 7; --brand-hi: #E50308; --brand-lo: #B00104;
+  --brand-d: #FCD9D6; --brand-d2: #FFEFED;
+  --brand-l: #B00206; --brand-t: #C20207;
+  --brand-bd: #E39A9A; --brand-bd-soft: #F2BDBB;
+  --brand-grad: linear-gradient(135deg, var(--gx-red-glow), var(--gx-red-deep));
+  --brand-grad-d: linear-gradient(165deg, var(--brand-d) 0%, var(--brand-d2) 58%, var(--s1) 100%);
+  --brand-sh: rgba(var(--brand-rgb), .28); --brand-sh-fab: rgba(var(--brand-rgb), .4);
+}
