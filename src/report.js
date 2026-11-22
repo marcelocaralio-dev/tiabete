@@ -28,6 +28,8 @@ const pdfSafe = t => String(t == null ? '' : t).replace(/[‒-―−]/g, '-').re
 const insTxt = r => [r.insMeal != null ? fn(r.insMeal) + ' rápida' : '', r.insCorr != null ? fn(r.insCorr) + ' corr.' : '', r.insBasal != null ? fn(r.insBasal) + ' basal' : '', r.insPen != null ? fn(r.insPen) + ' caneta' : '', r.insPump != null ? fn(r.insPump) + ' bomba' : ''].filter(Boolean).join(' · ');
 
 async function makePDF() {
+  /* mesma verificação de licença do botão "Gerar PDF" (licAllowed('rel-pdf')): também vale pelo caminho de compartilhar. Excel e CSV não passam por aqui. */
+  if (typeof licAllowed === 'function' && !licAllowed('rel-pdf')) { toast('O relatório em PDF é um recurso premium. O Excel e o CSV continuam gratuitos.'); return; }
   try { await makePDFInner(); } catch (e) { console.error(e); toast('Não consegui gerar o PDF: ' + (e && e.message || e)); const st = $('#rep-status'); if (st) st.textContent = ''; }
 }
 async function makePDFInner() {
