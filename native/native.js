@@ -154,10 +154,10 @@ if (NATIVE) {
     } catch (e) { }
   }
   /* Alarmes do "Meu tratamento": insulina, remédios, medições (diários) e troca do cateter da bomba (no dia) */
-  let planBusy = false;
+  let planBusy = false, planAgain = false; /* planAgain: uma mudança que chega durante a gravação não é mais descartada (antes o agendamento ficava com o estado antigo) */
   const planId = key => { let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return 500000 + (h % 400000); };
   async function planSync() {
-    const ln = LN(); if (!ln || planBusy || !cfgOk() || typeof planAlarms !== 'function') return; planBusy = true;
+    const ln = LN(); if (!ln || !cfgOk() || typeof planAlarms !== 'function') return; if (planBusy) { planAgain = true; return; } planBusy = true;
     try {
       const mm = (await Store.all('meta')).find(x => x.id === 'plan-sched'), old = (mm && mm.value) || [];
       if (old.length) { try { await ln.cancel({ notifications: old.map(id => ({ id })) }); } catch (e) { } }
@@ -186,7 +186,7 @@ if (NATIVE) {
       const n = granted ? list.length : 0, ch = window.TB_PLAN_N !== n || (list.length && window.TB_PLAN_PERM !== granted);
       window.TB_PLAN_N = n; if (list.length) window.TB_PLAN_PERM = granted; if (ch && S.route === 'esquemas' && !document.getElementById('sheet-bg') && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) { try { render(); } catch (e) { } }
       await Store.put('meta', { id: 'plan-sched', value: ids });
-    } catch (e) { console.error(e); } finally { planBusy = false; }
+    } catch (e) { console.error(e); } finally { planBusy = false; if (planAgain) { planAgain = false; setTimeout(planSync, 50); } }
   }
   { const _put = Store.put; Store.put = function (st, v) { const r = _put.apply(this, arguments); if (st === 'meta' && v && (v.id === 'plan' || v.id === 'alerts')) setTimeout(planSync, 150); return r; }; }
   window.tbPlanSync = () => setTimeout(planSync, 150); /* chamado quando muda quais insulinas passam a ter lembrete próprio (insrem.js): refaz os alarmes do tratamento sem duplicar */
@@ -202,9 +202,9 @@ if (NATIVE) {
     remResync(); postSync(); postClean(); planSync();
   }
   /* ---- Alertas personalizados: agenda no Android (toca com o app fechado), cancela os que deixaram de valer e abre a tela ao tocar ---- */
-  const CA_KEY = 'tb-ca-ids'; let caBusy = false;
+  const CA_KEY = 'tb-ca-ids'; let caBusy = false, caNext = null;
   window.caNativeSync = async list => {
-    const ln = LN(); if (!ln || caBusy || !cfgOk()) return; caBusy = true;
+    const ln = LN(); if (!ln || !cfgOk()) return; if (caBusy) { caNext = { list }; return; } caBusy = true; /* chamada durante a gravação: guarda a última lista e refaz depois */
     try {
       const now = Date.now(), fut = (list || []).filter(x => x.at > now + 3000); let old = [];
       try { old = JSON.parse(localStorage.getItem(CA_KEY) || '[]'); } catch (e) { }
@@ -215,7 +215,7 @@ if (NATIVE) {
       try { await ln.createChannel({ id: 'alertasp', name: 'Alertas personalizados', description: 'Avisos que você configurou no GLUXO', importance: 4, vibration: true }); } catch (e) { }
       await ln.schedule({ notifications: fut.map(x => ({ id: x.id, title: x.title, body: x.body, largeBody: x.body, channelId: 'alertasp', extra: { route: 'alertasp', rule: x.ruleId }, schedule: { at: new Date(x.at), allowWhileIdle: true } })) });
       try { localStorage.setItem(CA_KEY, JSON.stringify(fut.map(x => x.id))); } catch (e) { }
-    } catch (e) { console.error(e); } finally { caBusy = false; }
+    } catch (e) { console.error(e); } finally { caBusy = false; if (caNext) { const n = caNext; caNext = null; setTimeout(() => window.caNativeSync(n.list), 50); } }
   };
   try { const l0 = LN(); if (l0 && l0.addListener) l0.addListener('localNotificationActionPerformed', ev => { const x = ev && ev.notification && ev.notification.extra; if (x && x.route === 'alertasp' && typeof go === 'function') go('alertasp'); }); } catch (e) { }
   setTimeout(notifInit, 5000);
