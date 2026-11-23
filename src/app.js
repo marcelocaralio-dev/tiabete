@@ -167,7 +167,7 @@ function insIcon(x) { return (x.ts || 0) < ICON_CUT ? '' : `<svg class="mi" view
 const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const TITLES = { seguranca: 'Bloqueio e proteção', privacidade: 'Privacidade e armazenamento', alertashist: 'Histórico de alertas', alertasp: 'Alertas personalizados', insrem: 'Lembretes de insulina', config: 'Configurações', perfil: 'Meu perfil', aparencia: 'Aparência', painel: 'Início', historico: 'Histórico', analise: 'Análise', mais: 'Mais', hba1c: 'Hemoglobina glicada', esquemas: 'Meu tratamento', importar: 'Importar de outros aplicativos', classificar: 'Classificar medições', relatorios: 'Relatórios', backup: 'Cópia de segurança', sobre: 'Sobre o GLUXO', exames: 'Exames laboratoriais', eventos: 'Eventos', exame: 'Exame', comparar: 'Comparar exames', conquistas: 'Conquistas',  lembretes: 'Alertas e lembretes', padroes: 'Padrões', perguntas: 'Perguntar ao Claude', insulinas: 'Histórico de insulinas', };
 const navGroup = r => ['painel', 'historico', 'analise'].includes(r) ? r : (r === 'metricas' || r === 'metrica') ? 'painel' : 'mais';
-const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], HD_WD = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 /* Comparação visual (Design System) da média entre períodos; só apresenta números já calculados acima. */
 function dsCmpMean(sc, sp, cmp, cur, prev) {
   if (!window.TBDS || !sc.n || !sp.n) return '';
@@ -376,7 +376,8 @@ function histListHTML() {
   for (const [date, its] of groups) {
     const rs = itRecs(its), st = stats(rs), d = new Date(its[0].ts), ni2 = its.filter(i => i.t === 'i').length, nm2 = its.filter(i => i.t === 'm').length;
     const dbc = rs.length ? bandCounts(rs) : null, dseg = dbc ? TBCards.seg([{ v: dbc.low + (dbc.vlow || 0), tone: 'neg', label: 'baixas' }, { v: dbc.ok, tone: 'pos', label: 'na faixa' }, { v: dbc.high + (dbc.vhigh || 0), tone: 'warn', label: 'elevadas' }], { thin: true, label: `${rs.length} medições: ${dbc.ok} na faixa` }) : '';
-    h += `<div class="day-h gx-dh" data-d="${date}"><span>${WD[d.getDay()]} · ${fmtDate(date)}</span><span class="num">${rs.length ? `${rs.length} med. · média ${f0(st.mean)}` : ''}${rs.length && ni2 ? ' · ' : ''}${ni2 ? `${ni2} insulina` : ''}${nm2 ? `${rs.length || ni2 ? ' · ' : ''}${nm2} refeição` : ''}</span>${dseg}</div>`;
+    const dhc = (cls, v, l) => `<span class="dh-c${cls ? ' ' + cls : ''}"><b class="num">${v}</b> <small>${l}</small></span>`; /* só apresentação: os números vêm dos mesmos cálculos de antes (stats, contagens do dia) */
+    h += `<div class="day-h gx-dh" data-d="${date}"><span class="dh-d">${HD_WD[d.getDay()]}, ${fmtDate(date)}</span><div class="dh-r">${rs.length ? dhc('avg', f0(st.mean), 'mg/dL · média') + dhc('', rs.length, rs.length === 1 ? 'medição' : 'medições') : ''}${ni2 ? dhc('', ni2, ni2 === 1 ? 'aplicação' : 'aplicações') : ''}${nm2 ? dhc('', nm2, nm2 === 1 ? 'refeição' : 'refeições') : ''}</div>${dseg}</div>`;
     its.forEach(i => {
       if (i.t === 'e') h += epiHTML(i.e);
       else if (i.t === 'm') h += mealLogHTML(i.m, 'hist');
