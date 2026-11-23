@@ -7,6 +7,7 @@
   --good: #7BEAA8; --good-bd: #1F6B42; --good-bg: rgba(54,201,120,.14); --good-bg2: rgba(54,201,120,.22); --good-fill: #36C978; --good-st: #5BE39A;
   --low-bd: #6E2A34; --low-bg: rgba(255,142,152,.08); --low-bg2: rgba(255,142,152,.20);
   --rd-bd: #4A1620; --ban-bd: #5B1822; --warn-bg: #2A1209; --warn-bd: #6A3016; --dark-bd: #7A1B27;
+  --acp-bg: #261E24; --acp-row: #342A31; --acp-bd: #6A3A44; --acp-sh: 0 22px 56px rgba(0,0,0,.85), 0 4px 14px rgba(0,0,0,.6), 0 0 0 1px rgba(255,142,152,.10); --acp-hl: inset 0 1px 0 rgba(255,255,255,.07);
   --tip-bg: #000; --tip-bd: #55242C; --nav-bg: #0E0B0D; --sheet-bg: #0D0A0C; --scrim: rgba(0,0,0,.72); --shadow: rgba(0,0,0,.6);
   --bar-n: #8E2A37; --c-lunch: #E8B4B8; --on-red: #fff; --red-t: #FF5361;
   --f-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
@@ -21,6 +22,7 @@
   --good: #14693A; --good-bd: #86C9A2; --good-bg: rgba(20,105,58,.10); --good-bg2: rgba(20,105,58,.13); --good-fill: #1F9A58; --good-st: #17814A;
   --low-bd: #E3A3AB; --low-bg: rgba(212,22,42,.07); --low-bg2: rgba(212,22,42,.12);
   --rd-bd: #F0BBC1; --ban-bd: #F0BBC1; --warn-bg: #FFF1E2; --warn-bd: #EBC08F; --dark-bd: #E39AA3;
+  --acp-bg: #FFFFFF; --acp-row: #F4EEEB; --acp-bd: #B5A6A1; --acp-sh: 0 22px 52px rgba(60,30,40,.34), 0 4px 12px rgba(60,30,40,.22), 0 0 0 1px rgba(60,30,40,.06); --acp-hl: inset 0 1px 0 #fff;
   --tip-bg: #FFFFFF; --tip-bd: #CFC4C0; --nav-bg: #FFFFFF; --sheet-bg: #FFFFFF; --scrim: rgba(28,23,25,.45); --shadow: rgba(60,40,45,.22);
   --bar-n: #9A8A90; --c-lunch: #9A4F5A; --red-t: #C4132A;
 }
@@ -890,29 +892,29 @@ html, body { overscroll-behavior-x: none; }
 .ca-kv b { font-weight: 600; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
 
 /* ===== Central de alertas: bolha flutuante, painel e histórico ===== */
-.acb { position: fixed; z-index: 35; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 1px solid var(--tip-bd); background: var(--s1); display: grid; place-items: center; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; box-shadow: 0 8px 24px var(--shadow); transition: transform .18s ease, opacity .18s ease; }
+.acb { position: fixed; z-index: 35; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 1px solid var(--tip-bd); background: #fff; display: grid; place-items: center; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; box-shadow: 0 8px 24px var(--shadow); transition: transform .18s ease, opacity .18s ease; }
 .acb[hidden], .acp[hidden], .acz[hidden] { display: none; }
 .acb svg { pointer-events: none; display: block; }
 .acb:focus-visible { outline: 3px solid var(--red-l); outline-offset: 2px; }
-.acb.has { border-color: var(--red); }
-.acb.crit { animation: acPulse 2.2s ease-in-out infinite; }
+.acb::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity .2s ease; border: 2px solid var(--ds-pos); box-shadow: 0 0 10px 2px rgba(var(--ds-pos-rgb), .6), inset 0 0 8px rgba(var(--ds-pos-rgb), .35); }
+.acb.has::after { opacity: 1; }
+.acb-d { display: block; width: auto; height: 26px; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .acb.drag { cursor: grabbing; transform: scale(1.12); transition: none; z-index: 38; box-shadow: 0 14px 34px var(--shadow); }
 .acb.gone { transform: scale(.2); opacity: 0; }
 .acb.back { transition: left .28s ease, top .28s ease; }
-.acb-n { position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font: 700 12px/20px var(--f-body); text-align: center; border: 2px solid var(--bg); box-sizing: content-box; }
 body.acb-typing .acb:not(.drag), .dr-lock .acb { opacity: 0; pointer-events: none; }
 body.acb-drag { overscroll-behavior: none; }
 .acz { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 37; transform: translate(-50%, 24px); opacity: 0; transition: transform .2s ease, opacity .2s ease; width: 132px; height: 62px; border-radius: 32px; border: 2px dashed var(--tip-bd); background: var(--s2); display: grid; place-items: center; text-align: center; font: 600 12.5px/1.2 var(--f-body); color: var(--mut); padding: 0 14px; pointer-events: none; }
 .acz.on { opacity: 1; transform: translate(-50%, 0); }
 .acz.hot { border-color: var(--red); background: var(--red-d); color: #fff; transform: translate(-50%, 0) scale(1.08); }
-.acp { position: fixed; z-index: 36; background: var(--s1); border: 1px solid var(--tip-bd); border-radius: 18px; box-shadow: 0 14px 40px var(--shadow); overflow: auto; overscroll-behavior: contain; opacity: 0; transform: scale(.35); transition: transform .24s cubic-bezier(.2,.9,.3,1.1), opacity .2s ease; padding: 10px; }
+.acp { position: fixed; z-index: 36; background: var(--acp-bg); border: 1px solid var(--acp-bd); border-radius: 18px; box-shadow: var(--acp-sh), var(--acp-hl); overflow: auto; overscroll-behavior: contain; opacity: 0; transform: scale(.35); transition: transform .24s cubic-bezier(.2,.9,.3,1.1), opacity .2s ease; padding: 10px; }
 .acp.on { opacity: 1; transform: none; }
 .acp::after { content: ""; position: absolute; }
 .acp-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
 .acp-cat { font-weight: 700; color: var(--red-l); }
 .acp-t { color: var(--mut); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acp-nav { display: flex; align-items: center; gap: 4px; color: var(--mut); }
-.acp-i { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--s2); color: var(--fg); font-size: 18px; line-height: 1; cursor: pointer; }
+.acp-i { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--acp-row); color: var(--fg); font-size: 18px; line-height: 1; cursor: pointer; }
 .acp-i[disabled] { opacity: .35; }
 .acp-b { font-size: 14.5px; line-height: 1.4; }
 .acp-b.read { opacity: .75; }

@@ -269,7 +269,7 @@ function d1() {
   ok(/const K = 1\.29;/.test(rd('scripts/build-web.js')), 'escala de tela aprovada (K = 1,29) intacta');
   ok(/'native\/login\.js', 'native\/migrate\.js'/.test(rd('scripts/build-web.js')), 'migrate.js incluído no build, depois do login');
   ok(!/guest|install/i.test(rd('src/logic.js')) && !/guest\//.test(rd('src/app.js')), 'regras de negócio do app (registros) não conhecem visitante');
-  ok(/"version": "0\.3[34567]\.0"/.test(rd('package.json')), 'versão 0.33.x a 0.35.x');
+  ok(/"version": "0\.(3[3-9]|[4-9]\d)\.0"/.test(rd('package.json')), 'versão 0.33 ou posterior');
 
   console.log(fail ? `test34 FALHOU (${fail}/${n})` : `test34 ok (${n} verificações)`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('test34 erro:', e); process.exit(1); });

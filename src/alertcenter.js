@@ -7,7 +7,7 @@
 const AC_CATS = { hipo: 'Hipoglicemia', glic: 'Glicemia', lembrete: 'Lembretes', plano: 'Tratamento', backup: 'Cópia e sincronização', pers: 'Alertas personalizados', conquista: 'Conquistas', info: 'Informações', conf: 'Confirmações', atencao: 'Atenção', ia: 'Inteligência artificial', rel: 'Relatórios', analise: 'Análise', config: 'Configurações' };
 const AC_PRIO = { 0: 'Baixa', 1: 'Normal', 2: 'Alta', 3: 'Crítica' }, AC_MAX = 300, AC_SIZE = 56;
 S.ac = { mode: 'classic', pos: null, hidden: false, items: [] };
-const AC = { open: false, id: null, timer: null, fresh: false, only: null, confirm: false, exp: new Set(), bound: false };
+const AC = { booted: false, open: false, id: null, timer: null, fresh: false, only: null, confirm: false, exp: new Set(), bound: false };
 const acBubbleOn = () => S.ac.mode === 'bubble';
 const acNorm = s => String(s || '').replace(/\s+/g, ' ').trim();
 let acSaveT = null;
@@ -50,6 +50,9 @@ function acSources() {
   }
   return live;
 }
+/* destino de cada notificação (rota + parâmetros de contexto). Gravado no item; a validade é conferida só na hora do toque. */
+const AC_DEST = { mem: 'backup', hipo: 'painel', hiper: 'painel', conq: 'conquistas', drv: 'backup', bkp: 'backup', basal: 'insulinas', jantar: 'insulinas', rem: 'lembretes', plano: 'esquemas', insrem: 'insrem', ca: 'alertasp', ex: 'painel' };
+function acDest(L) { const r = AC_DEST[L.src]; if (!r) return null; const o = typeof ocParse === 'function' ? ocParse(L.occ) : null; return { r, p: o ? { occ: L.occ, day: o.day, id: o.id, time: o.time } : {} }; }
 /* ----- gestão: fila, ciclo de vida, histórico -----
    Cada item da bolha segue os estados programado → pendente → exibido → concluído | ignorado | cancelado | desativado | expirado (alertstate-core.js).
    O estado final de um item é decidido por um resolvedor que olha as MESMAS fontes do app (lembrete, tratamento, histórico de insulinas, configurações);
@@ -75,10 +78,10 @@ function acUpsert(live) {
       if (it.st === 'concluido') { if (!ocMove(it, 'pendente', 'desfeito')) continue; } /* só volta se foi o registro que a concluiu e ele foi apagado/editado */
       else if (ocIsFinal(it.st)) continue; /* cancelado, desativado, ignorado, expirado: não reaparece */
       else ocMove(it, 'pendente');
-      Object.assign(it, { active: true, read: false, dismissed: false, html: L.html, text: L.text, title: L.title, rev: (it.rev || 0) + 1 }); fresh.push(it); dirty = true; continue;
+      Object.assign(it, { active: true, read: false, dismissed: false, html: L.html, text: L.text, title: L.title, dest: acDest(L) || it.dest, rev: (it.rev || 0) + 1 }); fresh.push(it); dirty = true; continue;
     }
-    if (it) { it.html = L.html; if (it.st === 'programado') { ocMove(it, 'pendente'); dirty = true; } if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } continue; }
-    const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html, st: 'pendente', why: '' }; if (L.occ) n.occ = L.occ;
+    if (it) { it.html = L.html; const dd = acDest(L); if (dd && !it.dest) { it.dest = dd; dirty = true; } if (it.st === 'programado') { ocMove(it, 'pendente'); dirty = true; } if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } continue; }
+    const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html, st: 'pendente', why: '' }; if (L.occ) n.occ = L.occ; const nd = acDest(L); if (nd) n.dest = nd;
     S.ac.items.unshift(n); fresh.push(n); dirty = true;
   }
   if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX;
@@ -100,19 +103,21 @@ function acSync() {
   if (!S.irReady) return; /* antes de as configurações serem lidas do banco tudo pareceria desativado/cancelado: não resolve nada */
   let live = []; try { live = acSources(); } catch (e) { }
   const fresh = acUpsert(live);
-  if (acBubbleOn() && fresh.length) { const f = fresh.filter(x => !x.dismissed).sort((a, b) => b.prio - a.prio)[0]; if (f) { S.ac.hidden = false; acPop(f); } }
+  const boot = !AC.booted; AC.booted = true; /* primeira sincronização da abertura do app: itens antigos/pendentes NÃO expandem a bolha (só o halo avisa) */
+  if (!boot && acBubbleOn() && fresh.length) { const f = fresh.filter(x => !x.dismissed).sort((a, b) => b.prio - a.prio)[0]; if (f) { S.ac.hidden = false; acPop(f); } }
   acRefresh();
 }
 /* A bolha só mostra o que está valendo agora (alerta ativo) e as confirmações recentes. Alerta já concluído, cancelado, desativado ou expirado fica só no histórico. */
 const acLiveItem = x => x.src === 'toast' || (x.active && !!x.html);
 const acList = () => S.ac.items.filter(x => !x.dismissed && acLiveItem(x)).sort((a, b) => (a.read - b.read) || (b.prio - a.prio) || (b.ts - a.ts));
 const acUnread = () => S.ac.items.filter(x => !x.dismissed && !x.read && x.active && x.html).length;
-function acSetState(id, patch) { const it = S.ac.items.find(x => x.id === id); if (!it) return; Object.assign(it, patch); acSave(); acRefresh(); }
+function acSetState(id, patch) { const it = S.ac.items.find(x => x.id === id); if (!it) return; Object.assign(it, patch); acSave(true); acRefresh(); }
 /* ----- elementos da bolha ----- */
-const AC_DROP = `<svg viewBox="-5.5 -2.5 111 111" width="30" height="30" aria-hidden="true"><defs><linearGradient id="acg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF5A66"/><stop offset="1" stop-color="#E0182B"/></linearGradient><mask id="acm" maskUnits="userSpaceOnUse" x="-6" y="-3" width="112" height="112"><rect x="-6" y="-3" width="112" height="112" fill="#fff"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="#000" stroke-width="5.5" stroke-linecap="round"/></mask></defs><path mask="url(#acm)" d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="url(#acg)"/></svg>`;
+/* gota OFICIAL do GLUXO (o mesmo arquivo PNG da marca, embutido no build; não é redesenhada) */
+const AC_DROP = `<img class="acb-d" src="${typeof GX_DROP === 'string' ? GX_DROP : ''}" alt="" width="20" height="26" draggable="false">`;
 function acEnsure() {
   if (document.getElementById('acb')) return;
-  document.body.insertAdjacentHTML('beforeend', `<button id="acb" class="acb" type="button" aria-haspopup="true" aria-expanded="false" hidden>${AC_DROP}<span class="acb-n" hidden></span></button><div id="acz" class="acz" aria-hidden="true" hidden><span>Solte aqui para dispensar</span></div><div id="acp" class="acp" role="region" aria-live="polite" aria-label="Alertas do GLUXO" hidden></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<button id="acb" class="acb" type="button" aria-haspopup="true" aria-expanded="false" hidden>${AC_DROP}</button><div id="acz" class="acz" aria-hidden="true" hidden><span>Solte aqui para dispensar</span></div><div id="acp" class="acp" role="region" aria-live="polite" aria-label="Alertas do GLUXO" hidden></div>`);
   acBind(document.getElementById('acb'));
   if (AC.bound) return; AC.bound = true;
   document.addEventListener('pointerdown', e => { if (AC.open && !e.target.closest('#acp, #acb')) acCollapse(); }, true);
@@ -138,8 +143,7 @@ function acRefresh() {
   const on = acBubbleOn(); if (on) acEnsure();
   const b = document.getElementById('acb'); if (!b) return;
   const show = on && !S.ac.hidden; b.hidden = !show; if (!show) { acCollapse(true); return; }
-  const n = acUnread(), nb = b.querySelector('.acb-n'); nb.hidden = !n; nb.textContent = n > 9 ? '9+' : n;
-  b.classList.toggle('has', n > 0); b.classList.toggle('crit', S.ac.items.some(x => x.active && !x.read && !x.dismissed && x.prio >= 3));
+  const n = acUnread(); b.classList.toggle('has', n > 0); /* halo verde = único indicador de não lidos */
   b.setAttribute('aria-label', n ? `Alertas: ${n} não lido${n > 1 ? 's' : ''}` : 'Alertas'); acPlace();
   if (AC.open) acPanel();
 }
@@ -183,30 +187,39 @@ function acMsg(it) {
   return it.text || it.title || '';
 }
 function acRow(it) {
-  const d = new Date(it.ts), tm = pad(d.getHours()) + ':' + pad(d.getMinutes()), cat = AC_CATS[it.cat] || 'Alerta', a = acActions(it), n = a.n + (it.read ? 0 : 1) + 1;
-  return `<div class="acr${it.read ? ' read' : ''}${it.active && it.prio >= 3 ? ' crit' : ''}" data-ac-row="${it.id}" role="group" aria-label="${esc(cat)}" title="${esc(cat)} · ${tm}"><span class="acr-c" aria-hidden="true">${acSvg(AC_CIC[it.cat] || 'info', 15)}</span>
-    <div class="acr-w${AC.exp.has(it.id) ? ' open' : ''}"><p class="acr-m" data-ac="expand" data-id="${it.id}"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</p><button type="button" class="acr-t" data-ac="expand" data-id="${it.id}" aria-expanded="${AC.exp.has(it.id)}" hidden>${AC.exp.has(it.id) ? 'Recolher' : 'Ler tudo'}</button></div>
-    <span class="acr-a" style="--rows:${n > 3 ? 2 : 1}">${a.h}${it.read ? '' : `<button class="acr-i" data-ac="read" data-id="${it.id}" title="Marcar como lido" aria-label="Marcar como lido">${acSvg('ok', 16)}</button>`}<button class="acr-i" data-ac="dismiss" data-id="${it.id}" title="Dispensar" aria-label="Dispensar este alerta">${acSvg('x', 16)}</button></span></div>`;
+  const d = new Date(it.ts), tm = pad(d.getHours()) + ':' + pad(d.getMinutes()), cat = AC_CATS[it.cat] || 'Alerta';
+  return `<div class="acr${it.read ? ' read' : ''}${it.active && it.prio >= 3 ? ' crit' : ''}" data-ac-row="${it.id}" role="group" aria-label="${esc(cat)}${it.read ? ' (lida)' : ' (não lida)'}"><span class="acr-c" aria-hidden="true">${acSvg(AC_CIC[it.cat] || 'info', 15)}</span>
+    <div class="acr-w"><div class="acr-m" role="link" tabindex="0" data-ac="open" data-id="${it.id}" title="${esc(cat)} · ${tm}"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</div>
+    <div class="acr-a"><button type="button" class="acr-b" data-ac="read" data-id="${it.id}"${it.read ? ' disabled' : ''}>Marcar como lida</button><button type="button" class="acr-b" data-ac="dismiss" data-id="${it.id}">Remover da lista</button></div></div></div>`;
 }
 function acPanel() {
   const p = document.getElementById('acp'); if (!p) return; const all = acList(); let list = all;
   if (AC.only) { const o = all.filter(x => x.id === AC.only); if (o.length) list = o; else AC.only = null; }
-  if (AC.confirm && all.length < 2) AC.confirm = false;
-  const ib = (a, ic, t, cls) => `<button class="acp-i${cls ? ' ' + cls : ''}" data-ac="${a}" title="${t}" aria-label="${t}">${acSvg(ic, 17)}</button>`;
-  const head = AC.only ? '' : AC.confirm
-    ? `<div class="acp-h2"><span class="acp-q">Dispensar todos (${all.length})?</span><span class="acp-ctl">${ib('dismissall-yes', 'ok', 'Sim, dispensar todos', 'yes')}${ib('dismissall-no', 'x', 'Cancelar', 'no')}</span></div>`
-    : `<div class="acp-h2"><span class="acp-ti">${acSvg('bell', 16)}<b>Alertas</b>${all.length ? `<span class="num">${all.length}</span>` : ''}</span><span class="acp-ctl">${ib('hist', 'clock', 'Histórico de alertas')}${all.length ? ib('readall', 'all', 'Marcar todos como lidos') + ib('dismissall', 'clear', 'Dispensar todos os alertas') : ''}</span></div>`;
+  const ib = (a, ic, t) => `<button class="acp-i" data-ac="${a}" title="${t}" aria-label="${t}">${acSvg(ic, 17)}</button>`;
+  const tb = (a, t) => `<button type="button" class="acp-tb" data-ac="${a}">${t}</button>`;
+  const head = AC.only ? '' : `<div class="acp-h2"><span class="acp-ti">${acSvg('bell', 16)}<b>Alertas</b>${all.length ? `<span class="num">${all.length}</span>` : ''}</span><span class="acp-ctl">${ib('hist', 'clock', 'Histórico de alertas')}</span></div>${all.length ? `<div class="acp-cmd">${tb('readall', 'Marcar todas como lidas')}${tb('dismissall', 'Remover todas')}</div>` : ''}`;
   const body = list.length ? `<div class="acp-l">${list.slice(0, 40).map(acRow).join('')}</div>` : `<div class="acp-l"><div class="acr read"><span class="acr-c" aria-hidden="true">${acSvg('ok', 15)}</span><p class="acr-m">Nenhum alerta no momento.</p><span></span></div></div>`;
   const h = head + body; if (p._h !== h) { p.innerHTML = h; p._h = h; }
-  acFit(); acPanelPos();
+  acPanelPos();
 }
-/* mensagem que não cabe no espaço inicial ganha o botão "Ler tudo" (e "Recolher" depois); nada é cortado com reticências */
-function acFit() { const p = document.getElementById('acp'); if (!p || p.hidden) return; p.querySelectorAll('.acr-w').forEach(w => { const m = w.querySelector('.acr-m'), t = w.querySelector('.acr-t'), open = w.classList.contains('open'); const over = !open && m.scrollHeight > m.clientHeight + 1; w.classList.toggle('more', over); t.hidden = !(over || open); }); }
 const p_h_reset = () => { const p = document.getElementById('acp'); if (p) p._h = null; };
-function acDismiss(ids) {
+function acDismiss(ids) { /* "Remover da lista": o estado muda e é gravado na hora; a animação é só visual. O histórico geral continua com o item. */
   const p = document.getElementById('acp'); AC.confirm = false;
+  for (const id of ids) { const it = S.ac.items.find(x => x.id === id); if (it) { it.dismissed = true; it.read = true; } } acSave(true);
   if (p) ids.forEach((id, k) => { const r = p.querySelector(`[data-ac-row="${id}"]`); if (r) { r.style.transitionDelay = Math.min(k, 6) * 30 + 'ms'; r.classList.add('out'); } });
-  setTimeout(() => { for (const id of ids) { const it = S.ac.items.find(x => x.id === id); if (it) { it.dismissed = true; it.read = true; } } acSave(); AC.only = null; if (!acList().length) acCollapse(); acRefresh(); if (AC.open) acTimer(12000); }, 200 + Math.min(ids.length, 6) * 30);
+  setTimeout(() => { AC.only = null; if (!acList().length) acCollapse(); acRefresh(); if (AC.open) acTimer(12000); }, 200 + Math.min(ids.length, 6) * 30);
+  acRefresh();
+}
+/* toque no conteúdo: marca como lida, tira da lista na hora e só então navega; destino ausente/inválido ou falha na navegação não deixam o item na lista */
+function acClickItem(id) {
+  const it = S.ac.items.find(x => x.id === id); if (!it) return false; const d = it.dest;
+  it.dismissed = true; it.read = true; acSave(true); AC.only = null; AC.confirm = false; acCollapse(true); acRefresh();
+  try {
+    if (!d || typeof d.r !== 'string' || typeof VIEWS !== 'object' || typeof VIEWS[d.r] !== 'function') return false;
+    go(d.r);
+    if (d.r === 'insrem' && d.p && d.p.id && d.p.day) { const r = irById(d.p.id); if (r) openSheet(irSheet(r, d.p.day)); }
+    return true;
+  } catch (e) { console.error(e); return false; }
 }
 function acPop(it, ms) {
   acEnsure(); const b = document.getElementById('acb'); if (!b) return;
@@ -223,7 +236,6 @@ function acCollapse(now) {
   if (AC.open) { /* toasts de confirmação são lidos ao recolher */ const it = S.ac.items.find(x => x.id === AC.id); if (it && it.src === 'toast' && it.prio === 0 && !it.read) { it.read = true; acSave(); } }
   AC.open = false; AC.confirm = false; if (b) b.setAttribute('aria-expanded', 'false'); p.classList.remove('on');
   if (now) { p.hidden = true; return; } setTimeout(() => { if (!AC.open) p.hidden = true; }, 260);
-  if (b) { const n = acUnread(), nb = b.querySelector('.acb-n'); nb.hidden = !n; nb.textContent = n > 9 ? '9+' : n; }
 }
 /* ----- gestos: tocar abre o último alerta; arrastar muda só a ALTURA (a bolha nunca fica solta: está sempre numa das laterais);
    passar o dedo para o outro lado da tela troca de margem; arrastar para a área de descarte dispensa a bolha ----- */
@@ -260,17 +272,16 @@ function acBind(b) {
   b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', e => { if (d) end(e); });
   b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } } });
 }
+document.addEventListener('keydown', e => { const t = e.target; if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('#acp [data-ac="open"]')) { e.preventDefault(); acClickItem(t.dataset.id); } });
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-ac]'); const inP = e.target.closest('#acp');
   if (el) {
     const a = el.dataset.ac, id = el.dataset.id;
     if (a === 'read') acSetState(id, { read: true });
     else if (a === 'dismiss') { acDismiss([id]); acTimer(12000); return; }
-    else if (a === 'dismissall') { const l = acList(); if (l.length > 1) { AC.confirm = true; acPanel(); acTimer(8000); return; } acDismiss(l.map(x => x.id)); return; } /* com mais de um alerta, pede confirmação antes de dispensar todos */
-    else if (a === 'dismissall-yes') { acDismiss(acList().map(x => x.id)); return; }
-    else if (a === 'dismissall-no') { AC.confirm = false; }
-    else if (a === 'expand') { if (AC.exp.has(id)) AC.exp.delete(id); else AC.exp.add(id); p_h_reset(); acPanel(); acTimer(AC.exp.size ? 25000 : 12000); return; }
-    else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(); acRefresh(); }
+    else if (a === 'dismissall') { acDismiss(acList().map(x => x.id)); return; }
+    else if (a === 'open') { acClickItem(id); return; }
+    else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(true); acRefresh(); }
     else if (a === 'hist') { acCollapse(); go('alertashist'); return; }
     acPanel(); acTimer(12000); return;
   }
