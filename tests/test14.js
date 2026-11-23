@@ -147,7 +147,7 @@ function d1() {
   T.now += 31 * DAY; ok(c2.run('licAllowed("bolus")') === false && FREE.every(f => c2.run(`licAllowed(${JSON.stringify(f)})`) === true), 'passada a tolerância offline (30 dias na vitalícia) só o premium pausa; o gratuito segue');
   T.now -= 31 * DAY;
   /* relógio e token adulterados */
-  const tok = c1.store.get('lic-token'), forged = tok.split('.')[0] + '.' + tok.split('.')[1].slice(0, -2) + 'AA';
+  const tok = c1.store.get('lic-token'), sg = tok.split('.')[1], forged = tok.split('.')[0] + '.' + sg.slice(0, 100) + (sg[100] === 'A' ? 'B' : 'A') + sg.slice(101); /* troca um caractere no meio da assinatura (sempre diferente do original; antes, trocar o fim por "AA" não alterava o token em ~1 de 1000 execuções, pois a chave é aleatória) */
   const c3 = mk('u2', 'dev-cliente-111111111111'); c3.store.set('lic-token', forged); await c3.run('licLoad()'); ok(c3.run('licAllowed("bolus")') === false, 'token adulterado não libera premium');
   const c4 = mk('u1', 'dev-cliente-222222222222'); c4.store.set('lic-token', a.j.token); await c4.run('licLoad()'); T.now = Date.UTC(2026, 10, 15, 12) + 400 * H;
   ok(c4.run('licAllowed("bolus")') === false, 'token de teste vencido não libera premium'); T.now = Date.UTC(2026, 10, 15, 12);
