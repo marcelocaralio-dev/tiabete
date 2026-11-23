@@ -35,10 +35,10 @@ ok(!/<svg[^>]*>[^]*M50 4 C50 4 14 44/.test(rd('src/head.html')) && !/M50 4 C50 4
 const pngSize = f => { const b = fs.readFileSync(path.join(ROOT, f)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
 ok(pngSize('assets/icon-only.png').join() === '1024,1024' && pngSize('assets/pwa/icon-192.png').join() === '192,192' && pngSize('assets/pwa/icon-512.png').join() === '512,512' && pngSize('assets/pwa/icon-maskable-512.png').join() === '512,512', 'ícones do app e PWA nos tamanhos corretos');
 const exp = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 }; for (const [d, s] of Object.entries(exp)) ok(pngSize(`assets/notification/ic_stat_gluxo-${d}.png`).join() === `${s},${s}`, 'ícone de notificação ' + d);
-const cap = JSON.parse(rd('capacitor.config.json')); ok(cap.plugins.LocalNotifications.iconColor === '#E50308' && cap.appId === 'app.tiabete.glicose' && cap.backgroundColor === '#0a090c', 'Android: cor da notificação na marca; appId e fundo preservados');
+const cap = JSON.parse(rd('capacitor.config.json')); ok(cap.plugins.LocalNotifications.iconColor === '#E50308' && cap.appId === 'app.tiabete.glicose' && cap.backgroundColor === '#000000', 'Android: cor da notificação na marca; appId preservado, fundo preto absoluto da abertura');
 const pwa = rd('scripts/build-pwa.js'); ok(/short_name: 'GLUXO'/.test(pwa) && /background_color: '#0a090c'/.test(pwa), 'PWA: nome GLUXO, fundo preservado');
 /* 7. movimento */
-ok(/prefers-reduced-motion: reduce\) \{ \.gx-rise/.test(ui) && /prefers-reduced-motion:reduce\)\{#tb-splash \*/.test(rd('native/login.js')), 'animações da marca respeitam movimento reduzido (interface e splash)');
+ok(/prefers-reduced-motion: reduce\) \{ \.gx-rise/.test(ui) && /prefers-reduced-motion:reduce\)\{#tb-splash\{transition:none/.test(rd('src/splash.html')), 'animações da marca respeitam movimento reduzido (interface e splash)');
 /* 8. escopo: nenhum arquivo de lógica, licenciamento, armazenamento ou cálculo foi alterado */
 const guard = { 'src/logic.js': null, 'src/premium.js': null, 'src/storage.js': null };
 console.log(fail ? `${fail} falha(s) em ${n}` : `test33 ok (${n} verificações)`); process.exit(fail ? 1 : 0);

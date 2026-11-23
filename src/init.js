@@ -46,5 +46,6 @@
   }
   S.route = routeFromHash();
   render();
+  try { if (window.GxSplash) GxSplash.done('app'); } catch (e) { }
   S.irLive = true; try { irFlushQueue(); irSync(1500); } catch (e) { }
 })();

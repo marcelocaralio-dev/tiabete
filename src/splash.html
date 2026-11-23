@@ -1,0 +1,53 @@
+<style id="gx-splash-css">
+/* Abertura GLUXO: etapa de inicialização (não é uma rota). Fundo preto absoluto, vídeo oficial centralizado e sem controles. */
+#tb-splash{position:fixed;inset:0;z-index:3000;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:1;transition:opacity .38s ease;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#tb-splash.out{opacity:0;pointer-events:none}
+#tb-splash video{display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:#000;border:0;outline:0;pointer-events:none}
+#tb-splash video::-webkit-media-controls,#tb-splash video::-webkit-media-controls-panel,#tb-splash video::-webkit-media-controls-start-playback-button,#tb-splash video::-webkit-media-controls-overlay-play-button,#tb-splash video::-webkit-media-controls-enclosure{display:none!important;-webkit-appearance:none;opacity:0}
+@media (prefers-reduced-motion:reduce){#tb-splash{transition:none}}
+</style>
+<div id="tb-splash" role="img" aria-label="GLUXO · Controle da glicose"><video muted playsinline webkit-playsinline preload="auto" disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noremoteplayback" tabindex="-1" aria-hidden="true" poster="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"></video></div>
+<script>
+/* Controlador da abertura. Roda antes do resto do app e não depende dele.
+   - Toca o vídeo local (splash/gluxo-splash.mp4) uma vez por sessão do app; recarregar a página na mesma sessão não repete.
+   - Ao terminar, e quando o app avisar que a Home está pronta (GxSplash.done), some com um fade curto.
+   - Qualquer falha (sem codec, erro, autoplay barrado, vídeo travado) nunca prende o usuário: a abertura é dispensada. */
+(function () {
+  var SRC = 'splash/gluxo-splash.mp4', FLAG = 'gx-splash-v1', FADE = 380, GRACE = 2500, HARD = 9000, DEF_WATCH = 5500;
+  var el = document.getElementById('tb-splash'), v = el && el.querySelector('video');
+  var st = { done: false, ended: false }, waits = { app: 1 }, pending = 1, timers = [];
+  function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+  function drop() {
+    timers.forEach(clearTimeout); timers = [];
+    try { if (v) { v.pause(); v.removeAttribute('src'); v.load(); } } catch (e) { }
+    try { if (el && el.parentNode) el.parentNode.removeChild(el); var s = document.getElementById('gx-splash-css'); if (s && s.parentNode) s.parentNode.removeChild(s); } catch (e) { }
+    try { window.dispatchEvent(new Event('gx-splash-end')); } catch (e) { }
+  }
+  function finish(instant) {
+    if (st.done) return; st.done = true; st.ended = true;
+    if (instant || !el) { drop(); return; }
+    el.classList.add('out'); timers.forEach(clearTimeout); timers = [];
+    setTimeout(drop, FADE + 60);
+  }
+  function check() { if (st.ended && pending <= 0) finish(); }
+  function ended() { if (st.ended || st.done) return; st.ended = true; later(function () { finish(); }, GRACE); check(); }
+  window.GxSplash = {
+    /* Segura o fim da abertura até done(nome). Só vale enquanto a abertura está ativa. */
+    wait: function (n) { if (!st.done && !waits[n]) { waits[n] = 1; pending++; } },
+    done: function (n) { if (waits[n] === 1) { waits[n] = 2; pending--; check(); } },
+    active: function () { return !st.done; }
+  };
+  if (!el || !v) return;
+  var seen = false; try { seen = sessionStorage.getItem(FLAG) === '1'; sessionStorage.setItem(FLAG, '1'); } catch (e) { }
+  var can = ''; try { can = v.canPlayType('video/mp4; codecs="avc1.64001E"') || v.canPlayType('video/mp4'); } catch (e) { }
+  if (seen || !can) { finish(true); return; }
+  later(function () { finish(); }, HARD);
+  later(ended, DEF_WATCH);
+  v.muted = true; v.defaultMuted = true;
+  v.addEventListener('ended', ended);
+  v.addEventListener('error', ended);
+  v.addEventListener('loadedmetadata', function () { var d = v.duration; if (d > 0 && d < 30) later(ended, d * 1000 + 2000); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !st.ended && v.paused) { try { var q = v.play(); if (q && q.catch) q.catch(function () { }); } catch (e) { } } });
+  try { v.src = SRC; var p = v.play(); if (p && p.catch) p.catch(ended); } catch (e) { ended(); }
+})();
+</script>

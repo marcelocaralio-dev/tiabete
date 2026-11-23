@@ -39,7 +39,14 @@ for (const [pkg, fam, ws] of fonts) for (const w of ws) {
   css += `@font-face{font-family:'${fam}';font-style:normal;font-weight:${w};font-display:swap;src:url('fonts/${f}') format('woff2')}\n`;
 }
 if (missing) console.warn(`Aviso: ${missing} arquivo(s) de fonte não encontrados (rode "npm install"). O app usará fontes do sistema.`);
-const body = rd('src/head.html').replace('{{FONTS}}', () => css).replace('{{CSS}}', () => rd('src/style.css') + '\n' + rd('src/brand.css') + '\n' + rd('src/neon.css') + '\n' + rd('src/glucoform.css') + '\n' + rd('src/gauge.css') + '\n' + rd('src/buttons.css') + '\n' + rd('src/uipicker.css') + '\n' + rd('src/ptr.css') + '\n' + rd('src/readmore.css') + '\n' + rd('src/bolus2.css') + '\n' + rd('src/insrem.css') + '\n' + rd('src/acchat.css') + '\n' + rd('src/metricas.css') + '\n' + rd('src/premium.css') + '\n' + rd('src/premiumlock.css') + '\n' + rd('src/ds.css') + '\n' + rd('src/inicio.css') + '\n' + rd('src/analise.css') + '\n' + rd('src/cards.css') + '\n' + rd('src/conquistas-rec.css') + '\n' + rd('src/layout.css') + '\n' + rd('src/brand-ui.css')).replace('{{JS}}', () => js);
+/* Abertura (splash): vídeo oficial da animação do logotipo, copiado SEM alteração para www/splash/ e tocado localmente (sem internet). */
+const splashSrc = path.join(root, 'assets', 'splash', 'gluxo-splash.mp4');
+if (!fs.existsSync(splashSrc)) { console.error('ERRO: assets/splash/gluxo-splash.mp4 (animação oficial de abertura) não encontrado.'); process.exit(1); }
+fs.mkdirSync(path.join(out, 'splash'), { recursive: true }); fs.copyFileSync(splashSrc, path.join(out, 'splash', 'gluxo-splash.mp4'));
+/* Com as fontes locais presentes, o link para o Google Fonts é dispensável: sairia da rede e atrasaria a execução do app (e a abertura) sem internet. Sem as fontes locais ele continua como reserva. */
+let headHtml = rd('src/head.html').replace('{{SPLASH}}', () => rd('src/splash.html').trim());
+if (!missing) headHtml = headHtml.replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>\n?/, '');
+const body = headHtml.replace('{{FONTS}}', () => css).replace('{{CSS}}', () => rd('src/style.css') + '\n' + rd('src/brand.css') + '\n' + rd('src/neon.css') + '\n' + rd('src/glucoform.css') + '\n' + rd('src/gauge.css') + '\n' + rd('src/buttons.css') + '\n' + rd('src/uipicker.css') + '\n' + rd('src/ptr.css') + '\n' + rd('src/readmore.css') + '\n' + rd('src/bolus2.css') + '\n' + rd('src/insrem.css') + '\n' + rd('src/acchat.css') + '\n' + rd('src/metricas.css') + '\n' + rd('src/premium.css') + '\n' + rd('src/premiumlock.css') + '\n' + rd('src/ds.css') + '\n' + rd('src/inicio.css') + '\n' + rd('src/analise.css') + '\n' + rd('src/cards.css') + '\n' + rd('src/conquistas-rec.css') + '\n' + rd('src/layout.css') + '\n' + rd('src/brand-ui.css')).replace('{{JS}}', () => js);
 /* Escala de interface: no Claude o app é desenhado numa largura virtual maior e reduzido para caber. Aqui o mesmo efeito vem do CSS "zoom".
    Ajuste K: valores maiores deixam tudo menor (1 = tamanho nativo do Android). */
 const K = 1.29;

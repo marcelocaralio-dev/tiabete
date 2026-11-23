@@ -3,20 +3,11 @@
 if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
   const SEC = window.TB_SECURE, G = TB_DRV.state;
   let gate = null, ready = false;
-  /* Abertura: logo centralizado com animação; só depois entra a tela de login (ou direto o app, para quem já entrou). */
-  const SPLASH_MS = 1900, t0 = Date.now();
-  const splash = document.createElement('div'); splash.id = 'tb-splash'; splash.setAttribute('role', 'img'); splash.setAttribute('aria-label', 'GLUXO · Controle da glicose');
-  splash.innerHTML = '<div class="sp-logo"><img src="' + GX_LOGO + '" alt="" width="380" height="138"></div>';
-  document.body.appendChild(splash);
-  const hideSplash = () => { const w = Math.max(0, SPLASH_MS - (Date.now() - t0)); setTimeout(() => { splash.classList.add('out'); setTimeout(() => splash.remove(), 450); }, w); };
-  const css0 = `#tb-splash{position:fixed;inset:0;z-index:3000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .45s ease}#tb-splash.out{opacity:0;pointer-events:none}
-  #tb-splash .sp-logo{position:relative;overflow:hidden;border-radius:22px;animation:gx-rise .7s cubic-bezier(.22,.9,.3,1) both}
-  #tb-splash .sp-logo img{display:block;width:min(78vw,380px);height:auto;filter:drop-shadow(0 8px 28px rgba(var(--brand-rgb),.38))}
-  #tb-splash .sp-logo::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 36%,rgba(255,255,255,.14) 50%,transparent 64%);animation:gx-sheen 1.4s ease-out .55s both;pointer-events:none}
-  :root[data-theme="light"] #tb-splash .sp-logo{background:#08070A;padding:22px 28px;box-shadow:0 10px 40px rgba(28,23,25,.25)}
-  @keyframes sp-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  @media (prefers-reduced-motion:reduce){#tb-splash *{animation:none!important}}`;
-  const css = css0 + `#tb-gate{position:fixed;inset:0;z-index:2000;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;justify-content:center;gap:18px;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));overflow:auto;font-family:var(--f-body)}
+  /* A abertura (vídeo do logotipo) é a etapa de inicialização feita em src/splash.html. Aqui só pedimos que ela espere a decisão da tela de entrada,
+     para a pessoa ver o app (ou a tela de entrada) já pronto quando o vídeo terminar. */
+  try { if (window.GxSplash) GxSplash.wait('gate'); } catch (e) { }
+  const endSplash = () => { try { if (window.GxSplash) GxSplash.done('gate'); } catch (e) { } };
+  const css = `#tb-gate{position:fixed;inset:0;z-index:2000;background:var(--bg);color:var(--fg);display:flex;flex-direction:column;justify-content:center;gap:18px;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));overflow:auto;font-family:var(--f-body)}
   #tb-gate .gt{font-family:var(--f-display);font-size:26px;font-weight:700;margin:0;line-height:1.15}#tb-gate .gt b{color:var(--brand)}
   #tb-gate p{margin:0;color:var(--mut);font-size:15px;line-height:1.5}#tb-gate .gb{display:flex;flex-direction:column;gap:10px}
   #tb-gate .gl{background:none;border:0;color:var(--mut);text-decoration:underline;font:inherit;font-size:14px;padding:10px;cursor:pointer}`;
@@ -47,5 +38,5 @@ if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
     else if (e.target.closest('#gate-skip')) { await SEC.setCfg('login-skip', true); refresh(); try { window.dispatchEvent(new CustomEvent('tb-auth', { detail: { type: 'guest' } })); } catch (x) { } }
   });
   window.addEventListener('tb-auth', refresh);
-  refresh().then(hideSplash, hideSplash);
+  refresh().then(endSplash, endSplash);
 }

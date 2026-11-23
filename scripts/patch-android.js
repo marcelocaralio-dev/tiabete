@@ -27,6 +27,25 @@ if (fs.existsSync(g)) {
   console.log('versionCode', code, 'versionName', pkg.version);
 }
 
+/* Abertura sem flash: o tema de lançamento do Android (que aparece antes de o WebView existir) fica PRETO (#000000), sem a imagem padrão do Capacitor,
+   para entrar sem emenda no vídeo de abertura do GLUXO (src/splash.html). Só mexe no estilo "AppTheme.NoActionBarLaunch"; é idempotente e usa apenas
+   atributos válidos em qualquer tema. O atributo da tela de abertura do Android 12+ só é acrescentado quando o tema pai é o Theme.SplashScreen. */
+(function launchTheme() {
+  const f = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values', 'styles.xml');
+  if (!fs.existsSync(f)) { console.warn('styles.xml não encontrado; tema de lançamento não ajustado.'); return; }
+  let t = fs.readFileSync(f, 'utf8');
+  const m = /<style\s+name="AppTheme\.NoActionBarLaunch"([^>]*)>([\s\S]*?)<\/style>/.exec(t);
+  if (!m) { console.warn('Estilo AppTheme.NoActionBarLaunch não encontrado; tema de lançamento não ajustado.'); return; }
+  if (m[2].includes('gluxo-launch-black')) { console.log('Tema de lançamento preto já aplicado.'); return; }
+  let inner = m[2].replace(/\s*<item\s+name="android:(?:background|windowBackground|colorBackground)">[^<]*<\/item>/g, '');
+  const splashParent = /parent="Theme\.SplashScreen"/.test(m[1]);
+  const items = ['    <!-- gluxo-launch-black -->', '    <item name="android:background">@android:color/black</item>', '    <item name="android:windowBackground">@android:color/black</item>', '    <item name="android:colorBackground">@android:color/black</item>']
+    .concat(splashParent && !/windowSplashScreenBackground/.test(inner) ? ['    <item name="windowSplashScreenBackground">#000000</item>'] : []);
+  const blk = '<style name="AppTheme.NoActionBarLaunch"' + m[1] + '>' + inner.replace(/\s+$/, '') + '\n' + items.join('\n') + '\n    </style>';
+  t = t.slice(0, m.index) + blk + t.slice(m.index + m[0].length);
+  fs.writeFileSync(f, t); console.log('Tema de lançamento do Android ajustado para preto (#000000).');
+})();
+
 // Fontes do app iguais às da versão web: ignora o "tamanho da fonte" do Android dentro do WebView (textZoom 100%).
 (function findMain(dir) {
   if (!fs.existsSync(dir)) return;
