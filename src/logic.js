@@ -967,7 +967,7 @@ function caCompute(rules, records, now, opts) {
       }
       at = caAfterQuiet(at, q); if (at < now - 3 * 3600e3) continue;
       const key = rule.id + '|' + Math.round(at / 60000); if (seen.has(key)) continue; seen.add(key);
-      out.push({ key, id: caHash(key), ruleId: rule.id, name: rule.name, at, title: 'GLUXO · ' + rule.name, body: rule.msg || 'Alerta personalizado: confira sua orientação.', route: 'alertasp' });
+      out.push({ key, id: caHash(key), ruleId: rule.id, recId: o.id, name: rule.name, at, title: 'GLUXO · ' + rule.name, body: rule.msg || 'Alerta personalizado: confira sua orientação.', route: 'alertasp' });
     }
   }
   return out.sort((a, b) => a.at - b.at);

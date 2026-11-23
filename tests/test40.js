@@ -63,7 +63,7 @@ const st = pg => pg.evaluate(() => { const b = document.getElementById('acb'), p
   await pg.evaluate(() => { document.documentElement.dataset.theme = 'dark'; }); await sleep(100);
   /* ---- 8 botões da notificação ---- */
   const rb = await pg.evaluate(() => [...document.querySelectorAll('#acp .acr')].map(r => ({ n: r.querySelectorAll('button').length, svgBtn: r.querySelectorAll('button svg').length, t: [...r.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') })));
-  ok(rb.length === 3 && rb.every(r => r.n === 2 && r.svgBtn === 0 && r.t === 'Marcar como lida|Remover da lista'), 'R1: cada notificação tem exatamente os botões "Marcar como lida" e "Remover da lista", sem ícones: ' + JSON.stringify(rb));
+  ok(rb.length === 3 && rb.every(r => r.n === 3 && r.svgBtn === 0 && r.t === 'Marcar como lida|Acessar|Remover da lista'), 'R1: cada notificação tem exatamente os botões "Marcar como lida", "Acessar" e "Remover da lista", sem ícones: ' + JSON.stringify(rb));
   const idOf = t => pg.evaluate(t => S.ac.items.find(x => x.title === t).id, t);
   await pg.click(`#acp [data-ac="read"][data-id="${await idOf('Insulina A')}"]`); await sleep(200); s = await st(pg);
   ok(s.items.find(x => x.t === 'Insulina A').r && s.list.includes('Insulina A') && s.un === 2 && s.has, 'R2: marcar como lida mantém o item, atualiza a contagem (2) e o halo segue aceso');
@@ -74,11 +74,11 @@ const st = pg => pg.evaluate(() => { const b = document.getElementById('acb'), p
   await pg.click(`#acp [data-ac="dismiss"][data-id="${await idOf('Personalizado C')}"]`); await sleep(600); s = await st(pg); ok(s.un === 0 && !s.has && s.halo === 0, 'R5: remover o último não lido apaga o halo (un=' + s.un + ')');
   /* ---- 9 clique no conteúdo: lê, remove e navega; destino inválido/ausente ---- */
   await addLive(pg, [D]); await sleep(300); await pg.evaluate(() => acOpen(60000)); await sleep(300);
-  const dd = await pg.evaluate(() => S.ac.items.find(x => x.title === 'Hiper D').dest); ok(dd && dd.r === 'painel' && typeof dd.p === 'object', 'C0: item guarda destino com parâmetros: ' + JSON.stringify(dd));
+  const dd = await pg.evaluate(() => S.ac.items.find(x => x.title === 'Hiper D').dest); ok(dd && dd.v === 2 && dd.a === 'new' && typeof dd.p === 'object', 'C0: item guarda destino com parâmetros: ' + JSON.stringify(dd));
   await pg.evaluate(() => go('historico')); await sleep(200); await pg.evaluate(() => acOpen(60000)); await sleep(300);
   await pg.click(`#acp [data-ac="open"][data-id="${await idOf('Hiper D')}"]`); await sleep(500); s = await st(pg);
-  ok(s.route === 'painel' && !s.list.includes('Hiper D') && s.items.find(x => x.t === 'Hiper D').r && s.items.find(x => x.t === 'Hiper D').d && !s.has, 'C1: clique marca como lida, remove da lista e navega ao destino (rota=' + s.route + ')');
-  await pg.evaluate(() => { const it = S.ac.items.find(x => x.title === 'Insulina A'); it.read = false; it.dismissed = false; it.dest = { r: 'rota-que-nao-existe', p: {} }; acRefresh(); go('historico'); acOpen(60000); }); await sleep(300);
+  ok(await pg.evaluate(() => !!document.getElementById('rec-form')) && !s.list.includes('Hiper D') && s.items.find(x => x.t === 'Hiper D').r && s.items.find(x => x.t === 'Hiper D').d && !s.has, 'C1: clique marca como lida, remove da lista e navega ao destino (rota=' + s.route + ')'); await pg.evaluate(() => closeSheet());
+  await pg.evaluate(() => { const it = S.ac.items.find(x => x.title === 'Insulina A'); it.read = false; it.dismissed = false; it.dest = { v: 2, r: 'rota-que-nao-existe', p: {} }; acRefresh(); go('historico'); acOpen(60000); }); await sleep(300);
   await pg.click(`#acp [data-ac="open"][data-id="${await idOf('Insulina A')}"]`); await sleep(400); s = await st(pg);
   ok(s.route === 'historico' && !s.list.includes('Insulina A') && s.items.find(x => x.t === 'Insulina A').d && pg._errs.length === 0, 'C2: destino inválido: marca lida, remove, não navega e não quebra (rota=' + s.route + ')');
   await pg.evaluate(() => { S.ac.hidden = false; acToast('Confirmação de teste sem destino'); }); await sleep(500);

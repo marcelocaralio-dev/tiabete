@@ -51,7 +51,7 @@ const anchored = g => g.vis && (Math.abs(g.left - 6 * (g.w / 56)) < 4 || Math.ab
   ok(rows.pl >= 0 && rows.pr >= 0 && rows.w > rows.vw * .88, 'M0: painel largo (' + rows.w.toFixed(0) + ' de ' + rows.vw + ') e dentro das margens (' + rows.pl.toFixed(0) + '/' + rows.pr.toFixed(0) + ')');
   ok(rows.rows.every(r => r.clamp === 'none'), 'M1: sem truncamento por reticências (line-clamp) em nenhuma mensagem');
   ok(rows.rows.every(r => r.sh <= r.ch + 1), 'M2: toda mensagem (curta, média e longa) aparece inteira, sem cortes');
-  ok(rows.rows.every(r => r.btns === 2), 'M3: cada notificação tem exatamente dois botões');
+  ok(rows.rows.every(r => r.btns === 3), 'M3: cada notificação tem exatamente três botões (Marcar como lida, Acessar, Remover da lista)');
   const full = await pg.evaluate(T => [...document.querySelectorAll('#acp .acr-m')].some(m => m.textContent.includes(T.longa.slice(-60))), T); ok(full, 'M6: o fim da mensagem longa está presente (nada perdido)');
   /* telas estreitas e escala grande */
   await pg.setViewportSize({ width: 320, height: 640 }); await sleep(400); await pg.evaluate(() => { acPanelPos(); }); const nar = await pg.evaluate(() => { const r = document.getElementById('acp').getBoundingClientRect(); return [r.left, innerWidth - r.right]; }); ok(nar[0] >= 0 && nar[1] >= 0, 'M9: em tela de 320 px o painel respeita as margens');

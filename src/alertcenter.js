@@ -26,6 +26,7 @@ function acLoad(v) {
   v = v || {}; let mode = v.mode === 'bubble' ? 'bubble' : 'classic', pos = acPos(v.pos), hidden = !!v.hidden, ts = +v.ts || 0;
   const m = acMirrorRead(); if (m && m.ts >= ts) { mode = m.mode === 'bubble' ? 'bubble' : 'classic'; pos = acPos(m.pos); hidden = !!m.hidden; ts = m.ts; }
   S.ac = { mode, pos, hidden, ts, items: (Array.isArray(v.items) ? v.items : []).filter(x => x && x.id && x.key).slice(0, AC_MAX).map(x => { if (x.src !== 'toast' && !OC_STATES[x.st]) { x.st = x.active ? 'pendente' : 'concluido'; x.why = x.why || (x.active ? '' : 'antigo'); } return x; }) };
+  for (const it of S.ac.items) acFixDest(it);
 }
 /* ----- fontes de alerta: todas as faixas do app, com categoria e prioridade ----- */
 function acSources() {
@@ -45,14 +46,64 @@ function acSources() {
       const plain = el.cloneNode(true); plain.querySelectorAll('button,[data-hy-next]').forEach(n => n.remove());
       const text = acNorm(plain.textContent), b = plain.querySelector('b'), title = acNorm(b ? b.textContent : '').replace(/^[⚠▲\s]+/, '').replace(/[:.]+$/, '') || AC_CATS[s.cat];
       const occ = el.dataset.occ || ''; /* identidade da ocorrência (dia + horário + lembrete): o mesmo aviso mantém o mesmo item, e outro dia/horário é outro item */
-      live.push({ src: s.src, cat: s.cat, prio: s.prio, title, text, occ, html: el.outerHTML, key: s.src + '|' + (occ || (s.by === 'text' ? text : title)) });
+      const nb = el.querySelector('button[data-act="new"]'), nav = nb ? { ctx: nb.dataset.ctx || '', meal: nb.dataset.meal || '' } : null; /* o botão "Registrar" da própria faixa diz qual medição está faltando */
+      live.push({ src: s.src, cat: s.cat, prio: s.prio, title, text, occ, rec: el.dataset.rec || '', nav, html: el.outerHTML, key: s.src + '|' + (occ || (s.by === 'text' ? text : title)) });
     });
   }
   return live;
 }
-/* destino de cada notificação (rota + parâmetros de contexto). Gravado no item; a validade é conferida só na hora do toque. */
-const AC_DEST = { mem: 'backup', hipo: 'painel', hiper: 'painel', conq: 'conquistas', drv: 'backup', bkp: 'backup', basal: 'insulinas', jantar: 'insulinas', rem: 'lembretes', plano: 'esquemas', insrem: 'insrem', ca: 'alertasp', ex: 'painel' };
-function acDest(L) { const r = AC_DEST[L.src]; if (!r) return null; const o = typeof ocParse === 'function' ? ocParse(L.occ) : null; return { r, p: o ? { occ: L.occ, day: o.day, id: o.id, time: o.time } : {} }; }
+/* ===== Destino de cada notificação (mapeamento central) =====
+   O destino nasce do TIPO do alerta (campo src, o mesmo que gerou a faixa), nunca do texto exibido. Formato gravado no item: { v: 2, r?, a?, s?, p }
+     r = rota de tela cheia (VIEWS)          a = ação que abre um painel por cima da tela (não é rota)
+     s = seletor para rolar até o card       p = parâmetros de contexto (medição pedida, ocorrência, registro)
+   Ações (a): 'new' = formulário de nova glicemia (o mesmo do botão "Nova medição", já com o contexto pedido) · 'hypo' = protocolo de hipoglicemia
+              'irsheet' = aviso de insulina da ocorrência · 'record' = registro que disparou o alerta.
+   Tipo (src) -> destino:
+     rem    "Medição. Ainda sem glicemia …"  -> formulário de nova glicemia, já em jejum / antes do almoço / antes do jantar
+     plano  "Medir."                         -> formulário de nova glicemia  ·  "Hora do tratamento" -> Início, no card Meu tratamento
+     hipo   "Glicemia baixa / Hipoglicemia"  -> protocolo de hipoglicemia (cronômetro e registro)
+     hiper  "Glicemia muito elevada"         -> formulário de nova glicemia (nova medição de conferência)
+     basal  "Basal"                          -> Início, no card da basal            jantar "Pré-jantar" -> Início, no card da insulina rápida do jantar
+     insrem "Lembrete de insulina"           -> aviso daquela insulina (confirmar, adiar ou ignorar), sobre Lembretes de insulina
+     ca     "Alerta personalizado"           -> o registro que disparou o alerta (se não houver, Histórico)
+     conq   "Nova conquista"                 -> Conquistas        bkp / drv / mem -> Cópia de segurança        ex "Dados de exemplo" -> formulário de nova glicemia
+     toast  confirmações                     -> a tela onde a ação aconteceu (gravada na criação)
+   NENHUM tipo aponta para as telas de configuração de alertas (lembretes, alertasp). */
+const AC_DEST_V = 2;
+const AC_REM_CTX = [{ a: 240, b: 480, ctx: 'jejum', meal: 'cafe' }, { a: 600, b: 720, ctx: 'antes', meal: 'almoco' }, { a: 960, b: 1140, ctx: 'antes', meal: 'jantar' }]; /* mesmas janelas de REM_WIN (extras.js) */
+const AC_REM_TXT = [[/jejum/i, 'jejum', 'cafe'], [/almo[cç]o/i, 'antes', 'almoco'], [/jantar/i, 'antes', 'jantar']];
+const AC_TOAST_SKIP = { exame: 1, comparar: 1, alertashist: 1 }; /* telas que dependem de um item selecionado: não servem de destino de volta */
+function acRemCtx(x) { /* qual medição a faixa pedia: botão da faixa -> texto da mensagem -> horário em que o alerta nasceu */
+  if (x.nav && x.nav.ctx) return { ctx: x.nav.ctx, meal: x.nav.meal || '' };
+  const t = AC_REM_TXT.find(k => k[0].test(x.text || '')); if (t) return { ctx: t[1], meal: t[2] };
+  if (x.ts) { const d = new Date(x.ts), m = d.getHours() * 60 + d.getMinutes(), w = AC_REM_CTX.find(k => m >= k.a && m < k.b); if (w) return { ctx: w.ctx, meal: w.meal }; }
+  return {};
+}
+const AC_DEST = {
+  mem: () => ({ r: 'backup' }),
+  hipo: () => ({ a: 'hypo' }),
+  hiper: () => ({ a: 'new' }),
+  conq: () => ({ r: 'conquistas' }),
+  drv: () => ({ r: 'backup' }),
+  bkp: () => ({ r: 'backup' }),
+  basal: () => ({ r: 'painel', s: '#ins-basal' }),
+  jantar: () => ({ r: 'painel', s: '#ins-r-dinner' }),
+  rem: x => ({ a: 'new', p: acRemCtx(x) }),
+  plano: x => (x.nav || /^medir/i.test(x.title || '')) ? { a: 'new' } : { r: 'painel', s: '#ins-basal, .tr-wrap' },
+  insrem: x => { const o = typeof ocParse === 'function' ? ocParse(x.occ) : null; return o ? { r: 'insrem', a: 'irsheet', p: { occ: x.occ, day: o.day, id: o.id, time: o.time } } : { r: 'insrem' }; },
+  ca: x => x.rec ? { a: 'record', r: 'historico', p: { id: x.rec } } : { r: 'historico' },
+  ex: () => ({ a: 'new' })
+};
+/* x = alerta vivo (acSources) ou item já gravado; devolve o destino ou null quando o tipo não tem destino */
+function acDest(x) { const f = AC_DEST[x.src]; if (!f) return null; let d; try { d = f(x); } catch (e) { return null; } return d ? { v: AC_DEST_V, r: d.r, a: d.a, s: d.s, p: d.p || {} } : null; }
+/* itens gravados por versões anteriores (rota única, p.ex. rem -> lembretes) recebem o destino correto do tipo; destinos já na versão atual são respeitados */
+function acFixDest(it) {
+  if (!it || (it.dest && it.dest.v === AC_DEST_V)) return false;
+  let d = null;
+  if (it.src === 'toast') { const r = it.dest && it.dest.r; const m = { ia: 'ia', rel: 'relatorios', analise: 'analise', backup: 'backup' }[it.cat]; d = r ? { v: AC_DEST_V, r, p: {} } : m ? { v: AC_DEST_V, r: m, p: {} } : null; }
+  else { const keep = it.dest && it.dest.p && it.dest.p.id ? it.dest.p : null; d = acDest(it); if (d && keep && it.src === 'insrem' && !(d.p && d.p.id)) d.p = keep; }
+  it.dest = d; return true;
+}
 /* ----- gestão: fila, ciclo de vida, histórico -----
    Cada item da bolha segue os estados programado → pendente → exibido → concluído | ignorado | cancelado | desativado | expirado (alertstate-core.js).
    O estado final de um item é decidido por um resolvedor que olha as MESMAS fontes do app (lembrete, tratamento, histórico de insulinas, configurações);
@@ -78,10 +129,10 @@ function acUpsert(live) {
       if (it.st === 'concluido') { if (!ocMove(it, 'pendente', 'desfeito')) continue; } /* só volta se foi o registro que a concluiu e ele foi apagado/editado */
       else if (ocIsFinal(it.st)) continue; /* cancelado, desativado, ignorado, expirado: não reaparece */
       else ocMove(it, 'pendente');
-      Object.assign(it, { active: true, read: false, dismissed: false, html: L.html, text: L.text, title: L.title, dest: acDest(L) || it.dest, rev: (it.rev || 0) + 1 }); fresh.push(it); dirty = true; continue;
+      Object.assign(it, { active: true, read: false, dismissed: false, html: L.html, text: L.text, title: L.title, dest: acDest(L) || it.dest, rec: L.rec, nav: L.nav, rev: (it.rev || 0) + 1 }); fresh.push(it); dirty = true; continue;
     }
-    if (it) { it.html = L.html; const dd = acDest(L); if (dd && !it.dest) { it.dest = dd; dirty = true; } if (it.st === 'programado') { ocMove(it, 'pendente'); dirty = true; } if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } continue; }
-    const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html, st: 'pendente', why: '' }; if (L.occ) n.occ = L.occ; const nd = acDest(L); if (nd) n.dest = nd;
+    if (it) { it.html = L.html; const dd = acDest(L); if (dd && (!it.dest || it.dest.v !== AC_DEST_V)) { it.dest = dd; it.rec = L.rec; it.nav = L.nav; dirty = true; } if (it.st === 'programado') { ocMove(it, 'pendente'); dirty = true; } if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } continue; }
+    const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html, st: 'pendente', why: '' }; if (L.occ) n.occ = L.occ; if (L.rec) n.rec = L.rec; if (L.nav) n.nav = L.nav; const nd = acDest(L); if (nd) n.dest = nd;
     S.ac.items.unshift(n); fresh.push(n); dirty = true;
   }
   if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX;
@@ -94,7 +145,7 @@ function acToast(msg, cat) {
   const prio = c === 'atencao' ? 2 : 0, last = S.ac.items.find(x => !x.active && x.text === text && now - x.ts < 60000);
   let it = last;
   if (last) { last.n = (last.n || 1) + 1; last.ts = now; if (!acBubbleOn()) { acSave(); return false; } }
-  else { it = { id: uid(), key: 't|' + text + '|' + now, src: 'toast', cat: c, prio, title: AC_CATS[c], text, ts: now, read: prio === 0, dismissed: false, active: false, rev: 0 }; S.ac.items.unshift(it); if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX; }
+  else { it = { id: uid(), key: 't|' + text + '|' + now, src: 'toast', cat: c, prio, title: AC_CATS[c], text, ts: now, read: prio === 0, dismissed: false, active: false, rev: 0 }; if (r && !AC_TOAST_SKIP[r] && typeof VIEWS === 'object' && VIEWS[r]) it.dest = { v: AC_DEST_V, r, p: {} }; S.ac.items.unshift(it); if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX; }
   acSave();
   if (!acBubbleOn()) { acRefresh(); return false; }
   S.ac.hidden = false; acPop(it, prio === 0 ? 3500 : 9000); return true;
@@ -190,7 +241,7 @@ function acRow(it) {
   const d = new Date(it.ts), tm = pad(d.getHours()) + ':' + pad(d.getMinutes()), cat = AC_CATS[it.cat] || 'Alerta';
   return `<div class="acr${it.read ? ' read' : ''}${it.active && it.prio >= 3 ? ' crit' : ''}" data-ac-row="${it.id}" role="group" aria-label="${esc(cat)}${it.read ? ' (lida)' : ' (não lida)'}"><span class="acr-c" aria-hidden="true">${acSvg(AC_CIC[it.cat] || 'info', 15)}</span>
     <div class="acr-w"><div class="acr-m" role="link" tabindex="0" data-ac="open" data-id="${it.id}" title="${esc(cat)} · ${tm}"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</div>
-    <div class="acr-a"><button type="button" class="acr-b" data-ac="read" data-id="${it.id}"${it.read ? ' disabled' : ''}>Marcar como lida</button><button type="button" class="acr-b" data-ac="dismiss" data-id="${it.id}">Remover da lista</button></div></div></div>`;
+    <div class="acr-a"><button type="button" class="acr-b" data-ac="read" data-id="${it.id}"${it.read ? ' disabled' : ''}>Marcar como lida</button><button type="button" class="acr-b" data-ac="go" data-id="${it.id}">Acessar</button><button type="button" class="acr-b" data-ac="dismiss" data-id="${it.id}">Remover da lista</button></div></div></div>`;
 }
 function acPanel() {
   const p = document.getElementById('acp'); if (!p) return; const all = acList(); let list = all;
@@ -210,16 +261,27 @@ function acDismiss(ids) { /* "Remover da lista": o estado muda e é gravado na h
   setTimeout(() => { AC.only = null; if (!acList().length) acCollapse(); acRefresh(); if (AC.open) acTimer(12000); }, 200 + Math.min(ids.length, 6) * 30);
   acRefresh();
 }
-/* toque no conteúdo: marca como lida, tira da lista na hora e só então navega; destino ausente/inválido ou falha na navegação não deixam o item na lista */
+/* Abre o destino de uma notificação. Devolve true se chegou ao destino. Nunca lança: qualquer falha vira false e o app segue normal. */
+function acNavigate(d) {
+  if (!d || typeof d !== 'object') return false;
+  const p = d.p || {}, hasRoute = typeof d.r === 'string' && typeof VIEWS === 'object' && typeof VIEWS[d.r] === 'function';
+  const scrollTo = sel => { if (!sel) return; setTimeout(() => { try { const e = document.querySelector(sel); if (e) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) { } }, 80); };
+  try {
+    if (d.a === 'new') { openSheet(recordForm(null, p.ctx ? { context: p.ctx, meal: p.meal || undefined } : undefined)); return true; } /* mesma tela do botão "Nova medição" */
+    if (d.a === 'hypo') { hypoOpen(); return true; }
+    if (d.a === 'irsheet') { if (!hasRoute) return false; go(d.r); const r = p.id && p.day ? irById(p.id) : null; if (r) openSheet(irSheet(r, p.day)); return true; }
+    if (d.a === 'record') { if (!hasRoute) return false; go(d.r); if (p.id && S.records.some(x => x.id === p.id)) openRecord(p.id); return true; }
+    if (!hasRoute) return false;
+    if (S.route !== d.r) go(d.r); else { render(); window.scrollTo(0, 0); }
+    scrollTo(d.s); return true;
+  } catch (e) { console.error(e); return false; }
+}
+/* "Acessar" e toque no conteúdo (mesmo caminho): 1) grava lida + fora da lista ativa, 2) fecha o painel, 3) só então navega.
+   Destino ausente/inválido ou falha na navegação não desfazem a leitura e a remoção, e não levam a nenhuma tela alternativa. */
 function acClickItem(id) {
   const it = S.ac.items.find(x => x.id === id); if (!it) return false; const d = it.dest;
   it.dismissed = true; it.read = true; acSave(true); AC.only = null; AC.confirm = false; acCollapse(true); acRefresh();
-  try {
-    if (!d || typeof d.r !== 'string' || typeof VIEWS !== 'object' || typeof VIEWS[d.r] !== 'function') return false;
-    go(d.r);
-    if (d.r === 'insrem' && d.p && d.p.id && d.p.day) { const r = irById(d.p.id); if (r) openSheet(irSheet(r, d.p.day)); }
-    return true;
-  } catch (e) { console.error(e); return false; }
+  return acNavigate(d);
 }
 function acPop(it, ms) {
   acEnsure(); const b = document.getElementById('acb'); if (!b) return;
@@ -280,7 +342,7 @@ document.addEventListener('click', e => {
     if (a === 'read') acSetState(id, { read: true });
     else if (a === 'dismiss') { acDismiss([id]); acTimer(12000); return; }
     else if (a === 'dismissall') { acDismiss(acList().map(x => x.id)); return; }
-    else if (a === 'open') { acClickItem(id); return; }
+    else if (a === 'open' || a === 'go') { acClickItem(id); return; }
     else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(true); acRefresh(); }
     else if (a === 'hist') { acCollapse(); go('alertashist'); return; }
     acPanel(); acTimer(12000); return;
