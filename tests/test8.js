@@ -13,7 +13,7 @@ const mkR = o => C.irItem({ id: mk(), itemId: 'b1', type: 'basal', time: '22:00'
 const c = C.irClean({ items: [{ id: 'a', itemId: 'x', type: 'xx', time: '99:00', days: [1, 1, 9, 'q'], meal: 'cafe' }], state: { '2026-11-15|a': 'done', lixo: 1, '2026-11-15|b': { snooze: 5 } } }, mk);
 ok(c.items[0].type === 'rapida' && c.items[0].time === '08:00', 'tipo e horário inválidos viram valores seguros');
 ok(JSON.stringify(c.items[0].days) === '[1]', 'dias inválidos e repetidos são descartados');
-ok(c.state['2026-11-15|a'] === 'done' && c.state['2026-11-15|b'].snooze === 5 && !c.state.lixo, 'estado: só chaves válidas');
+ok(c.state['2026-11-15|a@08:00'] === 'done' && !c.state['2026-11-15|a'] && c.state['2026-11-15|b'].snooze === 5 && !c.state.lixo, 'estado: só chaves válidas; chave antiga (dia|id) passa a valer para o horário atual do lembrete');
 ok(C.irDays([0, 1, 2, 3, 4, 5, 6]).length === 0, 'sete dias = todos os dias (lista vazia)');
 
 // 2) próximo disparo, dias da semana
@@ -77,14 +77,14 @@ ok(!/\bUi\b|unidade|dose/i.test(tb.body + tb.largeBody + tr.body + tr.largeBody)
   ok(C.irDue(R, P, t - 60000).length === 0, 'antes da hora: nada');
   ok(C.irDue(R, P, t + 60000).length === 1, 'na hora: aparece');
   ok(C.irDue(R, P, t + 181 * 60000).length === 0, 'depois de 3 h expira');
-  R.state['2026-11-15|d1'] = 'done'; ok(C.irDue(R, P, t + 60000).length === 0, 'confirmado: some');
-  R.state['2026-11-15|d1'] = 'ignored'; ok(C.irDue(R, P, t + 60000).length === 0, 'ignorado: some');
-  R.state['2026-11-15|d1'] = { snooze: t + 10 * 60000 }; ok(C.irDue(R, P, t + 5 * 60000).length === 0, 'adiado: some até a hora');
+  R.state['2026-11-15|d1@22:00'] = 'done'; ok(C.irDue(R, P, t + 60000).length === 0, 'confirmado: some');
+  R.state['2026-11-15|d1@22:00'] = 'ignored'; ok(C.irDue(R, P, t + 60000).length === 0, 'ignorado: some');
+  R.state['2026-11-15|d1@22:00'] = { snooze: t + 10 * 60000 }; ok(C.irDue(R, P, t + 5 * 60000).length === 0, 'adiado: some até a hora');
   ok(C.irDue(R, P, t + 11 * 60000)[0].snoozed, 'adiado: volta depois dos minutos');
   ok(C.irSnoozes(R, P, t + 5 * 60000).length === 1 && C.irSnoozes(R, P, t + 11 * 60000).length === 0, 'adiamento vira 1 notificação única enquanto vale');
   ok(C.irNextShown(R, R.items[0], t + 5 * 60000) === t + 10 * 60000, 'próxima notificação mostra o adiamento');
   R.state = {}; ok(C.irDue(R, P, L.mkTs('2026-11-16', '00:30')).length === 1 && C.irDue(R, P, L.mkTs('2026-11-16', '00:30'))[0].day === '2026-11-15', 'cruza a meia-noite: aviso de ontem ainda vale na janela');
-  R.state = { '2026-11-10|d1': 'done', '2026-11-15|d1': 'done' }; C.irPrune(R, t); ok(Object.keys(R.state).length === 1, 'estado antigo é podado');
+  R.state = { '2026-11-10|d1@22:00': 'done', '2026-11-15|d1@22:00': 'done' }; C.irPrune(R, t); ok(Object.keys(R.state).length === 1, 'estado antigo é podado');
   R.items[0].on = false; ok(C.irDue(R, P, t + 60000).length === 0, 'desligado não gera aviso');
 }
 // 8) histórico: o tipo de registro da confirmação
