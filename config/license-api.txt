@@ -1,1 +1,1 @@
-https://tiabete-license-api.exemplo.workers.dev/rota?token=TKNZZ9
+https://tiabete-license-api.marcelocaralio.workers.dev
