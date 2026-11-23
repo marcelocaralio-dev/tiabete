@@ -203,8 +203,27 @@ const skipped = k => !!(S.ins.skip && S.ins.skip[k]);
 const setSkip = (k, v) => { S.ins.skip = S.ins.skip || {}; if (v) S.ins.skip[k] = 1; else delete S.ins.skip[k]; };
 const INS_KIND = { basal: 'Basal', fast: 'Jejum', lunch: 'Almoço', dinner: 'Jantar', extra: 'Outra insulina' };
 const insName = r => r.kind === 'extra' ? (r.name || 'Outra insulina') : INS_KIND[r.kind];
-async function logAdd(kind, ts, units) { const r = { id: uid(), kind, ts, date: isoDate(new Date(ts)), at: Date.now() }; if (units != null) r.units = units; await Store.put('inslog', r); S.inslog.push(r); S.inslog.sort((a, b) => a.ts - b.ts); return r; }
-async function logDel(id) { await Store.del('inslog', id); S.inslog = S.inslog.filter(x => x.id !== id); }
+/* "occ" (opcional) é o id da ocorrência do aviso que originou o registro (ver alertstate-core.js). Com ele, registrar duas vezes a mesma ocorrência devolve o registro que já existe em vez de criar outro. */
+async function logAdd(kind, ts, units, occ) {
+  if (occ) { const ex = S.inslog.find(x => x.occ === occ); if (ex) return ex; }
+  const r = { id: uid(), kind, ts, date: isoDate(new Date(ts)), at: Date.now() }; if (units != null) r.units = units; if (occ) r.occ = occ;
+  await Store.put('inslog', r); S.inslog.push(r); S.inslog.sort((a, b) => a.ts - b.ts); return r;
+}
+/* Apagar o registro desfaz o "concluído" do aviso que o originou (o aviso volta a valer enquanto estiver na janela) */
+async function logDel(id) { const r = S.inslog.find(x => x.id === id); await Store.del('inslog', id); S.inslog = S.inslog.filter(x => x.id !== id); if (r && r.occ && typeof alUndoOcc === 'function') { try { await alUndoOcc(r.occ); } catch (e) { console.error(e); } } }
+/* Caminho único para registrar uma dose "informada pelo usuário" a partir de um aviso (bolha, faixa, notificação do Android): idempotente, sem dose preenchida. */
+const doseBusy = new Set();
+async function doseConfirm(o) {
+  const lock = o.occ || ('k:' + o.kind); if (doseBusy.has(lock)) return { rec: null, dup: true }; doseBusy.add(lock);
+  try {
+    const ex = o.occ && S.inslog.find(x => x.occ === o.occ); if (ex) return { rec: ex, dup: true };
+    const now = Date.now(), kind = o.kind, rec = await logAdd(kind, now, undefined, o.occ);
+    rec.src = o.src || 'lembrete'; rec.status = 'confirmada'; if (o.rem) rec.rem = o.rem; if (o.sched) rec.sched = o.sched; if (o.insulin) rec.insulin = o.insulin; if (kind === 'extra') rec.name = o.name || o.insulin;
+    await logPut(rec); if (kind === 'basal' && (!S.ins.basalTs || now > S.ins.basalTs)) S.ins.basalTs = now;
+    if (kind !== 'extra') setSkip(kind, false);
+    insSync(); await insSave(); return { rec, dup: false };
+  } finally { doseBusy.delete(lock); }
+}
 async function logPut(r) { await Store.put('inslog', r); S.inslog = S.inslog.map(x => x.id === r.id ? r : x).sort((a, b) => a.ts - b.ts); }
 const todayLog = k => S.inslog.filter(x => x.kind === k && x.date === isoDate(new Date()));
 async function logDayClear(k) { for (const r of todayLog(k)) await logDel(r.id); }
@@ -229,6 +248,7 @@ function basalInfo() {
 function basalBanner() {
   if (!alCfg().bBasal) return '';
   const b = basalInfo(); if (!b || b.st === 'ok' || skipped('basal')) return '';
+  if (typeof basalAlertCovered === 'function' && basalAlertCovered()) return ''; /* já há o aviso programado desta aplicação (lembrete de insulina ou alarme do tratamento): um aviso só */
   return `<div class="banner warn"><span><b>Basal.</b> ${b.st === 'over' ? 'Já passaram 24 h desde a última dose de basal.' : `Faltam ${Math.max(1, Math.ceil(b.rem / 60000))} min para completar 24 h da última basal.`}</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
 }
 function preDinner() {
@@ -259,7 +279,7 @@ function remBanner() {
   return r ? `<div class="banner"><span><b>Medição.</b> Ainda sem glicemia ${r.t} hoje (janela ${hhmm(r.a)}–${hhmm(r.b)}).</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="new" data-ctx="${r.ctx}" data-meal="${r.meal}">Registrar</button><button class="btn sm" data-act="rem-off" data-k="${r.key}">Dispensar</button></span></div>` : '';
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const r = remPending(), k = r ? r.key : ''; if (k !== (S._rk || '')) render(); } }, 5000);
-document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el || !el.dataset.k) return; S.remOff[el.dataset.k] = 1; render(); });
+document.addEventListener('click', e => { const el = e.target.closest('[data-act="rem-off"]'); if (!el || !el.dataset.k) return; S.remOff[el.dataset.k] = 1; if (typeof adSave === 'function') adSave(); render(); });
 S.ud = {};
 /* doses memorizadas: última quantidade registrada de cada insulina, independente; só muda quando uma aplicação é registrada */
 const fnU = u => u == null ? '' : String(u).replace('.', ',');
@@ -374,7 +394,7 @@ document.addEventListener('submit', async e => {
     e.preventDefault(); const t = parseTime($('#it-t').value); if (!t) { $('#it-err').textContent = 'Informe um horário válido.'; return; }
     const un = parseUnits($('#it-u').value); if (un === 'bad') { $('#it-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
     const ts = mkTs(isoDate(new Date()), t); if (ts > Date.now() + 60000) { $('#it-err').textContent = 'Esse horário ainda não chegou hoje.'; return; }
-    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } await logDayClear(kk); await logAdd(kk, ts, u2); S.ins[kk] = ts; memSet(kk, u2); setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
+    insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } { const ex = todayLog(kk), keep = ex[ex.length - 1]; if (keep) { for (const o of ex) if (o !== keep) await logDel(o.id); await logPut({ ...keep, ts, date: isoDate(new Date(ts)), units: u2 }); } else await logAdd(kk, ts, u2); } S.ins[kk] = ts; memSet(kk, u2); setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
   } else if (e.target.id === 'ins-log-form') {
     e.preventDefault(); const id = e.target.dataset.id, old = id ? S.inslog.find(x => x.id === id) : null;
     const kind = old ? old.kind : $('#il-k').value, d = $('#il-d').value, t = parseTime($('#il-t').value);

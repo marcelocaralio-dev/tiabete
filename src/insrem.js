@@ -8,12 +8,18 @@ const irNative = () => (typeof window !== 'undefined' && window.TB_IR_NATIVE) ||
 let irAdSig = null;
 const irSave = async () => {
   try { await Store.put('meta', { id: 'ins-rem', value: S.ir }); } catch (e) { }
-  const sg = S.ir.adopted.slice().sort().join(); if (irAdSig !== null && sg !== irAdSig && window.tbPlanSync) window.tbPlanSync(); irAdSig = sg; /* o conjunto de insulinas com lembrete próprio mudou: os alarmes antigos do tratamento saem (sem duplicar) */
+  const sg = irCoverSig(); if (irAdSig !== null && sg !== irAdSig && window.tbPlanSync) window.tbPlanSync(); irAdSig = sg; /* o conjunto de horários com lembrete próprio mudou: os alarmes antigos do tratamento saem (sem duplicar) */
 };
-const irLoad = v => { S.ir = irClean(v, uid); irAdSig = S.ir.adopted.slice().sort().join(); };
+const irLoad = v => { S.ir = irClean(v, uid); irAdSig = irCoverSig(); };
 let irT = null;
 function irSync(ms) { clearTimeout(irT); irT = setTimeout(() => { const n = irNative(); if (n) n.sync(); }, ms == null ? 250 : ms); }
 const irCovers = id => !!(S.ir && S.ir.adopted.includes(id));
+/* Um horário do tratamento é "coberto" quando existe um lembrete de insulina ligado a ele (ligado ou não): só esse lembrete responde por ele.
+   Horários da mesma insulina SEM lembrete próprio continuam com o alarme do tratamento (antes ficavam sem aviso nenhum). */
+const irCoversTime = (itemId, t) => !!(S.ir && S.ir.items.some(r => r.itemId === itemId && (r.src || r.time) === t));
+const irCoverSig = () => S.ir.items.map(r => r.itemId + '@' + (r.src || r.time)).sort().join();
+/* avisos pendentes agora, já descontando o que o histórico de insulinas mostra como aplicado */
+const irDueNow = () => irDue(S.ir, S.plan, Date.now(), S.inslog);
 const irName = r => irNameOf(S.plan, r);
 const irById = id => S.ir.items.find(x => x.id === id);
 const irRepOf = d => { const k = irDays(d).join(); return !k ? 'all' : k === '1,2,3,4,5' ? 'util' : k === '0,6' ? 'fds' : 'custom'; };
@@ -43,16 +49,16 @@ setInterval(() => { try { irTzCheck(); } catch (e) { } }, 60000);
 /* ----- Aviso dentro do app (Início e central de alertas) ----- */
 function irBanner() {
   if (S.route !== 'painel' && !S._acCollect) return '';
-  const l = irDue(S.ir, S.plan, Date.now()); S._irk = l.map(x => x.key).join(',');
+  const l = irDueNow(); S._irk = l.map(x => x.key).join(',');
   return l.slice(0, 3).map(d => {
     const tx = irText(d.r, irName(d.r), d.snoozed), a = `data-id="${esc(d.r.id)}" data-day="${d.day}"`;
-    return `<div class="banner"><span><b>${esc(tx.title)}.</b> ${esc(irName(d.r))} · ${esc(irTipo(d.r))} · <span class="num">${d.r.time}</span>${d.snoozed ? ' (adiado)' : ''}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="ir-confirm" ${a}>Confirmar</button><button class="btn sm" data-act="ir-open" ${a}>Adiar ou ignorar</button></span></div>`;
+    return `<div class="banner" data-occ="${esc(d.occ)}"><span><b>${esc(tx.title)}.</b> ${esc(irName(d.r))} · ${esc(irTipo(d.r))} · <span class="num">${d.r.time}</span>${d.snoozed ? ' (adiado)' : ''}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm pri" data-act="ir-confirm" ${a}>Confirmar</button><button class="btn sm" data-act="ir-open" ${a}>Adiar ou ignorar</button></span></div>`;
   }).join('');
 }
 /* Navegador/PWA: sem servidor só dá para avisar com a página aberta */
 setInterval(() => {
   try {
-    const now = Date.now(), due = irDue(S.ir, S.plan, now);
+    const now = Date.now(), due = irDueNow();
     if (!irNative() && typeof Notification !== 'undefined' && Notification.permission === 'granted') for (const d of due) {
       if (now - d.at > 3 * 60000) continue; const k = d.key + '|' + d.at; if (S._irSeen[k]) continue; S._irSeen[k] = 1;
       const tx = irText(d.r, irName(d.r), d.snoozed);
@@ -72,27 +78,27 @@ function irSheet(r, day) {
   <p class="hint" style="margin:12px 0 0">“Confirmar” registra no histórico só que você informou ter aplicado. A dose não é preenchida: se quiser, informe as unidades depois no histórico. Abrir este aviso não registra nada.</p>`;
 }
 function irNativeClear(r) { const n = irNative(); if (n) n.clear(r.id); irSync(150); }
+/* Confirmar a aplicação (bolha, faixa, notificação do Android). É a MESMA ação lógica de registrar em Meu tratamento: se o histórico já tem essa
+   aplicação (feita em qualquer tela), só reconhece; senão cria exatamente um registro, ligado à ocorrência, e toques repetidos não criam outro. */
 async function irConfirm(rid, day) {
   const r = irById(rid); if (!r) { closeSheet(); toast('Este lembrete não existe mais.'); return false; }
-  day = day || irDueDay(r); const key = irKey(day, rid);
+  day = day || irDueDay(r); const key = irKey(day, rid, r.time), occ = irOccId(key);
   if (S.ir.state[key] === 'done') { closeSheet(); toast('Esta aplicação já foi confirmada.'); return false; }
-  const now = Date.now(), kind = irLogKind(r), name = irName(r); let msg = 'Aplicação confirmada e registrada no histórico. A dose não foi preenchida.';
-  if (kind !== 'basal' && kind !== 'extra' && todayLog(kind).length) msg = 'Esta refeição já tinha uma aplicação registrada hoje. Nada foi duplicado.';
-  else {
-    const rec = await logAdd(kind, now); rec.src = 'lembrete'; rec.status = 'confirmada'; rec.rem = r.id; rec.sched = r.time; rec.insulin = name; if (kind === 'extra') rec.name = name;
-    await logPut(rec); if (kind === 'basal' && (!S.ins.basalTs || now > S.ins.basalTs)) S.ins.basalTs = now;
-    if (typeof setSkip === 'function' && kind !== 'extra') setSkip(kind, false);
-    insSync(); await insSave();
-  }
-  S.ir.state[key] = 'done'; await irSave(); irNativeClear(r); closeSheet(); render(); toast(msg); return true;
+  const have = irMatched(S.ir, S.plan, Date.now(), S.inslog)[occ];
+  if (have) { closeSheet(); render(); toast('Esta aplicação já estava registrada no histórico (' + HM(have.ts) + '). Nada foi duplicado.'); irNativeClear(r); return false; }
+  const name = irName(r), kind = irLogKind(r), res = await doseConfirm({ kind, name, occ, rem: r.id, sched: r.time, insulin: name, src: 'lembrete' });
+  if (res.dup && !res.rec) return false; /* outro toque do mesmo aviso ainda está registrando */
+  S.ir.state[key] = 'done';
+  await irSave(); irNativeClear(r); closeSheet(); render();
+  toast(res.dup ? 'Esta aplicação já estava registrada. Nada foi duplicado.' : 'Aplicação confirmada e registrada no histórico. A dose não foi preenchida.'); return !res.dup;
 }
 async function irSnoozeDo(rid, day, m) {
   const r = irById(rid); if (!r || !IR_SNOOZE.includes(m)) return; day = day || irDueDay(r);
-  S.ir.state[irKey(day, rid)] = { snooze: Date.now() + m * 60000 }; await irSave(); irNativeClear(r); closeSheet(); render(); toast('Lembrete adiado por ' + m + ' minutos.');
+  S.ir.state[irKey(day, rid, r.time)] = { snooze: Date.now() + m * 60000 }; await irSave(); irNativeClear(r); closeSheet(); render(); toast('Lembrete adiado por ' + m + ' minutos.');
 }
 async function irIgnoreDo(rid, day) {
   const r = irById(rid); if (!r) return; day = day || irDueDay(r);
-  S.ir.state[irKey(day, rid)] = 'ignored'; await irSave(); irNativeClear(r); closeSheet(); render(); toast('Lembrete ignorado. Nada foi registrado.');
+  S.ir.state[irKey(day, rid, r.time)] = 'ignored'; await irSave(); irNativeClear(r); closeSheet(); render(); toast('Lembrete ignorado. Nada foi registrado.');
 }
 /* ação tocada na própria notificação do Android (chamada por native/insrem-native.js) */
 async function irNotifAction(actionId, x) {
@@ -228,7 +234,7 @@ document.addEventListener('click', async e => {
     else if (a === 'ir-del') {
       const r = irById(el.dataset.id); if (!r) return;
       if (el.dataset.ask !== '1') { const t0 = el.textContent; el.dataset.ask = '1'; el.textContent = 'Toque de novo para excluir'; setTimeout(() => { if (el.isConnected) { el.dataset.ask = ''; el.textContent = t0; } }, 4000); return; }
-      S.ir.items = S.ir.items.filter(x => x.id !== r.id); for (const k of Object.keys(S.ir.state)) if (k.endsWith('|' + r.id)) delete S.ir.state[k];
+      S.ir.items = S.ir.items.filter(x => x.id !== r.id); for (const k of Object.keys(S.ir.state)) if (irStateRid(k) === r.id) delete S.ir.state[k];
       await irSave(); if (n) n.clear(r.id); irSync(150); closeSheet(); render(); toast('Lembrete excluído.');
     }
     else if (a === 'ir-make') { const c = await irMake(el.dataset.item); if (c) { await irSave(); irSync(150); render(); toast(c + ' lembrete' + (c === 1 ? '' : 's') + ' criado' + (c === 1 ? '' : 's') + '.'); } }

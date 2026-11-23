@@ -105,7 +105,7 @@ function inShortcutsHTML() {
   let remWin = null, planN = 0, irN = 0;
   try { remWin = alCfg().bMiss ? remPending() : null; } catch (e) { }
   try { planN = plPending().length; } catch (e) { }
-  try { irN = irDue(S.ir, S.plan, Date.now()).length; } catch (e) { }
+  try { irN = irDueNow().length; } catch (e) { }
   const list = inShortcuts({ records: S.records, exams: S.exams, now: Date.now(), remWin, planN, irN });
   if (!list.length) return '';
   return `<div class="in-sc" role="group" aria-label="Atalhos">${list.map(x => `<button type="button" class="in-chip" data-act="${x.act}"${x.id ? ` data-id="${esc(x.id)}"` : ''}${x.d ? ` data-d="${esc(x.d)}" data-t="${esc(x.t || '')}"` : ''}${x.ctx ? ` data-ctx="${esc(x.ctx)}"` : ''}${x.meal ? ` data-meal="${esc(x.meal)}"` : ''}>${pnIc(x.icon)}<span><b>${esc(x.label)}</b><small>${esc(x.sub)}</small></span></button>`).join('')}</div>`;

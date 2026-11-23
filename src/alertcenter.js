@@ -25,7 +25,7 @@ const acPos = p => p && isFinite(p.fx) && isFinite(p.fy) ? { fx: p.fx >= .5 ? 1 
 function acLoad(v) {
   v = v || {}; let mode = v.mode === 'bubble' ? 'bubble' : 'classic', pos = acPos(v.pos), hidden = !!v.hidden, ts = +v.ts || 0;
   const m = acMirrorRead(); if (m && m.ts >= ts) { mode = m.mode === 'bubble' ? 'bubble' : 'classic'; pos = acPos(m.pos); hidden = !!m.hidden; ts = m.ts; }
-  S.ac = { mode, pos, hidden, ts, items: (Array.isArray(v.items) ? v.items : []).filter(x => x && x.id && x.key).slice(0, AC_MAX) };
+  S.ac = { mode, pos, hidden, ts, items: (Array.isArray(v.items) ? v.items : []).filter(x => x && x.id && x.key).slice(0, AC_MAX).map(x => { if (x.src !== 'toast' && !OC_STATES[x.st]) { x.st = x.active ? 'pendente' : 'concluido'; x.why = x.why || (x.active ? '' : 'antigo'); } return x; }) };
 }
 /* ----- fontes de alerta: todas as faixas do app, com categoria e prioridade ----- */
 function acSources() {
@@ -44,19 +44,42 @@ function acSources() {
     [...t.content.children].filter(e => e.classList.contains('banner')).forEach(el => {
       const plain = el.cloneNode(true); plain.querySelectorAll('button,[data-hy-next]').forEach(n => n.remove());
       const text = acNorm(plain.textContent), b = plain.querySelector('b'), title = acNorm(b ? b.textContent : '').replace(/^[⚠▲\s]+/, '').replace(/[:.]+$/, '') || AC_CATS[s.cat];
-      live.push({ src: s.src, cat: s.cat, prio: s.prio, title, text, html: el.outerHTML, key: s.src + '|' + (s.by === 'text' ? text : title) });
+      const occ = el.dataset.occ || ''; /* identidade da ocorrência (dia + horário + lembrete): o mesmo aviso mantém o mesmo item, e outro dia/horário é outro item */
+      live.push({ src: s.src, cat: s.cat, prio: s.prio, title, text, occ, html: el.outerHTML, key: s.src + '|' + (occ || (s.by === 'text' ? text : title)) });
     });
   }
   return live;
 }
-/* ----- gestão: fila, deduplicação, histórico ----- */
+/* ----- gestão: fila, ciclo de vida, histórico -----
+   Cada item da bolha segue os estados programado → pendente → exibido → concluído | ignorado | cancelado | desativado | expirado (alertstate-core.js).
+   O estado final de um item é decidido por um resolvedor que olha as MESMAS fontes do app (lembrete, tratamento, histórico de insulinas, configurações);
+   a bolha nunca inventa nem guarda uma versão própria do fato. Estado final não volta: concluído não vira pendente, cancelado não reaparece. */
+const AC_SW = { basal: 'bBasal', jantar: 'bPre', rem: 'bMiss', hipo: 'bHypo', hiper: 'bHyper', conq: 'rewards', bkp: 'backup', plano: 'plan' }; /* fonte → chave que o usuário liga/desliga em Alertas e lembretes */
+function acResolve(it, now) {
+  try {
+    if (it.occ) {
+      const r = it.src === 'insrem' ? irOccStatus(S.ir, S.plan, it.occ, now, S.inslog) : it.src === 'plano' ? plOccStatus(it.occ, now) : it.src === 'ca' ? caOccStatus(it.occ, now) : null;
+      if (r) return r.st === 'pendente' || r.st === 'exibido' ? { st: 'programado', why: 'oculto' } : r;
+    }
+  } catch (e) { console.error(e); }
+  const sw = AC_SW[it.src]; if (sw && !alCfg()[sw]) return { st: 'desativado', why: 'config' };
+  return { st: 'concluido', why: 'resolvido' };
+}
+function acEnd(it, res) { it.active = false; it.html = null; ocMove(it, res.st, res.why); if (ocIsFinal(it.st)) it.read = true; it.endTs = Date.now(); }
 function acUpsert(live) {
   const now = Date.now(), fresh = []; let dirty = false, seen = new Set(live.map(x => x.key));
-  for (const it of S.ac.items) if (it.active && !seen.has(it.key)) { it.active = false; it.html = null; dirty = true; }
+  for (const it of S.ac.items) if (it.active && !seen.has(it.key)) { acEnd(it, acResolve(it, now)); dirty = true; }
   for (const L of live) {
-    const it = S.ac.items.find(x => x.key === L.key && x.active);
-    if (it) { it.html = L.html; if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } }
-    else { const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html }; S.ac.items.unshift(n); fresh.push(n); dirty = true; }
+    const it = S.ac.items.find(x => x.key === L.key && (x.active || x.occ));
+    if (it && !it.active) { /* item de uma ocorrência que já existiu (adiada, ou terminada) */
+      if (it.st === 'concluido') { if (!ocMove(it, 'pendente', 'desfeito')) continue; } /* só volta se foi o registro que a concluiu e ele foi apagado/editado */
+      else if (ocIsFinal(it.st)) continue; /* cancelado, desativado, ignorado, expirado: não reaparece */
+      else ocMove(it, 'pendente');
+      Object.assign(it, { active: true, read: false, dismissed: false, html: L.html, text: L.text, title: L.title, rev: (it.rev || 0) + 1 }); fresh.push(it); dirty = true; continue;
+    }
+    if (it) { it.html = L.html; if (it.st === 'programado') { ocMove(it, 'pendente'); dirty = true; } if (it.text !== L.text) { it.text = L.text; it.rev = (it.rev || 0) + 1; dirty = true; } continue; }
+    const n = { id: uid(), key: L.key, src: L.src, cat: L.cat, prio: L.prio, title: L.title, text: L.text, ts: now, read: false, dismissed: false, active: true, rev: 0, html: L.html, st: 'pendente', why: '' }; if (L.occ) n.occ = L.occ;
+    S.ac.items.unshift(n); fresh.push(n); dirty = true;
   }
   if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX;
   if (dirty) acSave();
@@ -74,13 +97,16 @@ function acToast(msg, cat) {
   S.ac.hidden = false; acPop(it, prio === 0 ? 3500 : 9000); return true;
 }
 function acSync() {
+  if (!S.irReady) return; /* antes de as configurações serem lidas do banco tudo pareceria desativado/cancelado: não resolve nada */
   let live = []; try { live = acSources(); } catch (e) { }
   const fresh = acUpsert(live);
   if (acBubbleOn() && fresh.length) { const f = fresh.filter(x => !x.dismissed).sort((a, b) => b.prio - a.prio)[0]; if (f) { S.ac.hidden = false; acPop(f); } }
   acRefresh();
 }
-const acList = () => S.ac.items.filter(x => !x.dismissed).sort((a, b) => (a.read - b.read) || (b.prio - a.prio) || (b.ts - a.ts));
-const acUnread = () => S.ac.items.filter(x => !x.dismissed && !x.read && (x.active || x.src !== 'toast')).length;
+/* A bolha só mostra o que está valendo agora (alerta ativo) e as confirmações recentes. Alerta já concluído, cancelado, desativado ou expirado fica só no histórico. */
+const acLiveItem = x => x.src === 'toast' || (x.active && !!x.html);
+const acList = () => S.ac.items.filter(x => !x.dismissed && acLiveItem(x)).sort((a, b) => (a.read - b.read) || (b.prio - a.prio) || (b.ts - a.ts));
+const acUnread = () => S.ac.items.filter(x => !x.dismissed && !x.read && x.active && x.html).length;
 function acSetState(id, patch) { const it = S.ac.items.find(x => x.id === id); if (!it) return; Object.assign(it, patch); acSave(); acRefresh(); }
 /* ----- elementos da bolha ----- */
 const AC_DROP = `<svg viewBox="-5.5 -2.5 111 111" width="30" height="30" aria-hidden="true"><defs><linearGradient id="acg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF5A66"/><stop offset="1" stop-color="#E0182B"/></linearGradient><mask id="acm" maskUnits="userSpaceOnUse" x="-6" y="-3" width="112" height="112"><rect x="-6" y="-3" width="112" height="112" fill="#fff"/><path d="M30 66 A20 20 0 0 0 46 85" fill="none" stroke="#000" stroke-width="5.5" stroke-linecap="round"/></mask></defs><path mask="url(#acm)" d="M50 4 C50 4 14 44 14 66 A36 36 0 0 0 86 66 C86 44 50 4 50 4 Z" fill="url(#acg)"/></svg>`;
@@ -184,7 +210,7 @@ function acDismiss(ids) {
 }
 function acPop(it, ms) {
   acEnsure(); const b = document.getElementById('acb'); if (!b) return;
-  S.ac.hidden = false; AC.id = it ? it.id : null; AC.confirm = false; AC.only = it && it.src === 'toast' && it.prio === 0 ? it.id : null; acOpen((ms || (it && it.prio >= 3 ? 14000 : 8000)) + (it ? Math.min(9000, acMsg(it).length * 35) : 0)); /* mensagens longas ficam mais tempo abertas */
+  if (it && it.active) ocMove(it, 'exibido'); S.ac.hidden = false; AC.id = it ? it.id : null; AC.confirm = false; AC.only = it && it.src === 'toast' && it.prio === 0 ? it.id : null; acOpen((ms || (it && it.prio >= 3 ? 14000 : 8000)) + (it ? Math.min(9000, acMsg(it).length * 35) : 0)); /* mensagens longas ficam mais tempo abertas */
 }
 function acOpen(ms) {
   const b = document.getElementById('acb'), p = document.getElementById('acp'); if (!b || !p || b.hidden && !acBubbleOn()) return;
@@ -270,7 +296,7 @@ function viewAlertasHist() {
     const d = new Date(x.ts), ds = isoDate(d); if (ds !== day) { day = ds; h += `<h2 class="sec">${ds === isoDate(new Date()) ? 'Hoje' : fmtDate(ds)}</h2>`; }
     h += `<div class="card ac-it${x.read || x.dismissed ? ' read' : ''}" data-tone="${x.prio >= 3 ? 'neg' : x.prio === 2 ? 'warn' : x.prio === 1 ? 'brand' : 'neu'}"><div class="row sp" style="gap:8px;align-items:flex-start"><div style="min-width:0"><span class="atag">${esc(AC_CATS[x.cat] || 'Alerta')}</span> <span class="atag">${AC_PRIO[x.prio] || ''}</span></div><span class="dim num" style="white-space:nowrap">${pad(d.getHours())}:${pad(d.getMinutes())}${x.n > 1 ? ' · ' + x.n + 'x' : ''}</span></div>
     <div class="ac-tt">${esc(x.title)}</div><div class="ac-tx">${esc(x.text)}</div>
-    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${x.active && !x.dismissed ? '<span class="atag on">Ativo agora</span>' : ''}${!x.read && !x.dismissed ? '<span class="atag">Não lido</span>' : ''}${x.dismissed ? '<span class="atag">Dispensado</span>' : ''}<span style="flex:1"></span>${!x.read && !x.dismissed ? `<button class="btn sm" data-acid="read" data-id="${x.id}">Marcar como lido</button>` : ''}${x.dismissed ? `<button class="btn sm" data-acid="restore" data-id="${x.id}">Restaurar</button>` : `<button class="btn sm" data-acid="dismiss" data-id="${x.id}">Dispensar</button>`}</div></div>`;
+    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${x.active && !x.dismissed ? '<span class="atag on">Ativo agora</span>' : ''}${!x.active && x.src !== 'toast' && OC_STATES[x.st] ? `<span class="atag">${OC_STATES[x.st]}</span>` : ''}${!x.read && !x.dismissed ? '<span class="atag">Não lido</span>' : ''}${x.dismissed ? '<span class="atag">Dispensado</span>' : ''}<span style="flex:1"></span>${!x.read && !x.dismissed ? `<button class="btn sm" data-acid="read" data-id="${x.id}">Marcar como lido</button>` : ''}${x.dismissed ? `<button class="btn sm" data-acid="restore" data-id="${x.id}">Restaurar</button>` : `<button class="btn sm" data-acid="dismiss" data-id="${x.id}">Dispensar</button>`}</div></div>`;
   }
   return h;
 }
@@ -281,6 +307,22 @@ document.addEventListener('click', e => {
   el = e.target.closest('[data-acid]'); if (el) { const a = el.dataset.acid; acSetState(el.dataset.id, a === 'read' ? { read: true } : a === 'dismiss' ? { dismissed: true, read: true } : { dismissed: false }); render(); }
 });
 setInterval(() => { try { acSync(); } catch (e) { } }, 5000);
+/* Observador único das fontes de alerta: qualquer gravação no histórico de insulinas, no tratamento, nos lembretes de insulina, nos alertas
+   personalizados ou nas configurações de alertas atualiza na hora a bolha e refaz os agendamentos nativos (sem esperar o ciclo de 5 s). */
+const AL_META = ['plan', 'ins-rem', 'alerts', 'custom-alerts', 'alert-day', 'insulin'];
+let alKickT = null;
+function alKick() { clearTimeout(alKickT); alKickT = setTimeout(() => { try { acSync(); } catch (e) { } try { irSync(120); } catch (e) { } try { if (window.tbPlanSync) window.tbPlanSync(); } catch (e) { } }, 40); }
+{
+  const wrap = (name, test) => { const f = Store[name]; if (typeof f !== 'function') return; Store[name] = function (st, v) { const r = f.apply(this, arguments); if (test(st, v)) Promise.resolve(r).then(alKick, alKick); return r; }; };
+  wrap('put', (st, v) => st === 'inslog' || (st === 'meta' && v && AL_META.includes(v.id))); wrap('del', st => st === 'inslog'); wrap('putMany', st => st === 'inslog'); wrap('delMany', st => st === 'inslog');
+}
+/* O registro que concluía um aviso foi apagado: o aviso volta a valer (só enquanto estiver na janela). Única volta de um "concluído"; nasce de uma ação explícita do usuário. */
+async function alUndoOcc(occ) {
+  const p = ocParse(occ); if (!p) return;
+  for (const it of S.ac.items) if (it.occ === occ && it.st === 'concluido') it.why = 'registro'; /* a conclusão dependia deste registro */
+  if (p.src === 'ir') { const k = irKey(p.day, p.id, p.time); if (S.ir.state[k] === 'done') { delete S.ir.state[k]; await irSave(); } }
+  else if (p.src === 'pl') { plDoneRoll(); const k = p.id + '@' + p.time; if (S.planDone.day === p.day && S.planDone.map[k] === 1) { delete S.planDone.map[k]; await adSave(); } }
+}
 (function () { const _l = loadAll; loadAll = async function () { const r = await _l.apply(this, arguments); try { acSync(); } catch (e) { } return r; }; })();
 /* logotipo -> Painel (sem recarregar; não mexe em dados) */
 (function () { const go2 = () => { if (S.route === 'painel') window.scrollTo(0, 0); else go('painel'); }; document.addEventListener('click', e => { if (e.target.closest('#logo-home')) go2(); }); document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.id === 'logo-home') { e.preventDefault(); go2(); } }); })();

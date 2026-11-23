@@ -49,7 +49,7 @@ function plQuietAt(t) { const c = alCfg(); if (!c.plQuiet || !c.quiet) return fa
 /* Lista única de lembretes do tratamento: só o que a pessoa cadastrou (item, horário, dias). all=true inclui os desligados. */
 function plCollect(all) {
   const p = S.plan, out = [];
-  const add = (sec, items, on) => { if (on) items.forEach(it => { if (sec === 'Insulina' && typeof irCovers === 'function' && irCovers(it.id)) return; if (all || it.alarm) it.times.forEach(t => { if (!plTime(t)) return; const off = !it.alarm || (it.off || []).includes(t); if (off && !all) return; out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id, dose: it.dose || '', days: it.days || [], off, secKey: sec === 'Insulina' ? 'insulin' : sec === 'Remédio' ? 'meds' : 'checks' }); }); }); };
+  const add = (sec, items, on) => { if (on) items.forEach(it => { if (all || it.alarm) it.times.forEach(t => { if (!plTime(t)) return; if (sec === 'Insulina' && typeof irCoversTime === 'function' && irCoversTime(it.id, t)) return; /* este horário já tem lembrete de insulina próprio: só ele responde */ const off = !it.alarm || (it.off || []).includes(t); if (off && !all) return; out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id, dose: it.dose || '', days: it.days || [], off, secKey: sec === 'Insulina' ? 'insulin' : sec === 'Remédio' ? 'meds' : 'checks' }); }); }); };
   add('Insulina', p.insulin, p.types.includes('insulina')); add('Medicamento', p.meds, p.types.includes('remedios')); add('Medição', p.checks, true);
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
@@ -60,14 +60,50 @@ function planAlarms(day) {
   if (p.types.includes('bomba') && p.pump.alarm && p.pump.lastChange) { const due = isoDate(new Date(addDays(mkTs(p.pump.lastChange, '12:00'), p.pump.siteDays))); if (day >= due) out.push({ key: 'pump@' + due, time: p.pump.siteTime, label: 'Trocar o cateter da bomba', sec: 'Bomba', pump: true }); }
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
-function plDoneRoll() { const d = isoDate(new Date()); if (S.planDone.day !== d) S.planDone = { day: d, map: {} }; }
+/* Estado do dia dos avisos, gravado no banco (antes ficava só na memória e voltava ao abrir o app): "Feito" e adiamento do tratamento, "Dispensar" da medição. */
+async function adSave() { if (!S.adReady) return; try { await Store.put('meta', { id: 'alert-day', value: { day: S.planDone.day, plan: S.planDone.map, rem: S.remOff } }); } catch (e) { } }
+function adLoad(v) {
+  if (!v || typeof v !== 'object') return; const d = isoDate(new Date());
+  if (v.day === d && v.plan && typeof v.plan === 'object') { const m = {}; for (const [k, x] of Object.entries(v.plan)) if (x === 1 || (typeof x === 'number' && isFinite(x))) m[k] = x; S.planDone = { day: d, map: m }; }
+  if (v.rem && typeof v.rem === 'object') for (const k of Object.keys(v.rem)) if (k.startsWith(d)) S.remOff[k] = 1;
+}
+function plDoneRoll() { const d = isoDate(new Date()); if (S.planDone.day !== d) { S.planDone = { day: d, map: {} }; S.remOff = {}; adSave(); } }
+const plOccId = (day, key) => 'pl:' + day + '|' + key;
+const plItemOf = a => (S.plan.insulin || []).find(x => x.id === a.itemId);
+const plAlarmKind = a => { const it = plItemOf(a); return it ? ocDoseKind(it.role, it.name, a.time) : 'extra'; };
+/* alarmes de insulina de hoje que o histórico de insulinas já mostra como aplicados: { 'pl:dia|chave': registro } */
+function plInsMatched(day) {
+  day = day || isoDate(new Date()); const occs = planAlarms(day).filter(a => a.sec === 'Insulina').map(a => ({ key: plOccId(day, a.key), day, at: mkTs(day, a.time), kind: plAlarmKind(a), name: (plItemOf(a) || {}).name }));
+  return occs.length ? ocMatchLogs(occs, S.inslog, 120 * 60000) : {};
+}
 function plPending() {
-  if (!alCfg().plan) return []; plDoneRoll(); const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
-  return planAlarms().filter(a => { const [h, mi] = a.time.split(':').map(Number), mm = h * 60 + mi, st = S.planDone.map[a.key]; if (st === 1) return false; if (typeof st === 'number' && st > Date.now()) return false; if (a.sec === 'Medição' && plCheckDone(a.time)) return false; return m >= mm && (a.pump || m < mm + 120); });
+  if (!alCfg().plan) return []; plDoneRoll(); const now = new Date(), m = now.getHours() * 60 + now.getMinutes(), day = isoDate(now), mt = plInsMatched(day);
+  return planAlarms().filter(a => { const [h, mi] = a.time.split(':').map(Number), mm = h * 60 + mi, st = S.planDone.map[a.key]; if (st === 1) return false; if (typeof st === 'number' && st > Date.now()) return false; if (a.sec === 'Medição' && plCheckDone(a.time)) return false; if (a.sec === 'Insulina' && mt[plOccId(day, a.key)]) return false; return m >= mm && (a.pump || m < mm + 120); });
+}
+/* Estado de uma ocorrência do tratamento (id "pl:dia|item@HH:MM"), calculado do que está gravado */
+function plOccStatus(occ, now) {
+  const p = ocParse(occ); if (!p || p.src !== 'pl' || !p.time) return { st: 'cancelado', why: 'invalido' }; now = now || Date.now();
+  let it = null, sec = ''; for (const k of ['insulin', 'meds', 'checks']) { const f = (S.plan[k] || []).find(x => x.id === p.id); if (f) { it = f; sec = k; break; } }
+  if (!it) return { st: 'cancelado', why: 'excluido' };
+  if (!alCfg().plan || (sec === 'insulin' && !S.plan.types.includes('insulina')) || (sec === 'meds' && !S.plan.types.includes('remedios'))) return { st: 'desativado', why: 'config' };
+  if (!it.times.includes(p.time)) return { st: 'cancelado', why: 'horario' };
+  if (!it.alarm || (it.off || []).includes(p.time)) return { st: 'desativado', why: 'config' };
+  if (sec === 'insulin' && typeof irCoversTime === 'function' && irCoversTime(it.id, p.time)) return { st: 'cancelado', why: 'substituido' };
+  if (it.days.length && !it.days.includes(new Date(mkTs(p.day, '12:00')).getDay())) return { st: 'cancelado', why: 'dia' };
+  const key = p.id + '@' + p.time; plDoneRoll();
+  if (S.planDone.day === p.day) { const st = S.planDone.map[key]; if (st === 1) return { st: 'concluido', why: 'confirmado' }; if (typeof st === 'number' && st > now) return { st: 'programado', why: 'adiado' }; }
+  if (sec === 'checks' && p.day === isoDate(new Date(now)) && plCheckDone(p.time)) return { st: 'concluido', why: 'registro' };
+  if (sec === 'insulin' && plInsMatched(p.day)[occ]) return { st: 'concluido', why: 'registro' };
+  const at = mkTs(p.day, p.time); if (now >= at + 120 * 60000) return { st: 'expirado', why: 'janela' };
+  return now < at ? { st: 'programado', why: '' } : { st: 'pendente', why: '' };
+}
+/* Já existe aviso programado da basal (lembrete de insulina ou alarme do tratamento)? Então o aviso genérico de "24 h desde a última basal" não repete a mesma coisa. */
+function basalAlertCovered() {
+  try { if (irDueNow().some(d => d.r.type === 'basal')) return true; return plPending().some(a => a.sec === 'Insulina' && plAlarmKind(a) === 'basal'); } catch (e) { return false; }
 }
 function planBanner() {
-  if (S.route !== 'painel' && !S._acCollect) return ''; const l = plPending(); S._pk = l.map(x => x.key).join(',');
-  return l.slice(0, 3).map(a => `<div class="banner"><span><b>${a.sec === 'Medição' ? 'Medir.' : 'Hora do tratamento.'}</b> ${esc(a.label)} · <span class="num">${a.time}</span></span><span class="row" style="gap:6px;flex-wrap:nowrap">${a.sec === 'Medição' ? `<button class="btn sm pri" data-act="new">Registrar</button>` : ''}<button class="btn sm ${a.sec === 'Medição' ? '' : 'pri'}" data-act="pl-done" data-k="${esc(a.key)}">Feito</button><button class="btn sm" data-act="pl-snooze" data-k="${esc(a.key)}">+10 min</button></span></div>`).join('');
+  if (S.route !== 'painel' && !S._acCollect) return ''; const l = plPending(); S._pk = l.map(x => x.key).join(','); const day = isoDate(new Date());
+  return l.slice(0, 3).map(a => `<div class="banner"${a.pump ? '' : ` data-occ="${esc(plOccId(day, a.key))}"`}><span><b>${a.sec === 'Medição' ? 'Medir.' : 'Hora do tratamento.'}</b> ${esc(a.label)} · <span class="num">${a.time}</span></span><span class="row" style="gap:6px;flex-wrap:nowrap">${a.sec === 'Medição' ? `<button class="btn sm pri" data-act="new">Registrar</button>` : ''}<button class="btn sm ${a.sec === 'Medição' ? '' : 'pri'}" data-act="pl-done" data-k="${esc(a.key)}">Feito</button><button class="btn sm" data-act="pl-snooze" data-k="${esc(a.key)}">+10 min</button></span></div>`).join('');
 }
 setInterval(() => { if (S.route === 'painel' && !document.getElementById('sheet-bg')) { const k = plPending().map(x => x.key).join(','); if (k !== (S._pk || '')) render(); } }, 30000);
 
@@ -93,7 +129,7 @@ function plItemHTML(sec, it) {
     ${sec === 'insulin' ? `<div class="field full"><label class="fl">Unidades por aplicação (Ui) · gire para escolher</label>${uipHTML({ id: 'pl-du-' + it.id, value: plDoseUi(it.dose), label: 'Unidades por aplicação' })}</div>` : ''}${sec === 'checks' ? '' : `<div class="field full"><label class="fl" for="pl-d-${it.id}">Dose indicada pela equipe</label><input class="in" id="pl-d-${it.id}" data-pl="dose" value="${esc(it.dose)}" maxlength="120" placeholder="Ex.: 1 comprimido · 10 Ui (como a equipe indicou)"></div>`}
     <div class="field full"><label class="fl" for="pl-o-${it.id}">Observações</label><input class="in" id="pl-o-${it.id}" data-pl="notes" value="${esc(it.notes)}" maxlength="200" placeholder="Ex.: junto com o almoço"></div></div>
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-pl="alarm" ${it.alarm ? 'checked' : ''} ${n ? '' : 'disabled'}><span><b>Alarme nestes horários</b><small>${n ? 'Faixa no Início (e notificação no aplicativo Android) na hora marcada.' : 'Defina horários para poder ligar o alarme.'}</small></span></label>
-    ${sec === 'insulin' && typeof irCovers === 'function' && irCovers(it.id) ? '<p class="hint" style="margin:8px 0 0">Os avisos desta insulina são feitos em <b>Lembretes de insulina</b> (com confirmação da aplicação), por isso não aparecem na lista de lembretes do tratamento.</p><button class="btn sm" style="margin-top:8px" data-act="go" data-r="insrem">Abrir Lembretes de insulina</button>' : ''}
+    ${sec === 'insulin' && typeof irCoversTime === 'function' && it.times.some(t => irCoversTime(it.id, t)) ? '<p class="hint" style="margin:8px 0 0">Os avisos dos horários desta insulina que têm lembrete próprio são feitos em <b>Lembretes de insulina</b> (com confirmação da aplicação), por isso não aparecem na lista de lembretes do tratamento.</p><button class="btn sm" style="margin-top:8px" data-act="go" data-r="insrem">Abrir Lembretes de insulina</button>' : ''}
     <button class="btn full danger" style="margin-top:10px" data-act="pl-del" data-id="${it.id}" data-sec="${sec}">Remover da lista</button></div></details>`;
 }
 function plListCard(sec, title, hint, addLabel) {
@@ -243,8 +279,19 @@ document.addEventListener('click', async e => {
       S.plan = { ...S.plan, types: pre.types.slice(), insulin: pre.insulin.map(x => plItem0(x)), meds: pre.meds.map(x => plItem0(x)), checks: pre.checks.map(x => plItem0(x)) };
       await plSave(); render(); toast('Modelo aplicado. Edite como precisar.');
     }
-    else if (a === 'pl-done') { plDoneRoll(); S.planDone.map[el.dataset.k] = 1; if (el.dataset.k.startsWith('pump@')) { S.plan.pump.lastChange = isoDate(new Date()); await plSave(); } render(); }
-    else if (a === 'pl-snooze') { plDoneRoll(); S.planDone.map[el.dataset.k] = Date.now() + 10 * 60000; render(); toast('Aviso adiado por 10 minutos.'); }
+    else if (a === 'pl-done') {
+      plDoneRoll(); const k = el.dataset.k, day = S.planDone.day;
+      if (k.startsWith('pump@')) { S.planDone.map[k] = 1; S.plan.pump.lastChange = isoDate(new Date()); await plSave(); await adSave(); render(); return; }
+      const al = planAlarms(day).find(x => x.key === k);
+      if (al && al.sec === 'Insulina') { /* "Feito" numa insulina é registrar a aplicação: a mesma ação de Meu tratamento (um único registro, sem duplicar) */
+        const it = plItemOf(al), occ = plOccId(day, k);
+        if (plInsMatched(day)[occ]) { render(); toast('Esta aplicação já estava registrada no histórico. Nada foi duplicado.'); return; }
+        const res = await doseConfirm({ kind: plAlarmKind(al), name: it && it.name, occ, insulin: it && it.name, sched: al.time, src: 'tratamento' }); if (res.dup && !res.rec) return;
+        toast(res.dup ? 'Esta aplicação já estava registrada. Nada foi duplicado.' : 'Aplicação registrada no histórico. A dose não foi preenchida.');
+      }
+      S.planDone.map[k] = 1; await adSave(); render();
+    }
+    else if (a === 'pl-snooze') { plDoneRoll(); S.planDone.map[el.dataset.k] = Date.now() + 10 * 60000; await adSave(); render(); toast('Aviso adiado por 10 minutos.'); }
     else if (a === 'pl-pump-now') { S.plan.pump.lastChange = isoDate(new Date()); await plSave(); render(); toast('Troca registrada.'); }
   } catch (err) { console.error(err); toast('Algo deu errado: ' + (err && err.message || err)); }
 });
@@ -334,6 +381,6 @@ function treatmentCard() {
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act="pl-tgl"],[data-act="pl-settype"]'); if (!el) return;
-  if (el.dataset.act === 'pl-tgl') { plDoneRoll(); const k = el.dataset.k; if (S.planDone.map[k] === 1) delete S.planDone.map[k]; else S.planDone.map[k] = 1; render(); }
+  if (el.dataset.act === 'pl-tgl') { plDoneRoll(); const k = el.dataset.k; if (S.planDone.map[k] === 1) delete S.planDone.map[k]; else S.planDone.map[k] = 1; await adSave(); render(); }
   else { const k = el.dataset.k; if (!S.plan.types.includes(k)) S.plan.types.push(k); await plSave(); render(); }
 });

@@ -29,7 +29,8 @@
   try { const pm = (await Store.all('meta')).find(x => x.id === 'plan'); if (pm) plLoad(pm.value); else if (S.inslog.length || S.ins.basalTs) { S.plan.types = ['insulina']; await plSave(); } } catch (e) { }
   try { const im = (await Store.all('meta')).find(x => x.id === 'ins-rem'); if (im) irLoad(im.value); const rr = irReconcile(S.ir, S.plan), pr = irPrune(S.ir, Date.now()); if (rr.changed || pr) await irSave(); irTzCheck(); } catch (e) { console.error(e); }
   try { const mc = (await Store.all('meta')).find(x => x.id === 'metrics-cfg'); if (mc && typeof mtLoadCfg === 'function') mtLoadCfg(mc.value); } catch (e) { }
-  S.irReady = true;
+  try { const ad = (await Store.all('meta')).find(x => x.id === 'alert-day'); if (ad) adLoad(ad.value); } catch (e) { }
+  S.adReady = true; S.irReady = true; try { acSync(); } catch (e) { }
   try { if (typeof tbCfgReady === 'function') tbCfgReady(); } catch (e) { }
   try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0 }); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }

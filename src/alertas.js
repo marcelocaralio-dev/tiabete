@@ -28,7 +28,16 @@ setInterval(caTick, 30000);
 (function () { const _l = loadAll; loadAll = async function () { const r = await _l.apply(this, arguments); caSync(); caTick(); return r; }; })();
 function caBanner() {
   if (S.route !== 'painel' && !S._acCollect) return '';
-  return caDue().slice(0, 2).map(x => `<div class="banner"><span><b>${esc(x.name)}.</b> ${esc(x.body)}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="go" data-r="alertasp">Ver</button><button class="btn sm pri" data-act="ca-ok" data-key="${esc(x.key)}">Entendi</button></span></div>`).join('');
+  return caDue().slice(0, 2).map(x => `<div class="banner" data-occ="${esc('ca:' + x.key)}"><span><b>${esc(x.name)}.</b> ${esc(x.body)}</span><span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm" data-act="go" data-r="alertasp">Ver</button><button class="btn sm pri" data-act="ca-ok" data-key="${esc(x.key)}">Entendi</button></span></div>`).join('');
+}
+/* Estado de uma ocorrência de alerta personalizado (id "ca:regra|minuto") para a bolha */
+function caOccStatus(occ, now) {
+  const key = String(occ).replace(/^ca:/, ''), [rid, mn] = key.split('|'), r = S.ca.rules.find(x => x.id === rid);
+  if (!r) return { st: 'cancelado', why: 'excluido' }; if (!r.on) return { st: 'desativado', why: 'config' };
+  if (S.ca.state.dis[key]) return { st: 'concluido', why: 'confirmado' };
+  const at = (+mn || 0) * 60000; if (now - at >= 3 * 3600e3) return { st: 'expirado', why: 'janela' };
+  if (!S._caList.some(x => x.key === key)) return { st: 'cancelado', why: 'condicao' }; /* o registro que disparava o aviso foi apagado ou editado */
+  return now < at ? { st: 'programado', why: '' } : { st: 'pendente', why: '' };
 }
 /* ----- texto das regras ----- */
 const CA_FREQ = { each: 'A cada vez que acontecer', daily: 'No máximo uma vez por dia', once: 'Uma única vez' };
