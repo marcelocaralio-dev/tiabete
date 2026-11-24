@@ -573,7 +573,7 @@ function schemeStats(sc) {
   return { ...st, days, perDay: st.n / days, recs };
 }
 function viewEsquemas() {
-  let h = banners() + planCards() + `<h2 class="sec">Esquemas anteriores e comparação</h2><p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha no registro). O app só compara resultados: não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
+  let h = banners() + planCards() + `<h2 class="sec">Esquemas anteriores e comparação</h2>${trVigenteCard()}<p class="hint" style="margin:0 0 12px">Cadastre cada esquema com suas datas. As medições entram no esquema pelo período de uso (ou pela escolha no registro). O app só compara resultados: não recomenda mudanças.</p><button class="btn pri full" data-act="sch-new">Novo esquema</button>`;
   if (!S.schemes.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Nenhum esquema', 'Cadastre o esquema atual e os anteriores para poder compará-los.')}</div>`;
   h += `<h2 class="sec">Esquemas cadastrados</h2><div class="gx-sch-list">` + [...S.schemes].reverse().map(x => {
     const act = !x.end || x.end >= isoDate(new Date()), ss = schemeStats(x);
@@ -585,6 +585,15 @@ function viewEsquemas() {
   const rows = S.schemes.map(sc => ({ sc, ...schemeStats(sc) }));
   h += `<h2 class="sec">Comparação de resultados</h2>`;
   { const withN = rows.filter(r => r.n > 0); if (withN.length >= 2) { const cur = withN[withN.length - 1], prv = withN[withN.length - 2]; h += TBCards.d([{ label: cur.sc.name, period: `${cur.n} medições`, value: fm(cur.mean), unit: 'mg/dL' }, { label: prv.sc.name, period: `${prv.n} medições`, value: fm(prv.mean), unit: 'mg/dL' }], `Média: <b>${fsign(cur.mean - prv.mean)} mg/dL</b> · &lt;70: ${cur.hypo} × ${prv.hypo} · acima: ${cur.hyper} × ${prv.hyper}. Só descreve; não indica qual esquema é melhor.`) + `<div style="height:10px"></div>`; } }
+  { const cm = trCompare(rows), mx = Math.max(1, ...cm.map(c => c.mean || 0));
+    h += `<div class="card"><div class="stack" style="gap:12px">` + rows.map((r, i) => { const c = cm[i];
+      return `<div class="tc-cmp"><div class="row" style="justify-content:space-between;gap:8px"><b>${esc(r.sc.name)}</b><span class="dim num">${fmtDM(mkTs(r.sc.start, '00:00'))}${r.sc.end ? '–' + fmtDM(mkTs(r.sc.end, '00:00')) : ' → hoje'}</span></div>
+      ${c.n ? `<div class="tc-bar2" role="img" aria-label="Média ${fm(c.mean)} mg/dL"><span style="width:${(c.mean / mx * 100).toFixed(0)}%"></span></div>` : ''}
+      <div class="tc-cg"><div><b class="num">${c.days}</b><small>dias</small></div><div><b class="num">${c.n}</b><small>medições</small></div><div><b class="num">${c.n ? fn(c.perDay, 1) : '—'}</b><small>por dia</small></div><div><b class="num">${c.n ? fm(c.mean) : '—'}</b><small>média mg/dL</small></div>
+      <div><b class="num">${c.hypo}</b><small>&lt;70${c.n ? ' · ' + c.hypoPct.toFixed(0) + '%' : ''}</small></div><div><b class="num">${c.hyper}</b><small>acima${c.n ? ' · ' + c.hyperPct.toFixed(0) + '%' : ''}</small></div></div>
+      ${c.n ? `<div class="hint" style="margin:6px 0 0">≈ ${fn(c.hypoPer30, 1)} hipoglicemias e ≈ ${fn(c.hyperPer30, 1)} leituras acima da faixa a cada 30 dias.</div>` : '<div class="hint" style="margin:6px 0 0">Sem medições neste período: não há dados para comparar.</div>'}
+      ${c.n && (c.few || c.short) ? `<div class="hint tc-warn" style="margin:4px 0 0">${c.few ? 'Poucas medições (menos de 20)' : ''}${c.few && c.short ? ' e ' : ''}${c.short ? 'período curto (menos de 14 dias)' : ''}: leia com cautela.</div>` : ''}</div>`; }).join('') +
+    `</div><p class="hint">Comparação descritiva. As diferenças podem vir de alimentação, rotina, quantidade de medições e duração do período, não só do esquema; o app não afirma que um esquema causou melhora ou piora. Leve estes dados à sua equipe de saúde.</p></div>`; }
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>Esquema</th><th>Dias</th><th>n</th><th>Média</th><th>&lt;70</th><th>Acima</th></tr></thead><tbody>` +
     rows.map(r => `<tr><td>${esc(r.sc.name)}<small>${fmtDM(mkTs(r.sc.start, '00:00'))}${r.sc.end ? '–' + fmtDM(mkTs(r.sc.end, '00:00')) : ' → hoje'}</small></td><td>${r.days}</td><td>${r.n}${r.n < 20 ? '<small>poucas</small>' : `<small>${fn(r.perDay, 1)}/dia</small>`}</td><td>${fm(r.mean)}</td><td>${r.hypo}<small>${r.n ? (r.hypo / r.n * 100).toFixed(0) + '%' : '—'}</small></td><td>${r.hyper}<small>${r.n ? (r.hyper / r.n * 100).toFixed(0) + '%' : '—'}</small></td></tr>`).join('') +
     `</tbody></table></div><p class="hint">Comparação descritiva. As diferenças podem vir de alimentação, rotina e quantidade de medições, não só do esquema. Esquemas com menos de 20 medições aparecem como "poucas". Leve estes dados à sua equipe de saúde.</p></div>`;

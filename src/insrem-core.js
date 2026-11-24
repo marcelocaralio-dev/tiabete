@@ -44,7 +44,7 @@ const irRoleType = role => role === 'basal' ? 'basal' : role === 'rapida' ? 'rap
 function irStatusOf(r, plan) {
   if (r.flag) return r.flag;
   const it = irPlanItem(plan, r); if (!it) return 'removed';
-  if (!plan.types.includes('insulina') || it.alarm === false) return 'paused';
+  if (!plan.types.includes('insulina') || it.alarm === false || it.paused || it.sug) return 'paused';
   return '';
 }
 const irActive = (ir, r, plan) => !!(ir.on && r.on && !irStatusOf(r, plan));

@@ -20,24 +20,32 @@ const PL_MEDS = [
 const PL_PUMPS = ['Medtronic MiniMed', 'Omnipod', 'Tandem t:slim X2', 'Accu-Chek Insight', 'Ypsomed mylife YpsoPump', 'Outra'];
 const PL_PRESETS = {
   'Tipo 1': { intro: 'No tipo 1 o corpo não produz insulina, então o tratamento é feito com insulina (canetas ou bomba). O modelo abaixo é só uma estrutura para você preencher e editar.', types: ['insulina'], insulin: [{ name: 'Insulina basal', role: 'basal', times: ['22:00'] }, { name: 'Insulina rápida · café', role: 'rapida', times: ['07:00'] }, { name: 'Insulina rápida · almoço', role: 'rapida', times: ['12:00'] }, { name: 'Insulina rápida · jantar', role: 'rapida', times: ['19:00'] }], meds: [], checks: [{ name: 'Glicemia em jejum', times: ['06:45'] }, { name: 'Glicemia antes do almoço', times: ['11:45'] }, { name: 'Glicemia antes do jantar', times: ['18:45'] }, { name: 'Glicemia ao deitar', times: ['22:00'] }], tips: ['Quem usa bomba pode marcar também “Bomba de insulina” (troca do cateter e conferência).'] },
-  'Tipo 2': { intro: 'No tipo 2 o tratamento costuma começar com alimentação, atividade física e comprimidos; algumas pessoas usam também injetáveis ou insulina. O modelo é só uma estrutura para editar.', types: ['remedios'], insulin: [], meds: [{ name: 'Metformina', role: 'oral', times: ['08:00', '20:00'] }], checks: [{ name: 'Glicemia em jejum', times: ['07:00'] }, { name: 'Glicemia 2 h após o almoço', times: ['14:00'] }], tips: ['Se a sua equipe incluir insulina (por exemplo, basal à noite), ative também “Insulina”.'] },
-  'MODY': { intro: 'No MODY o tratamento depende do subtipo genético: alguns usam comprimidos, outros só alimentação e outros insulina. Preencha somente o que a sua equipe indicou.', types: ['remedios'], insulin: [], meds: [{ name: 'Comprimido indicado pela equipe', role: 'oral', times: ['08:00'] }], checks: [{ name: 'Glicemia em jejum', times: ['07:00'] }, { name: 'Glicemia 2 h após o almoço', times: ['14:00'] }], tips: ['Troque o nome pelo medicamento que você usa, ou desligue “Remédios” se o seu tratamento é só alimentação.'] },
+  'Tipo 2': { intro: 'No tipo 2 o tratamento costuma começar com alimentação, atividade física e comprimidos; algumas pessoas usam também injetáveis ou insulina. O modelo é só uma estrutura para editar.', types: [], insulin: [], meds: [], checks: [{ name: 'Glicemia em jejum', times: ['07:00'] }, { name: 'Glicemia 2 h após o almoço', times: ['14:00'] }], tips: ['Marque abaixo o que a sua equipe indicou (comprimidos, injetáveis ou insulina) e cadastre cada item com o nome e os horários dela.'] },
+  'MODY': { intro: 'No MODY o tratamento depende do subtipo genético: alguns usam comprimidos, outros só alimentação e outros insulina. Preencha somente o que a sua equipe indicou.', types: [], insulin: [], meds: [], checks: [{ name: 'Glicemia em jejum', times: ['07:00'] }, { name: 'Glicemia 2 h após o almoço', times: ['14:00'] }], tips: ['No MODY não há medicamento ou esquema único. Marque abaixo somente o que a sua equipe indicou; se o seu tratamento é só alimentação, não marque nada.'] },
   'Gestacional': { intro: 'Na diabetes gestacional o cuidado costuma ser alimentação e medições frequentes; se a equipe prescrever insulina ou remédio, ative abaixo. Ajuste os horários ao que a equipe pediu (1 h ou 2 h após as refeições).', types: [], insulin: [], meds: [], checks: [{ name: 'Glicemia em jejum', times: ['07:00'] }, { name: 'Glicemia 1 h após o café', times: ['08:30'] }, { name: 'Glicemia 1 h após o almoço', times: ['13:30'] }, { name: 'Glicemia 1 h após o jantar', times: ['20:30'] }], tips: ['Se receber insulina, ative “Insulina” e cadastre o que a equipe indicou.'] }
 };
-S.plan = { types: [], insulin: [], meds: [], checks: [], others: [], pump: { model: '', notes: '', siteDays: 3, lastChange: '', siteTime: '08:00', alarm: false } };
+S.plan = { updated: 0, log: [], types: [], insulin: [], meds: [], checks: [], others: [], pump: { model: '', notes: '', siteDays: 3, lastChange: '', siteTime: '08:00', alarm: false } };
 S.planOpen = {}; S.planDone = { day: '', map: {} };
 const plTime = t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t || '');
 const plDays0 = d => [...new Set((Array.isArray(d) ? d : []).map(Number).filter(x => x >= 0 && x <= 6))].sort(), plOff0 = (o, tm) => (Array.isArray(o.off) ? o.off : []).filter(t => tm.includes(t));
+/* Condição de registro (opcional, definida pela pessoa com a equipe): libera o botão só com a última glicemia de hoje a partir de um valor. O app não recomenda dose. */
+const plGate0 = g => g && typeof g === 'object' ? { on: !!g.on, min: isFinite(+g.min) && +g.min >= 40 && +g.min <= 600 ? Math.round(+g.min) : null } : null;
+const plGateOn = it => !!(it && it.gate && it.gate.on && it.gate.min);
 const plItem0 = (o, role) => { const tm = (o.times || []).filter(plTime).slice(0, 8); return plItem1(o, role, tm); };
-const plItem1 = (o, role, tm) => ({ id: uid(), name: String(o.name || '').slice(0, 80), role: o.role || role || '', times: tm, days: plDays0(o.days), off: plOff0(o, tm), dose: String(o.dose || '').slice(0, 120), notes: String(o.notes || '').slice(0, 200), alarm: o.alarm !== false });
+const plItem1 = (o, role, tm) => ({ id: uid(), name: String(o.name || '').slice(0, 80), role: o.role || role || '', times: tm, days: plDays0(o.days), off: plOff0(o, tm), dose: String(o.dose || '').slice(0, 120), notes: String(o.notes || '').slice(0, 200), alarm: o.alarm !== false, paused: !!o.paused, sug: !!o.sug, gate: plGate0(o.gate), guess: (Array.isArray(o.guess) ? o.guess : []).filter(t => tm.includes(t)), cat: String(o.cat || '').slice(0, 40) });
 function plClean(v) {
   v = v && typeof v === 'object' ? v : {}; const arr = a => Array.isArray(a) ? a.filter(x => x && typeof x === 'object').slice(0, 30).map(x => ({ ...plItem0(x), id: typeof x.id === 'string' && x.id ? x.id : uid() })) : [];
   const p = v.pump && typeof v.pump === 'object' ? v.pump : {};
-  return { types: (Array.isArray(v.types) ? v.types : []).filter(t => PL_TYPES.some(x => x[0] === t)), insulin: arr(v.insulin), meds: arr(v.meds), checks: arr(v.checks), others: (Array.isArray(v.others) ? v.others : []).filter(x => x && typeof x === 'object').slice(0, 30).map(x => ({ id: typeof x.id === 'string' && x.id ? x.id.slice(0, 40) : uid(), name: String(x.name || '').slice(0, 80), notes: String(x.notes || '').slice(0, 200) })), pump: { model: String(p.model || '').slice(0, 60), notes: String(p.notes || '').slice(0, 300), siteDays: [2, 3, 4, 5].includes(+p.siteDays) ? +p.siteDays : 3, lastChange: /^\d{4}-\d\d-\d\d$/.test(p.lastChange || '') ? p.lastChange : '', siteTime: plTime(p.siteTime) ? p.siteTime : '08:00', alarm: !!p.alarm } };
+  const lg = (Array.isArray(v.log) ? v.log : []).filter(x => x && typeof x === 'object' && isFinite(+x.ts) && x.txt).slice(-100).map(x => ({ ts: +x.ts, txt: String(x.txt).slice(0, 140) }));
+  return { updated: isFinite(+v.updated) && +v.updated > 0 ? +v.updated : 0, log: lg, types: (Array.isArray(v.types) ? v.types : []).filter(t => PL_TYPES.some(x => x[0] === t)), insulin: arr(v.insulin), meds: arr(v.meds), checks: arr(v.checks), others: (Array.isArray(v.others) ? v.others : []).filter(x => x && typeof x === 'object').slice(0, 30).map(x => ({ id: typeof x.id === 'string' && x.id ? x.id.slice(0, 40) : uid(), name: String(x.name || '').slice(0, 80), notes: String(x.notes || '').slice(0, 200) })), pump: { model: String(p.model || '').slice(0, 60), notes: String(p.notes || '').slice(0, 300), siteDays: [2, 3, 4, 5].includes(+p.siteDays) ? +p.siteDays : 3, lastChange: /^\d{4}-\d\d-\d\d$/.test(p.lastChange || '') ? p.lastChange : '', siteTime: plTime(p.siteTime) ? p.siteTime : '08:00', alarm: !!p.alarm } };
 }
 function plLoad(v) { S.plan = plClean(v); }
-const plSave = async () => { try { await Store.put('meta', { id: 'plan', value: S.plan }); } catch (e) { } };
+const plSave = async () => { try { S.plan.updated = Date.now(); await Store.put('meta', { id: 'plan', value: S.plan }); } catch (e) { } };
 const plHas = () => S.plan.types.length || S.plan.insulin.length || S.plan.meds.length || S.plan.checks.length || S.plan.others.length || S.plan.pump.model || S.plan.pump.notes || S.plan.pump.lastChange;
+/* Item ativo = fora da suspensão e já confirmado pela pessoa (itens de modelo ficam como sugestão até serem confirmados). Horários "a confirmar" (guess) são valores padrão, não prescritos. */
+const plActive = it => !!it && !it.paused && !it.sug;
+const plRealTimes = it => (it.times || []).filter(t => plTime(t) && !(it.guess || []).includes(t));
+function plLog(txt) { S.plan.log = (S.plan.log || []).concat([{ ts: Date.now(), txt: String(txt).slice(0, 140) }]).slice(-100); }
 const plSec = { insulina: 'insulin', remedios: 'meds', checks: 'checks' };
 const plNext = (times) => { const l = times[times.length - 1]; if (!l) return '08:00'; const [h, m] = l.split(':').map(Number); return pad((h + 4) % 24) + ':' + pad(m); };
 const plTimesTxt = it => it.times.length ? it.times.join(' · ') + (it.days && it.days.length && it.days.length < 7 ? ' · ' + plDaysTxt(it) : '') : 'sem horário fixo';
@@ -49,7 +57,7 @@ function plQuietAt(t) { const c = alCfg(); if (!c.plQuiet || !c.quiet) return fa
 /* Lista única de lembretes do tratamento: só o que a pessoa cadastrou (item, horário, dias). all=true inclui os desligados. */
 function plCollect(all) {
   const p = S.plan, out = [];
-  const add = (sec, items, on) => { if (on) items.forEach(it => { if (all || it.alarm) it.times.forEach(t => { if (!plTime(t)) return; if (sec === 'Insulina' && typeof irCoversTime === 'function' && irCoversTime(it.id, t)) return; /* este horário já tem lembrete de insulina próprio: só ele responde */ const off = !it.alarm || (it.off || []).includes(t); if (off && !all) return; out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id, dose: it.dose || '', days: it.days || [], off, secKey: sec === 'Insulina' ? 'insulin' : sec === 'Remédio' ? 'meds' : 'checks' }); }); }); };
+  const add = (sec, items, on) => { if (on) items.forEach(it => { if (!plActive(it)) return; if (all || it.alarm) plRealTimes(it).forEach(t => { if (!plTime(t)) return; if (sec === 'Insulina' && typeof irCoversTime === 'function' && irCoversTime(it.id, t)) return; /* este horário já tem lembrete de insulina próprio: só ele responde */ const off = !it.alarm || (it.off || []).includes(t); if (off && !all) return; out.push({ key: it.id + '@' + t, time: t, label: it.name || sec, sec, itemId: it.id, dose: it.dose || '', days: it.days || [], off, secKey: sec === 'Insulina' ? 'insulin' : sec === 'Remédio' ? 'meds' : 'checks' }); }); }); };
   add('Insulina', p.insulin, p.types.includes('insulina')); add('Medicamento', p.meds, p.types.includes('remedios')); add('Medição', p.checks, true);
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
@@ -85,6 +93,7 @@ function plOccStatus(occ, now) {
   const p = ocParse(occ); if (!p || p.src !== 'pl' || !p.time) return { st: 'cancelado', why: 'invalido' }; now = now || Date.now();
   let it = null, sec = ''; for (const k of ['insulin', 'meds', 'checks']) { const f = (S.plan[k] || []).find(x => x.id === p.id); if (f) { it = f; sec = k; break; } }
   if (!it) return { st: 'cancelado', why: 'excluido' };
+  if (!plActive(it)) return { st: 'desativado', why: 'config' };
   if (!alCfg().plan || (sec === 'insulin' && !S.plan.types.includes('insulina')) || (sec === 'meds' && !S.plan.types.includes('remedios'))) return { st: 'desativado', why: 'config' };
   if (!it.times.includes(p.time)) return { st: 'cancelado', why: 'horario' };
   if (!it.alarm || (it.off || []).includes(p.time)) return { st: 'desativado', why: 'config' };
@@ -118,11 +127,26 @@ document.addEventListener('change', e => {
   const u = parseUnits(el.value); t.value = plDoseWrite(t.value, u === 'bad' ? null : u);
   t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new Event('change', { bubbles: true }));
 });
+/* selos de situação de um item (não dependem só de cor) */
+function plBadges(it) {
+  const b = [];
+  if (it.paused) b.push('<span class="tag">⏸ Suspenso</span>'); if (it.sug) b.push('<span class="tag warn">A confirmar</span>');
+  if ((it.guess || []).length) b.push('<span class="tag warn">Horário a confirmar</span>');
+  if (!(it.name || '').trim()) b.push('<span class="tag warn">Falta o nome</span>');
+  return b.length ? `<span class="pl-bd">${b.join('')}</span>` : '';
+}
+/* lembretes associados ao item (cadastro do tratamento e lembretes de insulina) */
+function plRemInfo(it) {
+  const tm = plRealTimes(it); if (!tm.length) return '';
+  const cov = t => typeof irCoversTime === 'function' && irCoversTime(it.id, t);
+  const rows = tm.map(t => `<span class="tag">${t} · ${cov(t) ? 'lembrete de insulina' : (it.alarm && !(it.off || []).includes(t) ? 'ligado' : 'desligado')}</span>`).join('');
+  return `<div class="pl-rinfo"><span class="fl">Lembretes deste item</span><div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">${rows}</div></div>`;
+}
 function plItemHTML(sec, it) {
   const open = S.planOpen[it.id], n = it.times.length;
   const times = it.times.map((t, i) => `<div class="field"><label class="fl" for="pl-t-${it.id}-${i}">Horário ${i + 1}</label><input class="in" type="time" id="pl-t-${it.id}-${i}" data-pl="time" data-i="${i}" value="${t}"></div>`).join('');
   const nameLb = sec === 'checks' ? 'O que medir' : sec === 'meds' ? 'Medicamento' : 'Insulina';
-  return `<details class="pl-it" data-id="${it.id}" data-sec="${sec}" ${open ? 'open' : ''}><summary><span class="pl-s"><b data-pl-name>${esc(it.name || 'Sem nome')}</b><small data-pl-sum>${esc(plTimesTxt(it))}${it.alarm && n ? ' · alarme ligado' : ''}</small></span></summary>
+  return `<details class="pl-it" data-id="${it.id}" data-sec="${sec}" ${open ? 'open' : ''}><summary><span class="pl-s"><b data-pl-name>${esc(it.name || 'Sem nome')}</b><small data-pl-sum>${esc(plTimesTxt(it))}${it.alarm && n ? ' · alarme ligado' : ''}</small>${plBadges(it)}</span></summary>
     <div class="pl-b"><div class="form-grid"><div class="field full"><label class="fl" for="pl-n-${it.id}">${nameLb}</label><input class="in" id="pl-n-${it.id}" data-pl="name" value="${esc(it.name)}" maxlength="80"></div>
     <div class="field full"><label class="fl" for="pl-c-${it.id}">Quantas vezes por dia</label><select class="in" id="pl-c-${it.id}" data-pl="count"><option value="0" ${n === 0 ? 'selected' : ''}>Só quando necessário</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(c => `<option value="${c}" ${n === c ? 'selected' : ''}>${c} ${c === 1 ? 'vez' : 'vezes'} ao dia</option>`).join('')}</select></div>${times}
     ${n ? `<div class="field full"><span class="fl">Dias da semana</span><div class="row" style="gap:6px">${PL_WD.map((w, d) => `<label class="bl-chk"><input type="checkbox" data-pl="day" data-d="${d}" ${!it.days.length || it.days.includes(d) ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div><small class="hint" style="display:block;margin-top:4px">Vale para todos os horários deste item. Desmarque os dias em que não usa.</small></div>` : ''}
@@ -130,11 +154,20 @@ function plItemHTML(sec, it) {
     <div class="field full"><label class="fl" for="pl-o-${it.id}">Observações</label><input class="in" id="pl-o-${it.id}" data-pl="notes" value="${esc(it.notes)}" maxlength="200" placeholder="Ex.: junto com o almoço"></div></div>
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-pl="alarm" ${it.alarm ? 'checked' : ''} ${n ? '' : 'disabled'}><span><b>Alarme nestes horários</b><small>${n ? 'Faixa no Início (e notificação no aplicativo Android) na hora marcada.' : 'Defina horários para poder ligar o alarme.'}</small></span></label>
     ${sec === 'insulin' && typeof irCoversTime === 'function' && it.times.some(t => irCoversTime(it.id, t)) ? '<p class="hint" style="margin:8px 0 0">Os avisos dos horários desta insulina que têm lembrete próprio são feitos em <b>Lembretes de insulina</b> (com confirmação da aplicação), por isso não aparecem na lista de lembretes do tratamento.</p><button class="btn sm" style="margin-top:8px" data-act="go" data-r="insrem">Abrir Lembretes de insulina</button>' : ''}
+    ${sec === 'insulin' ? `<div class="field full pl-gate"><label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-pl="gate-on" ${it.gate && it.gate.on ? 'checked' : ''}><span><b>Condição para registrar (opcional)</b><small>Só libera o botão de confirmar depois de uma glicemia de hoje a partir do valor abaixo. Regra sua, definida com a equipe; o app só compara e não recomenda dose.</small></span></label>${it.gate && it.gate.on ? `<label class="fl" for="pl-g-${it.id}">Glicemia mínima para liberar (mg/dL)</label><input class="in" id="pl-g-${it.id}" data-pl="gate-min" inputmode="numeric" value="${it.gate.min || ''}" placeholder="Ex.: 140">` : ''}</div>` : ''}
+    ${plRemInfo(it)}
+    ${it.sug ? `<p class="hint" style="margin:10px 0 0"><b>Item do modelo, a confirmar.</b> Não aparece no Início nem gera lembretes até você conferir o nome, os horários e a dose com a sua equipe.</p><button class="btn pri full" style="margin-top:8px" data-act="pl-confirm" data-id="${it.id}" data-sec="${sec}">Confirmar este item</button>` : ''}
+    ${(it.guess || []).length ? `<p class="hint" style="margin:10px 0 0"><b>Horário a confirmar:</b> ${esc(it.guess.join(' · '))}. É só um valor inicial, não um horário prescrito. Ajuste ao que a equipe indicou ou confirme.</p><button class="btn full" style="margin-top:8px" data-act="pl-confirm-times" data-id="${it.id}" data-sec="${sec}">Confirmar horários</button>` : ''}
+    <div class="pl-mg"><button class="btn" data-act="pl-dup" data-id="${it.id}" data-sec="${sec}">Duplicar</button><button class="btn" data-act="pl-pause" data-id="${it.id}" data-sec="${sec}">${it.paused ? 'Reativar' : 'Suspender'}</button></div>
     <button class="btn full danger" style="margin-top:10px" data-act="pl-del" data-id="${it.id}" data-sec="${sec}">Remover da lista</button></div></details>`;
 }
+const PL_INS_GROUPS = [['basal', 'Basais'], ['rapida', 'Rápidas e ultrarrápidas'], ['mista', 'Mistas'], ['outra', 'Outras']];
 function plListCard(sec, title, hint, addLabel) {
   const items = S.plan[sec];
-  return `<h2 class="sec">${title}</h2><div class="card pl-card"><p class="hint" style="margin:0 0 10px">${hint}</p><div class="stack" style="gap:8px">${items.map(it => plItemHTML(sec, it)).join('') || '<p class="dim" style="margin:0;font-size:14.5px">Nada cadastrado ainda.</p>'}<button class="btn full" data-act="pl-add" data-sec="${sec}">+ ${addLabel}</button></div></div>`;
+  let body;
+  if (sec === 'insulin') body = PL_INS_GROUPS.map(([r, t]) => { const l = items.filter(it => (PL_INS_GROUPS.some(g => g[0] === it.role) ? it.role : 'outra') === r); return l.length ? `<div class="pl-grp"><p class="eyebrow" style="margin:4px 0 6px">${t} · ${l.length}</p><div class="stack" style="gap:8px">${l.map(it => plItemHTML(sec, it)).join('')}</div></div>` : ''; }).join('');
+  else body = items.length ? `<div class="stack" style="gap:8px">${items.map(it => plItemHTML(sec, it)).join('')}</div>` : '';
+  return `<h2 class="sec">${title}</h2><div class="card pl-card"><p class="hint" style="margin:0 0 10px">${hint}</p><div class="stack" style="gap:10px">${body || '<p class="dim" style="margin:0;font-size:14.5px">Nada cadastrado ainda.</p>'}<button class="btn full" data-act="pl-add" data-sec="${sec}">+ ${addLabel}</button></div></div>`;
 }
 function plPumpCard() {
   const p = S.plan.pump, due = p.lastChange ? isoDate(new Date(addDays(mkTs(p.lastChange, '12:00'), p.siteDays))) : '';
@@ -240,17 +273,17 @@ function plSettingsCard() {
 function planCards() {
   const type = (S.profile || {}).type || '', pre = PL_PRESETS[type], p = S.plan, on = k => p.types.includes(k);
   const sw = ([k, t, d]) => `<label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" data-ptype="${k}" ${on(k) ? 'checked' : ''}><span><b>${t}</b><small>${d}</small></span></label>`;
-  let h = `<div class="banner warn" style="margin:0 0 12px"><span><b>O GLUXO não substitui a consulta com a sua equipe de saúde.</b> Medicamentos, doses e horários devem ser os que ela indicou. O app só organiza as informações e lembra.</span></div>` + dbCard();
+  let h = `<div class="banner warn" style="margin:0 0 12px"><span><b>O GLUXO não substitui a consulta com a sua equipe de saúde.</b> Medicamentos, doses e horários devem ser os que ela indicou. O app só organiza as informações e lembra.</span></div>` + (typeof trSummaryCard === 'function' ? trSummaryCard() : '') + dbCard();
   h += `<h2 class="sec">Como você trata</h2><div class="card pl-card">
-    ${pre ? `<p class="hint" style="margin:0">${esc(pre.intro)}</p>${pre.tips.map(t => `<p class="hint" style="margin:6px 0 0">• ${esc(t)}</p>`).join('')}<button class="btn full" style="margin-top:12px" data-act="pl-preset">Usar modelo para ${esc(type)}</button><p class="hint" style="margin:8px 0 0">O modelo só cria uma estrutura editável, sem doses. Tudo pode ser alterado ou removido.</p>`
+    ${pre ? `<p class="hint" style="margin:0">${esc(pre.intro)}</p>${pre.tips.map(t => `<p class="hint" style="margin:6px 0 0">• ${esc(t)}</p>`).join('')}<button class="btn full" style="margin-top:12px" data-act="pl-preset">Ver sugestão de modelo para ${esc(type)}</button><p class="hint" style="margin:8px 0 0">O modelo é só uma sugestão: entra “a confirmar”, sem horários, sem dose e sem lembretes. Nada é ativado sem a sua confirmação.</p>`
       : `<p class="hint" style="margin:0">${type && type !== 'Prefiro não informar' ? 'Para este tipo não há modelo pronto.' : 'Escolha o tipo de diabetes acima para ver um modelo de tratamento do seu tipo.'} Você também pode montar o seu do zero abaixo.</p>`}
     <p class="eyebrow" style="margin:16px 0 4px">Que tipo de tratamento você usa?</p><p class="hint" style="margin:0 0 6px">Pode marcar mais de um.</p>${PL_TYPES.map(sw).join('')}</div>`;
   if (on('insulina')) h += plListCard('insulin', 'Insulinas', 'Cadastre cada insulina que você usa, quantas vezes por dia e em quais horários. Toque em um item para editar.', 'Adicionar insulina');
-  if (on('remedios')) h += plListCard('meds', 'Medicamentos', 'Cadastre cada medicamento (comprimido ou injetável), quantas vezes por dia e os horários. Toque em um item para editar.', 'Adicionar medicamento');
+  if (on('remedios')) h += plListCard('meds', 'Outros medicamentos', 'Comprimidos e injetáveis que não são insulina, separados das insulinas. Cadastre o nome, quantas vezes por dia, os horários e a dose que a equipe indicou. Toque em um item para editar.', 'Adicionar medicamento');
   if (on('bomba')) h += plPumpCard();
   h += plOthersCard();
   h += plListCard('checks', 'Medições programadas', 'Horários em que você quer ser lembrado de medir a glicemia. Os alarmes aparecem como faixa no Início.', 'Adicionar medição');
-  return h + plSettingsCard();
+  return h + plRemindersCard() + (typeof trManageCards === 'function' ? trManageCards() : '') + plSettingsCard();
 }
 function plPicker(sec) {
   const groups = sec === 'insulin' ? PL_INS.map(g => [g[0], g[2], g[1]]) : PL_MEDS.map(g => [g[0], g[1], 'oral']);
@@ -258,26 +291,48 @@ function plPicker(sec) {
     <div class="stack" style="gap:8px">${groups.map((g, gi) => `<details class="pl-it"><summary><span class="pl-s"><b>${esc(g[0])}</b><small>${g[1].length} opções</small></span></summary><div class="pl-b stack" style="gap:6px">${g[1].map((n, ni) => `<button class="btn full" style="text-align:left" data-act="pl-pick" data-sec="${sec}" data-g="${gi}" data-n="${ni}">${esc(n)}</button>`).join('')}</div></details>`).join('')}
     <button class="btn full" data-act="pl-pick" data-sec="${sec}" data-g="-1">Outro (digitar o nome)</button><button class="btn full" data-act="close">Cancelar</button></div>`;
 }
-function plAddItem(sec, name, role) {
-  const it = plItem0({ name, role, times: [plNext(sec === 'checks' ? [] : [])] }); it.times = ['08:00']; S.plan[sec].push(it); S.planOpen[it.id] = true;
+function plAddItem(sec, name, role, cat) {
+  const it = plItem0({ name, role, times: [], alarm: false, cat: cat || '' }); S.plan[sec].push(it); plLog('Adicionou: ' + (name || 'item sem nome')); S.planOpen[it.id] = true;
   const ty = sec === 'insulin' ? 'insulina' : sec === 'meds' ? 'remedios' : ''; if (ty && !S.plan.types.includes(ty)) S.plan.types.push(ty);
   return it;
 }
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="pl-"]'); if (!el) return; const a = el.dataset.act, sec = el.dataset.sec;
   try {
-    if (a === 'pl-add') { if (sec === 'checks') { plAddItem('checks', 'Glicemia', ''); await plSave(); render(); } else openSheet(plPicker(sec)); }
+    if (a === 'pl-add') { if (sec === 'checks') { plAddItem('checks', 'Glicemia', '', ''); await plSave(); render(); } else openSheet(plPicker(sec)); }
     else if (a === 'pl-pick') {
       const g = +el.dataset.g; let name = '', role = sec === 'insulin' ? 'outra' : 'oral';
       if (g >= 0) { name = sec === 'insulin' ? PL_INS[g][2][+el.dataset.n] : PL_MEDS[g][1][+el.dataset.n]; if (sec === 'insulin') role = PL_INS[g][1]; }
-      plAddItem(sec, name, role); await plSave(); closeSheet(); render(); toast('Adicionado. Defina as vezes por dia e os horários.');
+      const cat = g >= 0 ? (sec === 'insulin' ? PL_INS[g][0] : PL_MEDS[g][0]) : ''; plAddItem(sec, name, role, cat); await plSave(); closeSheet(); render(); toast('Adicionado. Defina as vezes por dia e os horários; o lembrete fica desligado até você ligar.');
     }
-    else if (a === 'pl-del') { const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return; if (el.dataset.ask !== '1') { el.dataset.ask = '1'; el.textContent = 'Toque de novo para remover'; setTimeout(() => { if (el.isConnected) { el.dataset.ask = ''; el.textContent = 'Remover da lista'; } }, 4000); return; } S.plan[sec] = S.plan[sec].filter(x => x.id !== it.id); delete S.planOpen[it.id]; await plSave(); render(); toast('Removido.'); }
+    else if (a === 'pl-del') { const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return; if (el.dataset.ask !== '1') { el.dataset.ask = '1'; el.textContent = 'Toque de novo para remover'; setTimeout(() => { if (el.isConnected) { el.dataset.ask = ''; el.textContent = 'Remover da lista'; } }, 4000); return; } S.plan[sec] = S.plan[sec].filter(x => x.id !== it.id); delete S.planOpen[it.id]; plLog('Removeu: ' + (it.name || 'item')); await plSave(); render(); toast('Removido. Os registros de aplicações já feitos continuam no histórico.'); }
     else if (a === 'pl-preset') {
       const type = (S.profile || {}).type, pre = PL_PRESETS[type]; if (!pre) return;
-      if (plHas() && el.dataset.ask !== '1') { el.dataset.ask = '1'; el.textContent = 'Já há itens: toque de novo para substituir tudo'; el.classList.add('pri'); setTimeout(() => { if (el.isConnected) { el.dataset.ask = ''; el.textContent = 'Usar modelo para ' + type; el.classList.remove('pri'); } }, 5000); return; }
-      S.plan = { ...S.plan, types: pre.types.slice(), insulin: pre.insulin.map(x => plItem0(x)), meds: pre.meds.map(x => plItem0(x)), checks: pre.checks.map(x => plItem0(x)) };
-      await plSave(); render(); toast('Modelo aplicado. Edite como precisar.');
+      openSheet(`<h2>Usar modelo para ${esc(type)}</h2><p class=\"hint\" style=\"margin:0 0 10px\">O modelo é só uma <b>sugestão de estrutura</b>. Os itens entram marcados como <b>“a confirmar”</b>, sem horários, sem dose e com os lembretes desligados. Nada aparece como tratamento ativo no Início até você revisar e confirmar cada item.</p><p class=\"hint\" style=\"margin:0 0 12px\">O que você já cadastrou é mantido.</p><div class=\"stack\"><button class=\"btn pri full\" data-act=\"pl-preset-do\">Adicionar sugestões</button><button class=\"btn full\" data-act=\"close\">Cancelar</button></div>`);
+    }
+    else if (a === 'pl-preset-do') {
+      const type = (S.profile || {}).type, pre = PL_PRESETS[type]; if (!pre) return; let added = 0;
+      const mk = (k, list) => list.forEach(x => { if (S.plan[k].some(y => (y.name || '').trim().toLowerCase() === x.name.toLowerCase())) return; S.plan[k].push(plItem0({ name: x.name, role: x.role, times: [], alarm: false, sug: true })); added++; });
+      mk('insulin', pre.insulin); mk('meds', pre.meds); mk('checks', pre.checks);
+      S.plan.types = [...new Set([...S.plan.types, ...pre.types])]; plLog('Adicionou sugestões do modelo ' + type + ' (' + added + ' itens a confirmar)');
+      await plSave(); closeSheet(); render(); toast(added ? 'Sugestões adicionadas. Revise e confirme cada item.' : 'Os itens do modelo já estavam na lista.');
+    }
+    else if (a === 'pl-dup') {
+      const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return;
+      const cp = plItem0({ ...it, name: (it.name || 'Item') + ' (cópia)', alarm: false, off: [], paused: false, sug: false, guess: [] }); S.plan[sec].push(cp); S.planOpen[cp.id] = true; plLog('Duplicou: ' + (it.name || 'item'));
+      await plSave(); render(); toast('Item duplicado. O lembrete da cópia fica desligado até você ligar.');
+    }
+    else if (a === 'pl-pause') {
+      const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return; it.paused = !it.paused; plLog((it.paused ? 'Suspendeu: ' : 'Reativou: ') + (it.name || 'item'));
+      await plSave(); render(); toast(it.paused ? 'Item suspenso. O histórico de aplicações foi mantido.' : 'Item reativado.');
+    }
+    else if (a === 'pl-confirm') {
+      const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return; it.sug = false; it.guess = []; plLog('Confirmou: ' + (it.name || 'item'));
+      await plSave(); render(); toast('Item confirmado.');
+    }
+    else if (a === 'pl-confirm-times') {
+      const it = S.plan[sec].find(x => x.id === el.dataset.id); if (!it) return; it.guess = []; plLog('Confirmou os horários de: ' + (it.name || 'item'));
+      await plSave(); render(); toast('Horários confirmados.');
     }
     else if (a === 'pl-done') {
       plDoneRoll(); const k = el.dataset.k, day = S.planDone.day;
@@ -286,7 +341,7 @@ document.addEventListener('click', async e => {
       if (al && al.sec === 'Insulina') { /* "Feito" numa insulina é registrar a aplicação: a mesma ação de Meu tratamento (um único registro, sem duplicar) */
         const it = plItemOf(al), occ = plOccId(day, k);
         if (plInsMatched(day)[occ]) { render(); toast('Esta aplicação já estava registrada no histórico. Nada foi duplicado.'); return; }
-        const res = await doseConfirm({ kind: plAlarmKind(al), name: it && it.name, occ, insulin: it && it.name, sched: al.time, src: 'tratamento' }); if (res.dup && !res.rec) return;
+        const res = await doseConfirm({ kind: plAlarmKind(al), name: it && it.name, occ, insulin: it && it.name, insId: it ? it.id : '', sched: al.time, src: 'tratamento' }); if (res.dup && !res.rec) return;
         toast(res.dup ? 'Esta aplicação já estava registrada. Nada foi duplicado.' : 'Aplicação registrada no histórico. A dose não foi preenchida.');
       }
       S.planDone.map[k] = 1; await adSave(); render();
@@ -302,12 +357,14 @@ document.addEventListener('change', async e => {
   if (t.dataset.ptype) { const k = t.dataset.ptype; S.plan.types = t.checked ? [...new Set([...S.plan.types, k])] : S.plan.types.filter(x => x !== k); await plSave(); render(); return; }
   if (t.dataset.pp) { const k = t.dataset.pp, p = S.plan.pump; if (k === 'alarm') p.alarm = t.checked; else if (k === 'siteDays') p.siteDays = +t.value; else if (k === 'siteTime') p.siteTime = plTime(t.value) ? t.value : p.siteTime; else p[k] = t.value; await plSave(); if (k === 'lastChange' || k === 'siteDays') render(); return; }
   const k = t.dataset.pl; if (!k) return; const box = t.closest('.pl-it'); if (!box) return; const sec = box.dataset.sec, it = S.plan[sec].find(x => x.id === box.dataset.id); if (!it) return;
-  if (k === 'name') { it.name = t.value.trim().slice(0, 80); const b = box.querySelector('[data-pl-name]'); if (b) b.textContent = it.name || 'Sem nome'; }
+  if (k === 'name') { plLog('Renomeou: ' + (it.name || 'item') + ' → ' + (t.value.trim() || 'sem nome')); it.name = t.value.trim().slice(0, 80); const b = box.querySelector('[data-pl-name]'); if (b) b.textContent = it.name || 'Sem nome'; }
   else if (k === 'dose') it.dose = t.value.slice(0, 120); else if (k === 'notes') it.notes = t.value.slice(0, 200);
-  else if (k === 'time') { if (plTime(t.value)) { const old = it.times[+t.dataset.i]; it.times[+t.dataset.i] = t.value; it.times.sort(); it.off = (it.off || []).filter(x => x !== old); } else return; }
+  else if (k === 'time') { if (plTime(t.value)) { const old = it.times[+t.dataset.i]; it.times[+t.dataset.i] = t.value; it.times.sort(); it.off = (it.off || []).filter(x => x !== old); it.guess = (it.guess || []).filter(x => x !== old && x !== t.value); plLog('Alterou horário de: ' + (it.name || 'item')); } else return; }
   else if (k === 'day') { const set = new Set(it.days.length ? it.days : [0, 1, 2, 3, 4, 5, 6]); t.checked ? set.add(+t.dataset.d) : set.delete(+t.dataset.d); if (!set.size) { t.checked = true; toast('Deixe pelo menos um dia marcado, ou desligue o alarme.'); return; } it.days = set.size === 7 ? [] : [...set].sort(); }
-  else if (k === 'alarm') it.alarm = t.checked;
-  else if (k === 'count') { const c = +t.value; while (it.times.length > c) it.times.pop(); it.off = (it.off || []).filter(x => it.times.includes(x)); while (it.times.length < c) it.times.push(plNext(it.times)); S.planOpen[it.id] = true; await plSave(); render(); return; }
+  else if (k === 'gate-on') { it.gate = { on: t.checked, min: it.gate && it.gate.min ? it.gate.min : null }; plLog((t.checked ? 'Definiu condição de registro em: ' : 'Removeu a condição de registro de: ') + (it.name || 'item')); await plSave(); render(); return; }
+  else if (k === 'gate-min') { const v = Math.round(Number(String(t.value).replace(',', '.'))); if (!(v >= 40 && v <= 600)) { toast('Informe um valor entre 40 e 600 mg/dL.'); return; } it.gate = { on: true, min: v }; plLog('Condição de registro de ' + (it.name || 'item') + ': glicemia a partir de ' + v); }
+  else if (k === 'alarm') { it.alarm = t.checked; plLog((t.checked ? 'Ligou' : 'Desligou') + ' o lembrete de: ' + (it.name || 'item')); }
+  else if (k === 'count') { const c = +t.value; while (it.times.length > c) it.times.pop(); it.off = (it.off || []).filter(x => it.times.includes(x)); while (it.times.length < c) { const nt = plNext(it.times); it.times.push(nt); (it.guess = it.guess || []).push(nt); } it.guess = (it.guess || []).filter(x => it.times.includes(x)); plLog('Frequência de ' + (it.name || 'item') + ': ' + c + ' por dia'); S.planOpen[it.id] = true; await plSave(); render(); return; }
   await plSave(); const s = box.querySelector('[data-pl-sum]'); if (s) s.textContent = plTimesTxt(it) + (it.alarm && it.times.length ? ' · alarme ligado' : '');
 });
 
@@ -368,13 +425,13 @@ function treatmentCard() {
   const p = S.plan, on = k => p.types.includes(k);
   const head = `<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 class="sec" style="margin:0">Meu tratamento</h2></div>`;
   const sm = `<div class="tr-wrap">${trSummary()}</div>`;
-  let h = on('insulina') ? insCard().replace('<h2 class="sec" style="margin:0">Insulinas</h2>', '<h2 class="sec" style="margin:0">Meu tratamento</h2>').replace('</div><div class="card" id="ins-basal"', '</div>' + sm + '<div class="card" id="ins-basal"') : head + sm;
+  let h = on('insulina') ? trInsCards(sm) : head + sm;
 
   if (!p.types.length) h += `<div class="card"><div class="eyebrow">Como você trata o diabetes?</div><p class="hint" style="margin:8px 0 12px">Escolha abaixo. O cartão do Início passa a mostrar o que você usa. Depois cadastre medicamentos e horários em Meu tratamento.</p><div class="stack" style="gap:8px">${PL_TYPES.map(([k, t, d]) => `<button class="btn full" data-act="pl-settype" data-k="${k}">${t}<small style="display:block;font-weight:400;color:var(--mut)">${d}</small></button>`).join('')}</div></div>`;
-  const meds = p.meds.filter(x => x.name || x.times.length);
+  const meds = p.meds.filter(x => plActive(x) && (x.name || x.times.length));
   if (on('remedios')) h += meds.length ? plTodayCard('Medicamentos · hoje', 'meds', meds, 'Toque no horário ao tomar. As marcas voltam a zerar a cada novo dia.') : `<div class="card" style="margin-top:12px"><div class="eyebrow">Medicamentos</div><p class="hint" style="margin:8px 0 0">Nenhum medicamento cadastrado. Adicione em Meu tratamento.</p></div>`;
   if (on('bomba')) h += plPumpToday();
-  const ck = p.checks.filter(x => x.times.length);
+  const ck = p.checks.filter(x => plActive(x) && x.times.length);
   if (ck.length) h += plTodayCard('Medições programadas · hoje', 'checks', ck, 'Marcam sozinhas quando você registra uma glicemia perto do horário.');
   h += `<div class="card" style="margin-top:12px"><button class="btn pri full tr-edit" data-act="go" data-r="esquemas">EDITAR MEU TRATAMENTO</button><p class="hint" style="margin:10px 0 0">O GLUXO não substitui a consulta com a sua equipe de saúde. Siga o que ela indicou; o app só organiza e lembra.</p></div>`;
   return h;

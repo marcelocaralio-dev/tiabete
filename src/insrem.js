@@ -86,7 +86,7 @@ async function irConfirm(rid, day) {
   if (S.ir.state[key] === 'done') { closeSheet(); toast('Esta aplicação já foi confirmada.'); return false; }
   const have = irMatched(S.ir, S.plan, Date.now(), S.inslog)[occ];
   if (have) { closeSheet(); render(); toast('Esta aplicação já estava registrada no histórico (' + HM(have.ts) + '). Nada foi duplicado.'); irNativeClear(r); return false; }
-  const name = irName(r), kind = irLogKind(r), res = await doseConfirm({ kind, name, occ, rem: r.id, sched: r.time, insulin: name, src: 'lembrete' });
+  const name = irName(r), kind = irLogKind(r), res = await doseConfirm({ kind, name, occ, rem: r.id, sched: r.time, insulin: name, insId: r.itemId || '', src: 'lembrete' });
   if (res.dup && !res.rec) return false; /* outro toque do mesmo aviso ainda está registrando */
   S.ir.state[key] = 'done';
   await irSave(); irNativeClear(r); closeSheet(); render();

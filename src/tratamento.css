@@ -1,0 +1,48 @@
+/* Meu tratamento: cartões de dose, resumo e comparação (mantém a identidade do GLUXO: preto, vermelho = pendente, verde = registrada) */
+.tc-list { display: flex; flex-direction: column; gap: 12px; }
+.tc { padding: 14px; }
+.tc-a { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.tc-n { font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+.tc-t { color: var(--mut); font-size: 14px; margin-top: 2px; }
+.tc-st { flex: none; font: 700 13px var(--f-body); padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ok); white-space: nowrap; }
+.tc-st.red { color: var(--red-l); border-color: var(--red); background: rgba(var(--red-rgb), .12); }
+.tc-st.ok { color: var(--good); border-color: var(--good-bd); background: var(--good-bg); }
+.tc-b { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tc-i { color: var(--mut); font-size: 14.5px; margin-top: 6px; }
+.tc-cd { font: 500 34px/1.1 var(--f-display); letter-spacing: -.03em; }
+.tc-cd.over { color: var(--red-l); }
+.tc-prox { font-size: 22px; }
+.tc-cd-l { font: 600 13px var(--f-mono); letter-spacing: .08em; color: var(--mut); }
+.tc-bar { height: 5px; margin-top: 8px; opacity: .8; }
+.tc-u { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); text-align: center; }
+.tc-ul { font: 700 13px var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
+.tc-u .uip { margin-inline: auto; max-width: 260px; min-height: 132px; }
+.tc-lastv { color: var(--mut); font-size: 13.5px; margin-top: 6px; }
+.tc-hint { font-size: 13.5px; margin-top: 6px; }
+.tc-main { width: 100%; min-height: 52px; margin-top: 12px; font-size: 16.5px; font-weight: 700; border-radius: 14px; }
+.tc-main[disabled] { opacity: .45; }
+.tc-sec { display: flex; gap: 8px; margin-top: 8px; }
+.tc-sec .btn { flex: 1 1 0; min-height: 44px; font-size: 14px; background: transparent; }
+.tc-lock { margin-top: 10px; padding: 10px; border-radius: 12px; background: var(--s2); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tc-done { border-color: var(--good-fill); padding: 10px 14px; }
+.tc-done .tc-n { font-size: 16px; }
+.tc-r { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.tc-edit { min-height: 44px; }
+.tc-warn { color: var(--red-l); }
+.tc-skip { opacity: .92; border-style: dashed; }
+.tc-sum { margin-bottom: 12px; }
+.tc-sg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.tc-sc { background: var(--s2); border-radius: 12px; padding: 8px 6px; text-align: center; }
+.tc-sc b { display: block; font-size: 22px; }
+.tc-sc span { font-size: 12.5px; color: var(--mut); line-height: 1.2; display: block; }
+.tc-vig { margin: 12px 0; }
+.tc-cg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.tc-cg div { background: var(--s2); border-radius: 10px; padding: 8px; text-align: center; }
+.tc-cg b { display: block; font-size: 18px; }
+.tc-cg small { color: var(--mut); font-size: 12.5px; }
+.tc-bar2 { height: 6px; background: var(--s2); border-radius: 6px; margin-top: 8px; overflow: hidden; }
+.tc-bar2 span { display: block; height: 100%; background: var(--red); border-radius: 6px; }
+.tc-cmp + .tc-cmp { border-top: 1px solid var(--line); padding-top: 12px; }
+.il-bt { margin: 0 0 6px; }
+.il-rev { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: var(--s2); font-size: 14px; min-height: 20px; }
+@media (max-width: 380px) { .tc-sg { grid-template-columns: repeat(2, 1fr); } .tc-cd { font-size: 30px; } }

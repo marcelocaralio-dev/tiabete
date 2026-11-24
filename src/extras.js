@@ -202,7 +202,7 @@ function insRoll() { const d = isoDate(new Date()); if (S.ins.day === d) return 
 const skipped = k => !!(S.ins.skip && S.ins.skip[k]);
 const setSkip = (k, v) => { S.ins.skip = S.ins.skip || {}; if (v) S.ins.skip[k] = 1; else delete S.ins.skip[k]; };
 const INS_KIND = { basal: 'Basal', fast: 'Jejum', lunch: 'Almoço', dinner: 'Jantar', extra: 'Outra insulina' };
-const insName = r => r.kind === 'extra' ? (r.name || 'Outra insulina') : INS_KIND[r.kind];
+const insName = r => (r.kind === 'extra' || r.insId) ? (r.name || r.insulin || (r.kind === 'extra' ? 'Outra insulina' : INS_KIND[r.kind])) : INS_KIND[r.kind];
 /* "occ" (opcional) é o id da ocorrência do aviso que originou o registro (ver alertstate-core.js). Com ele, registrar duas vezes a mesma ocorrência devolve o registro que já existe em vez de criar outro. */
 async function logAdd(kind, ts, units, occ) {
   if (occ) { const ex = S.inslog.find(x => x.occ === occ); if (ex) return ex; }
@@ -218,7 +218,7 @@ async function doseConfirm(o) {
   try {
     const ex = o.occ && S.inslog.find(x => x.occ === o.occ); if (ex) return { rec: ex, dup: true };
     const now = Date.now(), kind = o.kind, rec = await logAdd(kind, now, undefined, o.occ);
-    rec.src = o.src || 'lembrete'; rec.status = 'confirmada'; if (o.rem) rec.rem = o.rem; if (o.sched) rec.sched = o.sched; if (o.insulin) rec.insulin = o.insulin; if (kind === 'extra') rec.name = o.name || o.insulin;
+    rec.src = o.src || 'lembrete'; rec.status = 'confirmada'; if (o.rem) rec.rem = o.rem; if (o.sched) rec.sched = o.sched; if (o.insulin) rec.insulin = o.insulin; if (o.insId) { rec.insId = o.insId; rec.name = o.name || o.insulin; } if (kind === 'extra') rec.name = o.name || o.insulin;
     await logPut(rec); if (kind === 'basal' && (!S.ins.basalTs || now > S.ins.basalTs)) S.ins.basalTs = now;
     if (kind !== 'extra') setSkip(kind, false);
     insSync(); await insSave(); return { rec, dup: false };
@@ -257,13 +257,8 @@ function preDinner() {
   return rs.length ? rs[rs.length - 1] : null;
 }
 const dinnerOpen = () => { const pd = preDinner(); return !!(pd && pd.glucose >= S.ins.dinnerMin); };
-const isLocked = k => k === 'dinner' && !S.ins.dinner && !dinnerOpen();
-function dinnerBanner() {
-  if (!alCfg().bPre) return '';
-  insRoll(); if (S.ins.dinner || skipped('dinner') || !dinnerOpen()) return '';
-  const pd = preDinner();
-  return `<div class="banner warn"><span><b>Pré-jantar.</b> Sua medição das ${pd.time} foi <b class="num">${f0(pd.glucose)}</b> mg/dL, no limite de ${S.ins.dinnerMin} ou acima. A chave da insulina rápida do jantar está liberada.</span>${S.route === 'painel' ? '' : '<button class="btn sm" data-act="go" data-r="painel">Ver</button>'}</div>`;
-}
+const isLocked = () => false; /* regra fixa do limite pré-jantar removida: condições de registro agora são configuradas por insulina em Meu tratamento */
+function dinnerBanner() { return ''; }
 /* Lembrete de medição pré-refeição (só no Painel, só avisa; nada é enviado) */
 const REM_WIN = [{ k: 'jejum', t: 'em jejum', a: 240, b: 480, ctx: 'jejum', meal: 'cafe' }, { k: 'almoco', t: 'antes do almoço', a: 600, b: 720, ctx: 'antes', meal: 'almoco' }, { k: 'jantar', t: 'antes do jantar', a: 960, b: 1140, ctx: 'antes', meal: 'jantar' }];
 S.remOff = {};
@@ -297,38 +292,7 @@ document.addEventListener('input', e => {
   if (b && !b.dataset.lk) { b.disabled = !ok; b.setAttribute('aria-disabled', String(!ok)); b.style.opacity = ok ? '' : '.35'; }
   const nb = document.querySelector('[data-act="ins-now"][data-k="' + k + '"]'); if (nb) { nb.disabled = !ok; nb.setAttribute('aria-disabled', String(!ok)); }
 });
-/* Insulina rápida: mesmo formato da basal (cartão, roleta + "Tomei agora" na mesma linha, botões menores abaixo). Verde até o fim do dia depois de tomada. */
-function swRow(k, title, sub, extra = '') {
-  const on = S.ins[k], lk = isLocked(k), sk = skipped(k) && !on, u = on && unitsEntry(k) && unitsEntry(k).units != null ? ' · ' + fU(unitsEntry(k).units) : '';
-  const st = on ? `<b style="color:var(--good)">✓ Tomada às ${HM(on)}${u}</b>` : sk ? '<b style="color:var(--mut)">⏭ Pulada hoje</b>' : lk ? '🔒 Bloqueada até a glicemia pré-jantar ser ' + S.ins.dinnerMin + ' ou mais' : 'Ainda não tomada';
-  const hint = `<div class="dim" id="udh-${k}" style="font-size:13.5px;margin-top:8px${udOk(k) ? ';display:none' : ''}">Escolha as unidades (Ui) para liberar o botão.</div>`;
-  const act = `<button class="btn pri ins-act${on ? ' ins-lockd' : ''}" data-act="ins-now" data-k="${k}" ${on || udOk(k) ? '' : 'disabled aria-disabled="true"'} ${on ? 'disabled aria-label="' + title + ': dose já registrada"' : ''}>Tomei agora</button>`;
-  const sec = `<div class="ins-sec"><button class="btn sm" data-act="ins-time" data-k="${k}" data-t="${title}">${on ? 'Editar horário' : 'Outro horário'}</button>${on ? '' : `<button class="btn sm" data-act="ins-skip" data-k="${k}">Pular hoje</button>`}</div>`;
-  const body = sk ? `<div class="ins-sec" style="margin-top:10px"><button class="btn sm" data-act="ins-skip" data-k="${k}">Desfazer pulo</button></div>` : lk ? '' :
-    `<div class="ins-line">${draftUnits(k, false)}<div class="ins-side">${act}${sec}</div></div>${on ? '' : hint}`;
-  return `<div class="card ins-card${on ? ' ins-done' : ''}" id="ins-r-${k}" style="margin-top:12px"><div class="ins-hd"><div class="eyebrow">Rápida · ${title}</div></div><div class="ins-st">${st}${sub ? ' · ' + sub : ''}</div>${extra}${body}</div>`;
-}
-function insCard() {
-  insRoll();
-  const b = basalInfo(), pd = preDinner(), min = S.ins.dinnerMin;
-  let dn = '', dnWarn = '';
-  if (!pd) dn = `<div class="dim" style="font-size:14px;margin-top:6px">Sem medição pré-jantar hoje (16h–19h). O registro só libera com ${min} mg/dL ou mais.</div>`;
-  else { const yes = pd.glucose >= min; dn = `<div style="margin-top:6px;font-size:14px">Pré-jantar <b class="num">${f0(pd.glucose)}</b> mg/dL às ${pd.time}: <span class="badge ${yes ? 'high' : 'ok'}">${yes ? '▲ ' + min + ' ou mais' : '● abaixo de ' + min}</span> <span class="dim">${yes ? 'registro liberado.' : 'registro bloqueado.'}</span>${S.ins.dinner && !yes ? ' <span class="tag warn">marcada fora da regra</span>' : ''}</div>`; }
-  dn += `<button class="btn sm" style="margin-top:8px" data-act="ins-min">Alterar limite (${min})</button>`;
-  const basal = !b ? `<div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1">—</div><div class="dim" style="font-size:14px;margin-top:4px">Marque quando tomar a basal para iniciar a contagem de 24 h.</div>`
-    : `<div class="dim" style="font-size:13.5px;font-family:var(--f-mono);letter-spacing:.08em">${b.st === 'over' ? 'PASSARAM 24 H · ATRASO' : 'FALTAM PARA A PRÓXIMA'}</div><div class="v num" id="ib-t" style="font-family:var(--f-display);font-weight:500;font-size:34px;letter-spacing:-.03em;line-height:1.1;${b.st === 'over' ? 'color:var(--red-l)' : ''}">${b.st === 'over' ? '+' : ''}${hms(b.rem)}</div>
-      <div class="ib-bar"><span id="ib-bar" style="width:${Math.min(100, b.el / H24 * 100).toFixed(1)}%"></span></div>
-      <div class="dim" style="font-size:14px;margin-top:6px">Última basal: <b class="num">${new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem'} ${HM(S.ins.basalTs)}</b> · próxima: <b class="num">${new Date(S.ins.basalTs + H24).toDateString() === new Date().toDateString() ? 'hoje' : 'amanhã'} ${HM(S.ins.basalTs + H24)}</b></div>${b.st !== 'ok' ? `<div style="margin-top:8px"><span class="badge high">${b.st === 'over' ? '▲▲ Hora da basal' : '▲ Chegando a hora'}</span></div>` : ''}`;
-  const basalToday = !!S.ins.basalTs && new Date(S.ins.basalTs).toDateString() === new Date().toDateString(), skB = skipped('basal'), pend = ['fast', 'lunch', 'dinner'].filter(k => !S.ins[k]), allSk = skB && pend.every(skipped);
-  const basalShow = skB ? `<div style="font-weight:700">⏭ Basal pulada hoje</div><div class="dim" style="font-size:14px;margin-top:4px">O lembrete de 24 h fica em silêncio até amanhã.${b ? ' Última basal: ' + (new Date(S.ins.basalTs).toDateString() === new Date().toDateString() ? 'hoje' : 'ontem') + ' ' + HM(S.ins.basalTs) + '.' : ''}</div>` : basal;
-  return `<div class="row" style="justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h2 class="sec" style="margin:0">Insulinas</h2><button class="btn sm" data-act="ins-skip-all">${allSk ? 'Desfazer pulos de hoje' : 'Pular tudo hoje'}</button></div><div class="card ins-card${basalToday ? ' ins-done' : ''}" id="ins-basal" data-st="${b ? b.st : 'none'}"><div class="ins-hd"><div class="eyebrow">Basal · lembrete de 24 h</div>${b ? '<button class="btn sm ins-stop" data-act="ins-basal-stop">Parar lembrete</button>' : ''}</div><div style="margin-top:8px">${basalShow}</div>
-    ${skB ? `<div class="ins-sec" style="margin-top:10px"><button class="btn sm" data-act="ins-basal-at">Outro horário</button><button class="btn sm" data-act="ins-skip" data-k="basal">Desfazer pulo</button></div>`
-      : `<div class="ins-line">${draftUnits('basal', false)}<div class="ins-side"><button class="btn pri ins-act${b && b.st === 'ok' ? ' ins-lockd' : ''}" data-act="ins-basal" ${b && b.st === 'ok' ? 'disabled aria-label="Basal: dose registrada. Libera quando faltar 1 hora para a próxima"' : ''}>Tomei agora</button><div class="ins-sec"><button class="btn sm" data-act="ins-basal-at">Outro horário</button><button class="btn sm" data-act="ins-skip" data-k="basal">Pular hoje</button></div></div></div>`}</div>
-  ${swRow('fast', 'Jejum', '')}${swRow('lunch', 'Antes do almoço', '')}${swRow('dinner', 'Antes do jantar', '', dn)}
-  <div class="card" style="margin-top:12px"><p class="hint" style="margin:0 0 10px">As unidades ficam memorizadas da última dose; mude quando precisar. O cartão fica verde ao registrar e volta ao normal no dia seguinte.</p>
-    <button class="btn full" data-act="go" data-r="insulinas">Ver histórico de insulinas</button>
-    <p class="hint" style="margin:10px 0 0">O app só registra e lembra, segundo as regras que você definiu. Não calcula nem sugere dose. Confirme sempre com seu médico.</p></div>${extraInsCard()}`;
-}
+/* Os cartões de insulina do Início são gerados a partir de Meu tratamento (src/tratamento.js). Não há estrutura fixa de basal/jejum/almoço/jantar. */
 setInterval(() => {
   if (!insLoaded) return;
   if (insRoll()) { insSave(); render(); return; }
@@ -377,7 +341,6 @@ document.addEventListener('click', async e => {
       const r = S.inslog.find(x => x.id === el.dataset.id); if (r) { await logDel(r.id); if (r.kind === 'basal' && r.ts === S.ins.basalTs) S.ins.basalTs = null; insSync(); await insSave(); }
       closeSheet(); render(); toast('Registro excluído.');
     }
-    else if (act === 'ins-min') openSheet(`<h2>Limite do jantar</h2><p class="hint" style="margin:0 0 12px">Valor definido por você e seu médico. O app só compara a medição pré-jantar de hoje com ele.</p><form id="ins-min-form" novalidate><div class="field"><label class="fl" for="im-v">mg/dL (ou mais)</label><input class="in" inputmode="numeric" id="im-v" value="${S.ins.dinnerMin}"></div><p class="err" id="im-err" role="alert"></p><div class="row"><button class="btn pri grow" type="submit">Salvar</button><button class="btn" type="button" data-act="close">Cancelar</button></div></form>`);
   } catch (err) { console.error(err); toast('Algo deu errado: ' + (err && err.message || err)); }
 });
 document.addEventListener('submit', async e => {
@@ -397,17 +360,14 @@ document.addEventListener('submit', async e => {
     insRoll(); const kk = e.target.dataset.k; if (isLocked(kk)) { closeSheet(); return; } let u2 = un; if (u2 == null) { const ex = unitsEntry(kk); if (ex && ex.units != null) u2 = ex.units; } if (!(u2 > 0)) { $('#it-err').textContent = 'Informe as unidades (Ui) tomadas.'; return; } { const ex = todayLog(kk), keep = ex[ex.length - 1]; if (keep) { for (const o of ex) if (o !== keep) await logDel(o.id); await logPut({ ...keep, ts, date: isoDate(new Date(ts)), units: u2 }); } else await logAdd(kk, ts, u2); } S.ins[kk] = ts; memSet(kk, u2); setSkip(kk, false); await insSave(); closeSheet(); render(); toast('Horário salvo: ' + t + '.');
   } else if (e.target.id === 'ins-log-form') {
     e.preventDefault(); const id = e.target.dataset.id, old = id ? S.inslog.find(x => x.id === id) : null;
-    const kind = old ? old.kind : $('#il-k').value, d = $('#il-d').value, t = parseTime($('#il-t').value);
+    const sel = old ? '' : $('#il-k').value, pi = sel.startsWith('p:') ? (S.plan.insulin || []).find(x => x.id === sel.slice(2)) : null, kind = old ? old.kind : pi ? ocDoseKind(pi.role, pi.name, '') : sel, d = $('#il-d').value, t = parseTime($('#il-t').value);
     if (!parseDate(d)) { $('#il-err').textContent = 'Informe uma data válida.'; return; }
     if (!t) { $('#il-err').textContent = 'Informe um horário válido (ex.: 21:30).'; return; }
     const ts = mkTs(d, t); if (ts > Date.now() + 60000) { $('#il-err').textContent = 'Esse horário ainda não chegou.'; return; }
     const un = parseUnits($('#il-u').value); if (un === 'bad') { $('#il-err').textContent = 'Unidades: informe um número entre 0,5 e 300 (ou deixe em branco).'; return; }
     if (old) { const nb = { ...old, ts, date: isoDate(new Date(ts)) }; if (kind === 'extra' && $('#il-n')) nb.name = $('#il-n').value.trim().slice(0, 80) || old.name; if (un != null) nb.units = un; else delete nb.units; await logPut(nb); if (kind === 'basal' && old.ts === S.ins.basalTs) S.ins.basalTs = ts; }
-    else { await logAdd(kind, ts, un); if (kind === 'basal') { const lb = S.inslog.filter(x => x.kind === 'basal').pop(); if (!S.ins.basalTs || lb.ts > S.ins.basalTs) S.ins.basalTs = lb.ts; } }
+    else { const nr = await logAdd(kind, ts, un); if (pi) { nr.insId = pi.id; nr.name = pi.name; nr.insulin = pi.name; nr.src = 'manual'; await logPut(nr); } if (kind === 'basal') { const lb = S.inslog.filter(x => x.kind === 'basal').pop(); if (!S.ins.basalTs || lb.ts > S.ins.basalTs) S.ins.basalTs = lb.ts; } }
     insSync(); await insSave(); closeSheet(); render(); toast('Registro salvo.');
-  } else if (e.target.id === 'ins-min-form') {
-    e.preventDefault(); const v = parseNum($('#im-v').value); if (v === null || v < 70 || v > 400) { $('#im-err').textContent = 'Informe um valor entre 70 e 400.'; return; }
-    S.ins.dinnerMin = Math.round(v); await insSave(); closeSheet(); render(); toast('Limite salvo: ' + S.ins.dinnerMin + ' mg/dL.');
   }
 });
 
@@ -416,9 +376,9 @@ document.addEventListener('submit', async e => {
 function insLogForm(r) {
   const now = new Date(), d = r ? r.date : isoDate(now), t = r ? HM(r.ts) : HM(now.getTime());
   return `<h2>${r ? 'Editar · ' + esc(insName(r)) : 'Registrar dose passada'}</h2><p class="hint" style="margin:0 0 12px">Horário e unidades são registros seus. O app não calcula nem sugere dose.</p><form id="ins-log-form" data-id="${r ? r.id : ''}" novalidate><div class="form-grid">
-    ${r && r.kind === 'extra' ? `<div class="field full"><label class="fl" for="il-n">Insulina</label><input class="in" id="il-n" maxlength="80" value="${esc(r.name || '')}"></div>` : ''}${r ? '' : `<div class="field full"><label class="fl" for="il-k">Tipo</label><select class="in" id="il-k"><option value="basal">Basal</option><option value="fast">Rápida · Jejum</option><option value="lunch">Rápida · Antes do almoço</option><option value="dinner">Rápida · Antes do jantar</option></select></div>`}
-    <div class="field"><label class="fl" for="il-d">Data</label><input class="in" type="date" id="il-d" value="${d}" max="${isoDate(now)}"></div>
-    <div class="field"><label class="fl" for="il-t">Horário</label><input class="in" id="il-t" value="${t}" inputmode="numeric" placeholder="21:30" autocomplete="off"></div>${unitsField('il-u', r ? r.units : null)}</div>
+    ${r && r.kind === 'extra' ? `<div class="field full"><label class="fl" for="il-n">Insulina</label><input class="in" id="il-n" maxlength="80" value="${esc(r.name || '')}"></div>` : ''}${r ? '' : `<div class="field full"><p class="eyebrow il-bt">1 · Qual insulina?</p><select class="in" id="il-k" aria-label="Qual insulina?">${ilOptions()}</select></div>`}
+    <p class="eyebrow il-bt" style="grid-column:1/-1;margin:6px 0 0">${r ? 'Quando aconteceu?' : '2 · Quando aconteceu?'}</p><div class="field"><label class="fl" for="il-d">Data</label><input class="in" type="date" id="il-d" value="${d}" max="${isoDate(now)}"></div>
+    <div class="field"><label class="fl" for="il-t">Horário</label><input class="in" id="il-t" value="${t}" inputmode="numeric" placeholder="21:30" autocomplete="off"></div><p class="eyebrow il-bt" style="grid-column:1/-1;margin:6px 0 0">${r ? 'Quantas unidades foram tomadas?' : '3 · Quantas unidades foram tomadas?'}</p>${unitsField('il-u', r ? r.units : null)}</div><div class="il-rev" id="il-rev" aria-live="polite"></div>
     <div class="err" id="il-err" role="alert" style="color:var(--red-l);min-height:18px;margin-top:6px"></div>
     <div class="stack" style="margin-top:10px"><button class="btn pri full" type="submit">Salvar</button>${r ? `<button class="btn full" type="button" data-act="ins-log-del-ask" data-id="${r.id}">Excluir registro</button>` : ''}</div></form>`;
 }
@@ -464,7 +424,7 @@ function viewInsulinas() {
   const rapid = ['fast', 'lunch', 'dinner'].map(k => { const st = insStats(list.filter(x => x.kind === k)); return `<div class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line,var(--line))"><span><b>${k === 'fast' ? 'Jejum' : k === 'lunch' ? 'Antes do almoço' : 'Antes do jantar'}</b><div class="dim" style="font-size:13.5px">${st.n ? st.n + ' registro' + (st.n > 1 ? 's' : '') + ' em 30 dias' : 'Sem registros em 30 dias'}${(() => { const us = unitsStat(list.filter(x => x.kind === k)); return us ? '<br>' + unitsTxt(us) : ''; })()}</div></span><span class="num" style="text-align:right">${st.n ? '<b>' + hhmm(st.mean) + '</b><div class="dim" style="font-size:13.5px">' + (st.n > 1 ? hhmm(st.earliest) + ' – ' + hhmm(st.latest) : 'média') + '</div>' : '—'}</span></div>`; }).join('');
   const byDay = {}; all.forEach(r => (byDay[r.date] = byDay[r.date] || []).push(r));
   const days = Object.keys(byDay).sort().reverse();
-  const dl = days.length ? `<div class="stack" style="gap:8px">${days.map(d => `<div class="card" style="padding:12px"><div class="num" style="font-weight:700;margin-bottom:8px">${fmtDate(d)}</div><div class="row" style="flex-wrap:wrap;gap:6px">${byDay[d].sort((a, b) => a.ts - b.ts).map(r => `<button class="btn sm" data-act="ins-log-edit" data-id="${r.id}">${esc(insName(r))} · ${HM(r.ts)}${r.units != null ? ' · ' + fU(r.units) : ''}</button>`).join('')}</div></div>`).join('')}</div>` : `<div class="card"><p class="hint" style="margin:0">Nenhum registro nos últimos 30 dias.</p></div>`;
+  const dl = days.length ? `<div class="stack" style="gap:8px">${days.map(d => `<div class="card" style="padding:12px"><div class="num" style="font-weight:700;margin-bottom:8px">${fmtDate(d)}</div><div class="row" style="flex-wrap:wrap;gap:6px">${byDay[d].sort((a, b) => a.ts - b.ts).map(r => `<button class="btn sm" data-act="ins-log-edit" data-id="${r.id}">${esc(insName(r))} · ${HM(r.ts)}${r.units != null ? ' · ' + fU(r.units) : (r.status === 'confirmada' ? ' · confirmada, sem quantidade' : '')}</button>`).join('')}</div></div>`).join('')}</div>` : `<div class="card"><p class="hint" style="margin:0">Nenhum registro nos últimos 30 dias.</p></div>`;
   return banners() + `<p class="hint" style="margin:0 0 12px">Mostra a que horas você costuma tomar cada insulina e quanto isso varia entre os dias. São só registros seus: o app não calcula nem sugere dose.</p>
   <button class="btn pri full" data-act="ins-log-new">Registrar dose passada</button>
   <h2 class="sec">Basal · últimos 30 dias</h2><div class="card">${basal}</div>
@@ -1406,7 +1366,6 @@ function viewConfig() {
   return banners() + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
-    <div class="row sp"><span><b>Limite da insulina do jantar</b><br><span class="dim" style="font-size:14px">Hoje: ${S.ins.dinnerMin} mg/dL (definido por você e seu médico)</span></span><button class="btn sm" data-act="ins-min">Alterar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
   </div></div>
   <h2 class="sec">Roleta de insulina</h2><div class="card"><p class="hint" style="margin:0 0 10px">Vale para todas as telas em que você escolhe unidades (Ui). O limite é por aplicação, não por dia. Doses já registradas acima do limite continuam como estão.</p><div class="uip-cfg">
