@@ -4,7 +4,7 @@
 const PTR = { busy: false, on: false, y0: 0, x0: 0, d: 0, id: 0 };
 const PTR_TRIGGER = 72, PTR_MAX = 96;
 (function () {
-  const SKIP = 'input, textarea, select, [contenteditable], [role=slider], [role=spinbutton], .uip, .chart, .xscroll, #acb, #acp, #acz, #dr, #lk, .sheet-bg, .rw-bg, .pm-bg';
+  const SKIP = '.in-grip, input, textarea, select, [contenteditable], [role=slider], [role=spinbutton], .uip, .chart, .xscroll, #acb, #acp, #acz, #dr, #lk, .sheet-bg, .rw-bg, .pm-bg';
   const calm = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
   const top = () => (document.scrollingElement || document.documentElement).scrollTop <= 0;
   /* algum contêiner que rola (horizontal ou vertical) entre o toque e a página? então não é com a gente */

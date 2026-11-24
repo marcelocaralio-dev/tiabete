@@ -13,21 +13,24 @@ const INC = (typeof module !== 'undefined' && typeof require === 'function') ? r
 /* Cartões que o usuário pode reordenar e ocultar. Ficam de fora (essenciais, sempre visíveis): situação geral, acontecimentos
    importantes, atalhos, avisos/lembretes (banners) e a navegação. */
 const IN_CARDS = [
-  { k: 'hoje', t: 'Evolução do dia' },
-  { k: 'hba', t: 'Hemoglobina glicada (estimativa)' },
-  { k: 'exa', t: 'Exames e HbA1c de laboratório' },
-  { k: 'evo', t: 'Evolução da glicemia' },
-  { k: 'trat', t: 'Meu tratamento' },
-  { k: 'var', t: 'Variabilidade' },
-  { k: 'med', t: 'Média no período' },
-  { k: 'cmp', t: 'Comparação' },
-  { k: 'min', t: 'Menor' },
-  { k: 'max', t: 'Maior' },
-  { k: 'n', t: 'Medições' },
-  { k: 'hipo', t: 'Episódios abaixo de 70' },
-  { k: 'hiper', t: 'Acima da faixa' },
-  { k: 'dist', t: 'Distribuição por faixa' }
+  { k: 'hoje', t: 'Evolução do dia', d: 'Medições do dia em gráfico e linha do tempo.' },
+  { k: 'hba', t: 'Hemoglobina glicada (estimativa)', d: 'HbA1c estimada a partir dos últimos 90 dias.' },
+  { k: 'exa', t: 'Exames e HbA1c de laboratório', d: 'Último exame e última HbA1c de laboratório.' },
+  { k: 'evo', t: 'Evolução da glicemia', d: 'Gráfico resumido das medições do período.' },
+  { k: 'trat', t: 'Meu tratamento', d: 'Resumo de insulina e medicamentos.' },
+  { k: 'var', t: 'Variabilidade', d: 'Desvio-padrão e amplitude das medições.' },
+  { k: 'med', t: 'Média no período', d: 'Média do período e diferença para o anterior.' },
+  { k: 'cmp', t: 'Comparação', d: 'Período atual comparado ao anterior.' },
+  { k: 'min', t: 'Menor', d: 'Menor glicemia do período.' },
+  { k: 'max', t: 'Maior', d: 'Maior glicemia do período.' },
+  { k: 'n', t: 'Medições', d: 'Quantidade de medições no período.' },
+  { k: 'hipo', t: 'Episódios abaixo de 70', d: 'Medições abaixo de 70 mg/dL.' },
+  { k: 'hiper', t: 'Acima da faixa', d: 'Medições acima da faixa-alvo.' },
+  { k: 'dist', t: 'Distribuição por faixa', d: 'Proporção das medições em cada faixa.' }
 ];
+/* Cards estruturais: NÃO fazem parte da lista personalizável (não entram em order/hidden, não têm alça nem ocultação).
+   Resumo glicêmico fica sempre no topo; Central de Métricas, sempre no final. */
+const IN_FIXED = [{ k: 'resumo', t: 'Resumo glicêmico', pos: 'top' }, { k: 'metricas', t: 'Central de Métricas', pos: 'bottom' }];
 /* Indicadores que podem ir para o painel de situação geral (máximo IN_PRI_MAX). */
 const IN_IND = [
   { k: 'media', t: 'Média do período' },
@@ -73,6 +76,25 @@ function inTogglePri(p, k) {
   if (q.pri.length >= IN_PRI_MAX) return { prefs: q, msg: `Escolha no máximo ${IN_PRI_MAX} indicadores.` };
   q.pri = [...q.pri, k]; return { prefs: q, msg: '' };
 }
+/* Cartões ocultos, na ordem do catálogo (área "Cards disponíveis"). */
+const inHiddenCards = p => { const q = inCleanPrefs(p); return IN_CARDS.filter(c => q.hidden.includes(c.k)); };
+/* Move um cartão VISÍVEL uma posição entre os visíveis (pula os ocultos). */
+function inMoveVisible(p, k, dir) {
+  const q = inCleanPrefs(p), vis = q.order.filter(x => !q.hidden.includes(x)), i = vis.indexOf(k), j = i + dir;
+  if (i < 0 || j < 0 || j >= vis.length) return q;
+  const n = vis.slice(); [n[i], n[j]] = [n[j], n[i]]; return inReorder(q, n);
+}
+/* Aplica uma nova ordem dos cartões visíveis (vinda do arraste). Os ocultos ficam onde estavam; chaves estranhas/duplicadas são ignoradas. */
+function inReorder(p, visKeys) {
+  const q = inCleanPrefs(p), vis = q.order.filter(x => !q.hidden.includes(x)), want = [], seen = new Set();
+  (visKeys || []).forEach(k => { if (vis.includes(k) && !seen.has(k)) { seen.add(k); want.push(k); } });
+  vis.forEach(k => { if (!seen.has(k)) want.push(k); });
+  let i = 0; q.order = q.order.map(k => q.hidden.includes(k) ? k : want[i++]); return q;
+}
+/* Oculta (reversível; nada é apagado). */
+function inHide(p, k) { const q = inCleanPrefs(p); if (!IN_CARDS.some(c => c.k === k) || q.hidden.includes(k)) return q; q.hidden = [...q.hidden, k]; return q; }
+/* Readiciona um cartão oculto: vai para o fim da lista personalizável (sempre acima da Central de Métricas). */
+function inShow(p, k) { const q = inCleanPrefs(p); if (!q.hidden.includes(k)) return q; q.hidden = q.hidden.filter(x => x !== k); q.order = q.order.filter(x => x !== k).concat(k); return q; }
 const inVisible = p => { const q = inCleanPrefs(p); return q.order.filter(k => !q.hidden.includes(k)); };
 
 /* ---------- utilitários ---------- */
@@ -265,4 +287,4 @@ function inScale(vals, lo, hi) {
   return { min: mn, max: mx, pos: v => Math.max(0, Math.min(100, (v - mn) / span * 100)) };
 }
 
-if (typeof module !== 'undefined') module.exports = { IN_CARDS, IN_IND, IN_PRI_MAX, IN_PRI_DEF, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inTogglePri, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };
+if (typeof module !== 'undefined') module.exports = { IN_FIXED, inHiddenCards, inMoveVisible, inReorder, inHide, inShow, IN_CARDS, IN_IND, IN_PRI_MAX, IN_PRI_DEF, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inTogglePri, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };

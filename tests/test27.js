@@ -118,16 +118,17 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     await pg.click('.in-ind[data-pm="med"], .in-ind'); await sleep(250); ok(await q('#pm-bg') === 1, 'ui: indicador abre os detalhes'); await pg.evaluate(() => pmClose(true));
     /* personalização: mover, ocultar, indicador, persistir, restaurar */
     const keys = () => pg.evaluate(() => [...document.querySelectorAll('.pn-grid > *')].map(e => e.dataset.pm || (e.classList.contains('in-day') ? 'hoje' : e.classList.contains('in-exa') ? 'exa' : '')).join(','));
-    const before = await keys(); await pg.click('[data-act="in-cust"]'); await sleep(200);
-    ok(await q('#sheet-bg .in-cr') === 14 && await q('#sheet-bg .in-pill') === 8, 'ui: folha de personalização lista cartões e indicadores');
-    await pg.click('[data-act="in-mv"][data-k="dist"][data-d="-1"]'); await pg.click('[data-act="in-vis"][data-k="min"]'); await sleep(200);
+    const before = await keys(); await pg.click('[data-act="in-cust"]'); await sleep(250);
+    ok(await q('.in-grip') === 14 && await q('.in-hide') === 14 && await q('.in-hero .in-grip, .mt-blk .in-grip, .in-hero .in-hide, .mt-blk .in-hide') === 0, 'ui: modo de edição no Início: alça e ocultar nos 14 cartões, nenhum nos dois estruturais');
+    await pg.focus('.in-grip[data-grip="dist"]'); await pg.keyboard.press('ArrowUp'); await pg.click('.in-hide[data-k="min"]'); await sleep(250);
+    await pg.click('[data-act="in-done"]'); await sleep(250);
     const after = await keys(); ok(after !== before && !/\bmin\b/.test(after) && after.indexOf('dist') < before.indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
-    ok(await q('#sheet-bg') === 1, 'ui: a folha continua aberta depois de cada alteração');
-    await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(100); ok(/no máximo/.test(await txt('#in-msg')) && await q('#sheet-bg .in-pill[aria-pressed="true"]') === 4, 'ui: limite de indicadores é avisado e respeitado');
+    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-indt"]'); await sleep(350);
+    await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(100); ok(/no máximo/.test(await txt('#in-msg')) && await q('.in-ed-pb .in-pill[aria-pressed="true"]') === 4, 'ui: limite de indicadores é avisado e respeitado');
     await pg.click('[data-act="in-pri"][data-k="faixa"]'); await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(150); ok(await q('.in-pc .in-ind') === 4 && /Abaixo de/.test(await txt('.in-inds')), 'ui: escolha dos indicadores prioritários');
     await pg.click('[data-act="in-done"]'); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { } await noGate(pg);
     const kept = await keys(); ok(kept === after && /Abaixo de/.test(await txt('.in-inds')), 'ui: preferências persistem depois de reabrir');
-    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-reset"]'); await sleep(200); ok(await keys() === before && await q('#sheet-bg .in-pill[aria-pressed="true"]') === 4 && !/Abaixo de/.test(await txt('.in-inds')), 'ui: restaurar organização padrão'); await pg.click('[data-act="in-done"]');
+    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-reset"]'); await pg.click('[data-act="in-reset-ok"]'); await sleep(250); await pg.click('[data-act="in-done"]'); await sleep(200); ok(await keys() === before && !/Abaixo de/.test(await txt('.in-inds')), 'ui: restaurar organização padrão');
     ok(await q('.in-hero') === 1 && await q('.in-pc') === 1 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: elementos essenciais continuam mesmo com tudo personalizável');
     /* tema claro e escuro: nenhum texto invisível nos elementos novos */
     for (const th of ['dark', 'light']) { await pg.evaluate(t => setTheme(t), th); await sleep(200);

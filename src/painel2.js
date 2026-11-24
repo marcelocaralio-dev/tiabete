@@ -12,7 +12,7 @@ function pnlCard() {
   return `<h2 class="sec">Visual do Painel</h2><div class="card" style="margin-bottom:12px"><p class="hint" style="margin:0 0 10px">Escolha como a tela Início é mostrada. A escolha é aplicada na hora e fica guardada neste aparelho.</p><div class="seg" role="group" aria-label="Visual do Início" style="display:flex">${o.map(([k, t]) => `<button class="grow" data-act="pnl-mode" data-v="${k}" aria-pressed="${pnlMode === k}">${t}</button>`).join('')}</div><p class="hint" style="margin:8px 0 0">${esc(o.find(x => x[0] === pnlMode)[2])}</p></div>`;
 }
 /* Central de Métricas: UM bloco de acesso depois dos cartões (os cartões não mudam). Só aparece quando já há medições, como o resto do Início. */
-function viewPainel() { return (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()) + (S.records.length && typeof mtHomeBlock === 'function' ? mtHomeBlock() : ''); }
+function viewPainel() { const ed = typeof inEditing === 'function' && S.records.length && inEditing(); return (pnlMode === 'classic' ? viewPainelClassic() : viewPainelCards()) + (S.records.length && typeof mtHomeBlock === 'function' ? (ed ? inFixRow('bottom') : '') + mtHomeBlock() : ''); }
 
 const PNI = {
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
@@ -77,7 +77,8 @@ function viewPainelCards() {
   const d = pnData(), { all, sc, cmp, rc } = d;
   if (!all.length) return viewPainelClassic(); // boas-vindas
   const M = inModel();
-  let h = banners() + labelBanner() + pfInvite() + prNotice('painel');
+  const ed = inEditing();
+  let h = (ed ? inEditBar() : inTopBtn()) + banners() + labelBanner() + pfInvite() + prNotice('painel');
   const C = {};
   C.hoje = inDayCard(d);
   const e = est90();
@@ -103,8 +104,8 @@ function viewPainelCards() {
   C.dist = pnCard('dist', 'wide pn-dist-c', 'pie', 'Distribuição por faixa',
     n ? `<span class="pn-bar" aria-hidden="true">${BAND_LIST.filter(b => bc[b.k]).map(b => `<i class="d-${b.k}" style="flex:${bc[b.k]}"></i>`).join('')}</span><span class="pn-leg">${BAND_LIST.filter(b => bc[b.k]).map(b => `<span><i class="d-${b.k}"></i><b class="num">${(bc[b.k] / n * 100).toFixed(0)}%</b> ${b.name.toLowerCase()}</span>`).join('')}</span>` : '<span class="pn-sub">Sem medições neste período.</span>',
     'Distribuição por faixa');
-  const cards = inVisible(inPrefs()).map(k => C[k] || '').join('');
-  return h + inHero() + inStale(M) + inPeriodo(M) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid">${cards}</div>` + `<div class="in-cust-w"><button type="button" class="btn sm in-cust" data-act="in-cust">${pnIc('sliders')}Personalizar tela</button></div>`;
+  const vis = inVisible(inPrefs()), cards = ed ? vis.map(k => inEditCard(k, C[k] || '')).join('') : vis.map(k => C[k] || '').join('');
+  return h + (ed ? inFixRow('top') : '') + inHero() + inStale(M) + inPeriodo(M) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid${ed ? ' editing' : ''}">${cards}</div>`;
 }
 
 /* ---------- Janela flutuante (detalhes) ---------- */
