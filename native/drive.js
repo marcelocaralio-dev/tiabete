@@ -48,6 +48,29 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   const qOf = q => String(q || '').replace(/\btitle\s*=/g, 'name =').replace(/\bparentId\s*=\s*'([^']+)'/g, "'$1' in parents").replace(/\bowner\s*=\s*'me'/g, "'me' in owners");
   const json = (o) => JSON.stringify(o);
 
+  /* ---------- Sair da conta Google (componente único, usado no Perfil e no card do Drive) ---------- */
+  const LOGOUT_IC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+  const signedIn = () => !!(G.conn || G.profile);
+  const outBtn = () => `<button type="button" class="gx-out-btn" data-act="g-out-ask" ${G.busy ? 'disabled' : ''}>${LOGOUT_IC}<span>Sair da conta Google</span></button>`;
+  const withTimeout = (p, ms) => Promise.race([p, new Promise(ok => setTimeout(ok, ms))]);
+  /* Seção "Conta Google" do Perfil: conectado = e-mail + botão vermelho de saída; desconectado = opção de entrar de novo. */
+  function accountCard() {
+    if (!signedIn()) return `<h2 class="sec">Conta Google</h2><div class="card gx-acct"><p class="hint" style="margin:0">Você não está conectado a uma conta Google. Seus registros ficam só neste aparelho. Entrar liga a cópia opcional no seu Drive e vincula a licença à conta, sem apagar nem mover nada.</p>
+      <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="g-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Entrar com Google'}</button></div></div>`;
+    const em = G.profile && G.profile.email ? G.profile.email : '', nm = G.profile && G.profile.name ? G.profile.name : '', ini = String(nm || em || 'G').trim().charAt(0).toUpperCase();
+    return `<h2 class="sec">Conta Google</h2><div class="card gx-acct"><div class="gx-acct-id"><span class="gx-acct-av" aria-hidden="true">${esc(ini)}</span><div class="gx-acct-tx"><b>${esc(nm || em || 'Conta Google conectada')}</b>${em && nm ? `<span>${esc(em)}</span>` : ''}<small>${G.conn ? 'Conectada' : 'Conexão expirada · entre de novo para usar o Drive'}</small></div></div>
+      <p class="hint" style="margin:12px 0 0">Sair encerra só o login do Google neste aparelho. <b>Seus registros, histórico e configurações não são apagados.</b></p>
+      <div class="stack" style="margin-top:12px">${outBtn()}</div></div>`;
+  }
+  /* Confirmação antes de desconectar: explica o que acontece e o que NÃO acontece. */
+  function askSignOut() {
+    if (G.busy || !signedIn()) return;
+    const who = G.profile && G.profile.email ? `<b>${esc(G.profile.email)}</b>` : 'a sua conta Google';
+    openSheet(`<h2>Sair da conta Google?</h2><p style="margin:0 0 10px">Você está prestes a sair da conta Google vinculada ao GLUXO (${who}).</p>
+      <p class="hint" style="margin:0 0 16px"><b>Nenhum dado será apagado.</b> Suas medições, histórico, alimentos, medicamentos, insulinas e configurações continuam neste aparelho. A cópia programada no Drive será desligada e as cópias que já estão no seu Drive não são tocadas. Você pode entrar de novo quando quiser.</p>
+      <div class="row"><button class="btn grow" type="button" data-act="close" autofocus>Cancelar</button><button class="btn gx-out-confirm grow" type="button" data-act="g-out">${LOGOUT_IC}<span>Sair da conta</span></button></div>`);
+  }
+
   window.TB_DRV = {
     async call(tool, input) {
       input = input || {};
@@ -73,11 +96,11 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
       }
       throw E('tool_error', 'Operação não suportada.');
     },
-    signIn: () => connect(), state: G,
+    signIn: () => connect(), state: G, signedIn, accountCard, askSignOut, signOut: () => disconnect(),
     card(drv, body) {
       if (!G.loaded) load();
       const intro = `Salva uma cópia completa na pasta <b>GLUXO Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
-      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px"><button class="btn full" data-act="g-out" ${G.busy ? 'disabled' : ''}>Sair da conta Google</button></div></div>`;
+      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px">${outBtn()}</div></div>`;
       const idField = G.baked ? '' : `<div class="field" style="margin-top:12px"><label class="fl" for="g-cid">ID do cliente Google (OAuth)</label><input class="in" id="g-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid)}"></div>`;
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}
         <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="g-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Conectar conta Google'}</button></div>
@@ -112,15 +135,28 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     } catch (e) { G.msg = e.aiMsg || 'Falha ao conectar.'; }
     G.busy = false; render(); notify(G.conn ? 'connected' : 'changed');
   }
+  /* Encerra a sessão Google de verdade: revoga o token no Google (melhor esforço, com limite de tempo), apaga o token de renovação do cofre do aparelho
+     e zera o estado em memória. NÃO toca em registros, histórico, alimentos, insulinas, configurações nem nas cópias que já estão no Drive.
+     Se não for possível apagar o token local, nada muda (continua conectado) e a pessoa é avisada. */
   async function disconnect() {
-    G.busy = true; render();
-    try { const rt = await SEC.get('g-refresh'); if (rt) await http('https://oauth2.googleapis.com/revoke', Object.assign({ method: 'POST' }, form({ token: rt }))); } catch (e) { }
-    await SEC.del('g-refresh'); await SEC.setCfg('g-profile', null); await SEC.setCfg('login-skip', false); G.profile = null; G.conn = false; G.access = null; G.idToken = null; G.idErr = null; G.busy = false; G.msg = '';
+    if (G.busy) return;
+    closeSheet(); G.busy = true; G.msg = ''; render();
+    try {
+      let rt = null; try { rt = await SEC.get('g-refresh'); } catch (e) { }
+      if (rt) { try { await withTimeout(http('https://oauth2.googleapis.com/revoke', Object.assign({ method: 'POST' }, form({ token: rt }))), 6000); } catch (e) { } }
+      await SEC.del('g-refresh');
+    } catch (e) {
+      console.error(e); G.busy = false; toast('Não foi possível sair da conta agora. Nada foi apagado. Tente de novo.'); render(); notify('changed'); return;
+    }
+    try { await SEC.setCfg('g-profile', null); } catch (e) { console.error(e); }
+    try { await SEC.setCfg('login-skip', false); } catch (e) { console.error(e); }
+    G.profile = null; G.conn = false; G.access = null; G.exp = 0; G.idToken = null; G.idAt = 0; G.idErr = null; G.pending = null; G.busy = false; G.msg = '';
     S.drv.auto = false; S.drv.folderId = null; S.drv.list = null; try { await drvSavePref(); } catch (e) { }
     toast('Você saiu da conta Google.'); render(); notify('disconnected');
   }
   document.addEventListener('click', e => {
-    const el = e.target.closest('[data-act="g-in"],[data-act="g-out"]'); if (!el) return;
+    const el = e.target.closest('[data-act="g-in"],[data-act="g-out"],[data-act="g-out-ask"]'); if (!el) return;
+    if (el.dataset.act === 'g-out-ask') { askSignOut(); return; }
     (el.dataset.act === 'g-in' ? connect() : disconnect()).catch(x => { console.error(x); G.busy = false; G.msg = 'Algo deu errado. Tente de novo.'; render(); });
   });
   const A = P('App'); if (A && A.addListener) A.addListener('appUrlOpen', d => onUrl(d && d.url));

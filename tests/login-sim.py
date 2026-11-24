@@ -55,7 +55,7 @@ async def main():
             if await pg.query_selector('#rw-ok'): await pg.click('#rw-ok'); await pg.wait_for_timeout(200)
         await pg.evaluate("go('backup')"); await pg.wait_for_timeout(400); await pg.click('text=Expandir tudo'); await pg.wait_for_timeout(200)
         print('mostra e-mail:', 'maria@gmail.com' in await T())
-        await pg.click('[data-act=g-out]'); await pg.wait_for_timeout(800); print('sair mostra gate:', await pg.is_visible('#gate-in'))
+        await pg.click('[data-act=g-out-ask]'); await pg.wait_for_timeout(300); await pg.click('#sheet-bg [data-act=g-out]'); await pg.wait_for_timeout(800); print('sair mostra gate:', await pg.is_visible('#gate-in'))
         await pg.click('#gate-skip'); await pg.wait_for_timeout(300); print('pular some:', not await pg.query_selector('#tb-gate'))
         await pg.reload(); await pg.wait_for_selector('#tb-splash', state='detached', timeout=8000); await pg.wait_for_timeout(300); print('pular lembrado:', not await pg.query_selector('#tb-gate'))
         print('erros', errs); await b.close()

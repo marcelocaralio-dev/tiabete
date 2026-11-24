@@ -468,6 +468,7 @@ async function saveRecord(form) {
   if (hasExamples() && !old) { await removeExamples(); note = ' Dados de exemplo removidos.'; }
   await Store.put('records', rec); await loadAll(); closeSheet(); render(); toast('Medição salva.' + note);
   hypoAfterSave(rec);
+  if (!old) { try { gxGreet(rec); } catch (e) { } } /* saudação visual (saudacao.js): só medição nova, só depois de salvar */
 }
 function openRecord(id) {
   const r = S.records.find(x => x.id === id); if (!r) return;

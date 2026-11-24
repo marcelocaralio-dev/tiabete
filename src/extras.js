@@ -467,7 +467,7 @@ document.addEventListener('click', async e => {
 /* ---------- Tópicos expansíveis / retráteis ---------- */
 S.acc = {};
 const ACC_ALL = /[?&]all\b/.test(location.search); // gancho de teste: abre todos os tópicos
-const ACC_OPEN = { ia: ['como a ia', 'assistente'], painel: ['hoje', 'meu tratamento', 'evolucao'], insrem: [''], esquemas: ['diabetes', 'como voce', 'insulinas', 'medicamentos', 'bomba', 'outros', 'medicoes', 'configuracoes', 'historico'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''], alertasp: ['seus alertas'], backup: ['exportar', 'google drive', 'restaurar'], perfil: ['informa', 'meu tratamento'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
+const ACC_OPEN = { ia: ['como a ia', 'assistente'], painel: ['hoje', 'meu tratamento', 'evolucao'], insrem: [''], esquemas: ['diabetes', 'como voce', 'insulinas', 'medicamentos', 'bomba', 'outros', 'medicoes', 'configuracoes', 'historico'], historico: [''], bolus: [''], padroes: [''], conquistas: [''], ia: [''], alertasp: ['seus alertas'], backup: ['exportar', 'google drive', 'restaurar'], perfil: ['informa', 'meu tratamento', 'conta google'] }; // abertos por padrão; nas demais páginas, só o primeiro (ou todos, se forem até 2)
 try { const a = JSON.parse(localStorage.getItem('tb-acc') || '{}'); if (a && typeof a === 'object') S.acc = a; } catch (e) { }
 const accSave = () => { try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } try { Store.put('meta', { id: 'acc', value: S.acc }); } catch (e) { } };
 const accKey = (route, h2, i) => route + '|' + (route === 'painel' && i === 0 ? 'hoje' : norm(h2.textContent).trim().split('·')[0].trim().slice(0, 40)); // 1º tópico do Painel muda de rótulo (Hoje/Ontem/data)
@@ -631,7 +631,7 @@ document.addEventListener('submit', async e => {
     if (hasExamples()) await removeExamples();
     await Store.put('records', rec); await loadAll();
     if (st0 && S.hypoOff[st0.id]) { delete S.hypoOff[st0.id]; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } // nova medição: o aviso volta à tela inicial
-    render();
+    render(); try { gxGreet(rec); } catch (e) { } /* saudação visual (saudacao.js) */
     if (hypoState()) { if (!hypoRefresh({ g, time: rec.time, n, low: true })) hypoOpen(); toast('Medição registrada. Meça de novo em 15 min.'); }
     else { hypoClose(); toast('Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.'); }
   } catch (x) { console.error(x); err('Não foi possível salvar: ' + (x && x.message || x)); if (btn) btn.disabled = false; }
@@ -1309,6 +1309,7 @@ function viewPerfil() {
   <h2 class="sec">Preferências</h2><div class="stack">${mi2('aparencia', 'Aparência', 'Tema claro, escuro ou automático e tamanho da tela')}${mi2('alertasp', 'Alertas personalizados', 'Avisos ligados a marcações como Dia de perna e à glicemia')}${mi2('lembretes', 'Alertas e lembretes', 'Avisos, lembretes de horário e silêncio noturno')}${mi2('config', 'Configurações', 'Meta de HbA1c, faixas e outros ajustes')}${VIEWS.ia ? mi2('ia', 'Inteligência artificial', 'Provedor e chave de IA') : ''}</div>
   <h2 class="sec">Dados da conta</h2><div class="card">${pfKv('Perfil criado em', has ? fmtDate(isoDate(new Date(p.createdAt))) : 'ainda não criado')}${has ? pfKv('Identificador', esc(String(p.id).slice(0, 8))) : ''}${pfKv('Plataforma', IS_NATIVE ? 'Aplicativo Android' : 'Versão web')}${gp && gp.email ? pfKv('Conta Google', esc(gp.email)) : ''}${pfKv('IA', aiTx)}${pfKv('Medições de glicemia', n.med)}${pfKv('Resultados de HbA1c', n.hba)}${pfKv('Exames', n.ex)}${pfKv('Registros de insulina', n.ins)}${pfKv('Lembretes do tratamento', n.pl)}${pfKv('Alimentos cadastrados', n.fd)}${pfKv('Refeições salvas e feitas', n.sv + n.rm)}${pfKv('Registros da razão', n.rl)}
     <p class="hint" style="margin:10px 0 0">Tudo o que você registra neste aparelho (medições, exames, tratamento, alimentos, bolus, IA, notificações e preferências) pertence a este perfil, fica no banco local e vai na cópia de segurança. Atualizar o app não apaga nada.</p></div>
+  ${window.TB_DRV && TB_DRV.accountCard ? TB_DRV.accountCard() : ''}
   <h2 class="sec">Privacidade e segurança</h2><div class="card"><p class="hint" style="margin:0 0 10px">Bloqueio por PIN, biometria, armazenamento persistente e apagar o perfil estão em Segurança e privacidade.</p><div class="stack"><button class="btn full" data-act="go" data-r="seguranca">Bloqueio e proteção</button><button class="btn full" data-act="go" data-r="privacidade">Privacidade e armazenamento</button></div></div>
   <h2 class="sec">Dados e cópias</h2><div class="card">${pfKv('Última cópia (arquivo)', S.lastBackup ? new Date(S.lastBackup).toLocaleDateString('pt-BR') : 'nenhum ainda')}${pfKv('Última cópia no Drive', drvTx)}${pfKv('Cópia programada', S.drv.auto ? 'ligado' : 'desligado')}
     <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="go" data-r="backup">Cópia, restauração e Google Drive</button></div></div>`;
