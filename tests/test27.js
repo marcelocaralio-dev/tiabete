@@ -97,9 +97,10 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
   const { execSync } = require('child_process'), sleep = ms => new Promise(r => setTimeout(r, ms));
   execSync('node scripts/build-web.js', { cwd: ROOT, stdio: 'ignore' });
   const HTML = 'file://' + ROOT + '/www/index.html';
+  const noGate = pg => pg.evaluate(() => { for (const i of ['tb-gate', 'tb-splash']) { const e = document.getElementById(i); if (e) e.remove(); } });
   const run = async (name, seedFn, fn, opt = {}) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'in27-')), ctx = await chromium.launchPersistentContext(dir, Object.assign({}, devices['Pixel 7'], opt)), pg = ctx.pages()[0] || await ctx.newPage(), errs = [];
-    pg.on('pageerror', e => errs.push(e.message)); await pg.goto(HTML); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1500 }); } catch (e) { }
+    pg.on('pageerror', e => errs.push(e.message)); await pg.goto(HTML); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1500 }); } catch (e) { } await noGate(pg);
     await pg.evaluate(seedFn); await sleep(350); await fn(pg); ok(!errs.length, name + ': sem erros de JavaScript' + (errs.length ? ' (' + errs[0] + ')' : '')); await ctx.close();
   };
   const seedBase = `(async () => { await Store.put('meta', { id: 'seeded', at: 1 }); await removeExamples(); const recs = [], today = new Date(); today.setHours(0, 0, 0, 0);
@@ -108,7 +109,7 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     await Store.putMany('records', recs); await loadAll(); S.route = 'painel'; render(); })()`;
   await run('muitos registros', seedBase, async pg => {
     const q = s => pg.evaluate(s => document.querySelectorAll(s).length, s), txt = s => pg.evaluate(s => (document.querySelector(s) || {}).textContent || '', s);
-    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 4 && await q('.in-hero [data-pm="ult"]') === 1 && await q('.in-hero [data-pm="dia"]') === 1 && await q('.pn-dia') === 0, 'ui: situação geral com 4 indicadores prioritários e a janela da última glicemia');
+    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 0 && await q('.in-pc .in-ind') === 4 && await q('.in-hero [data-pm]') === 0 && await q('.in-pc [data-act="period"]') === 3 && await q('.in-hero [data-act="period"]') === 0 && await q('.pn-dia') === 0, 'ui: Resumo glicêmico sem indicadores/filtro; período de análise independente com 4 indicadores prioritários');
     ok(await q('.in-ev .in-evi') >= 1 && /Hipoglicemia/.test(await txt('.in-ev')), 'ui: card de acontecimentos mostra a hipoglicemia recente');
     ok(await q('.in-day') === 1 && await q('.in-day .in-pt') >= 0, 'ui: evolução do dia presente');
     ok(await q('.pn-grid > *') >= 13 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: cartões, bloco de métricas e navegação preservados');
@@ -123,19 +124,19 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     const after = await keys(); ok(after !== before && !/\bmin\b/.test(after) && after.indexOf('dist') < before.indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
     ok(await q('#sheet-bg') === 1, 'ui: a folha continua aberta depois de cada alteração');
     await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(100); ok(/no máximo/.test(await txt('#in-msg')) && await q('#sheet-bg .in-pill[aria-pressed="true"]') === 4, 'ui: limite de indicadores é avisado e respeitado');
-    await pg.click('[data-act="in-pri"][data-k="faixa"]'); await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(150); ok(await q('.in-hero .in-ind') === 4 && /Abaixo de/.test(await txt('.in-inds')), 'ui: escolha dos indicadores prioritários');
-    await pg.click('[data-act="in-done"]'); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { }
+    await pg.click('[data-act="in-pri"][data-k="faixa"]'); await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(150); ok(await q('.in-pc .in-ind') === 4 && /Abaixo de/.test(await txt('.in-inds')), 'ui: escolha dos indicadores prioritários');
+    await pg.click('[data-act="in-done"]'); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { } await noGate(pg);
     const kept = await keys(); ok(kept === after && /Abaixo de/.test(await txt('.in-inds')), 'ui: preferências persistem depois de reabrir');
     await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-reset"]'); await sleep(200); ok(await keys() === before && await q('#sheet-bg .in-pill[aria-pressed="true"]') === 4 && !/Abaixo de/.test(await txt('.in-inds')), 'ui: restaurar organização padrão'); await pg.click('[data-act="in-done"]');
-    ok(await q('.in-hero') === 1 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: elementos essenciais continuam mesmo com tudo personalizável');
+    ok(await q('.in-hero') === 1 && await q('.in-pc') === 1 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: elementos essenciais continuam mesmo com tudo personalizável');
     /* tema claro e escuro: nenhum texto invisível nos elementos novos */
     for (const th of ['dark', 'light']) { await pg.evaluate(t => setTheme(t), th); await sleep(200);
       const bad = await pg.evaluate(() => { const bg = c => { const m = c.match(/[\d.]+/g).map(Number); return m; }, out = []; document.querySelectorAll('.in-hero, .in-ev, .in-sc, .in-day').forEach(el => { const s = getComputedStyle(el); if (s.visibility === 'hidden' || s.display === 'none') out.push(el.className); }); return out; }); ok(!bad.length, 'ui: tema ' + th + ': blocos visíveis');
-      const lum = await pg.evaluate(() => { const c = getComputedStyle(document.querySelector('.in-sum')).color.match(/\d+/g).map(Number), b = getComputedStyle(document.querySelector('.in-hero')).backgroundColor.match(/\d+/g).map(Number); const L = a => (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]) / 255; return Math.abs(L(c) - L(b)); }); ok(lum > 0.5, 'ui: tema ' + th + ': contraste do texto do resumo (' + lum.toFixed(2) + ')'); }
+      const lum = await pg.evaluate(() => { const c = getComputedStyle(document.querySelector('.in-sum')).color.match(/\d+/g).map(Number), b = (() => { for (let e = document.querySelector('.in-sum'); e; e = e.parentElement) { const m = getComputedStyle(e).backgroundColor.match(/[\d.]+/g).map(Number); if (m.length < 4 || m[3] > 0.9) return m; } return [255, 255, 255]; })(); const L = a => (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]) / 255; return Math.abs(L(c) - L(b)); }); ok(lum > 0.5, 'ui: tema ' + th + ': contraste do texto do resumo (' + lum.toFixed(2) + ')'); }
     await pg.evaluate(() => setTheme('dark'));
     /* atualização após novo registro: a última glicemia e o resumo mudam */
     const b0 = await txt('.in-last-v'); await pg.evaluate(async () => { const d = isoDate(new Date()), t = new Date(); const hm = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); await Store.put('records', { id: 'new1', date: d, time: hm, ts: mkTs(d, hm), glucose: 233, context: 'antes', meal: 'almoco', source: 'manual' }); await loadAll(); render(); }); await sleep(1300); /* o número do Resumo glicêmico sobe até o valor em 1 s */
-    ok(/233/.test(await txt('.in-last-v')) && await txt('.in-last-v') !== b0 && /233/.test(await txt('.in-sum')), 'ui: indicadores atualizam depois de um novo registro');
+    ok(/233/.test(await txt('.in-last-v')) && await txt('.in-last-v') !== b0 && /1\s*$/.test((await txt('.in-rs-m .in-rs-c:nth-child(2) b')).trim()) && /233/.test(await txt('.in-rs-m .in-rs-c:first-child b')), 'ui: Resumo glicêmico atualiza depois de um novo registro (última, média e registros do dia)');
     ok(await q('.in-sc [data-act="in-hist"]') === 1 && await q('.in-sc [data-act="new"][data-ctx="depois"]') === 1, 'ui: atalhos contextuais aparecem depois do registro (histórico e acompanhamento da refeição)');
     await pg.click('.in-sc [data-act="in-hist"]'); await sleep(400); ok(await pg.evaluate(() => S.route) === 'historico', 'ui: atalho leva ao histórico');
   });

@@ -109,11 +109,12 @@ function inSituation(records, now, period, hbaEst) {
   return m;
 }
 /* Texto-resumo: só fatos que os registros sustentam. */
-function inSummary(m) {
+function inSummary(m, opt) {
   if (!m.last) return 'Registre uma medição para o resumo aparecer aqui.';
   const parts = [], f1 = x => (Math.round(x * 10) / 10).toLocaleString('pt-BR'), f0 = x => Math.round(x).toLocaleString('pt-BR');
   const when = m.ageMs < 90 * 60e3 ? 'agora há pouco' : m.ageMs < 24 * 3600e3 ? `há ${Math.round(m.ageMs / 3600e3)} h` : `há ${Math.round(m.ageMs / 86400e3)} dia${Math.round(m.ageMs / 86400e3) === 1 ? '' : 's'}`;
-  parts.push(`Última medição ${when}: ${f0(m.last.glucose)} mg/dL (${m.lastBand.txt.toLowerCase()}).`);
+  /* opt.noLast: o Resumo glicêmico (só do dia atual) já mostra a última medição; o texto do período não a repete */
+  if (!(opt && opt.noLast)) parts.push(`Última medição ${when}: ${f0(m.last.glucose)} mg/dL (${m.lastBand.txt.toLowerCase()}).`);
   if (m.stale) parts.push('Sem medições recentes; os números abaixo refletem o que foi registrado antes.');
   if (m.sc.n) {
     let s = `Média de ${m.period} dias: ${f0(m.sc.mean)} mg/dL em ${m.sc.n} medi${m.sc.n === 1 ? 'ção' : 'ções'}`;
@@ -242,10 +243,26 @@ function inShortcuts(inp) {
   return out.slice(0, 3);
 }
 
+/* ---------- Resumo glicêmico: só o dia atual ----------
+   Usa apenas medições reais da data local de `now`. Independe do período (7/30/90 dias) e do dia escolhido na Evolução do dia.
+   items: da medição mais recente para a mais antiga. Nada é estimado: sem medições, mean/min/max/last são null. */
+function inToday(records, now) {
+  const iso = INC.isoDate(new Date(now));
+  const items = inReal(records).filter(r => r.date === iso).slice().sort((a, b) => (b.ts - a.ts) || String(b.id).localeCompare(String(a.id)));
+  const n = items.length, vals = items.map(r => r.glucose);
+  const inN = items.filter(r => INC.bandOf(r.glucose, r.context).k === 'ok').length;
+  return {
+    iso, n, items, last: n ? items[0] : null,
+    mean: n ? vals.reduce((a, b) => a + b, 0) / n : null,
+    min: n ? Math.min(...vals) : null, max: n ? Math.max(...vals) : null,
+    inN, outN: n - inN
+  };
+}
+
 /* ---------- variabilidade: posição na escala (para a barra de amplitude) ---------- */
 function inScale(vals, lo, hi) {
   const mn = Math.min(40, ...vals), mx = Math.max(hi + 40, ...vals), span = mx - mn;
   return { min: mn, max: mx, pos: v => Math.max(0, Math.min(100, (v - mn) / span * 100)) };
 }
 
-if (typeof module !== 'undefined') module.exports = { IN_CARDS, IN_IND, IN_PRI_MAX, IN_PRI_DEF, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inTogglePri, inVisible, inReal, inTrend, inSituation, inSummary, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };
+if (typeof module !== 'undefined') module.exports = { IN_CARDS, IN_IND, IN_PRI_MAX, IN_PRI_DEF, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inTogglePri, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };

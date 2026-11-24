@@ -2,7 +2,7 @@
    Centro de acompanhamento. A lógica (sem DOM) está em inicio-core.js; aqui só há montagem de HTML e eventos.
    Estrutura da tela (de cima para baixo):
    1. avisos e lembretes (banners existentes, intactos)
-   2. Situação geral (essencial): Resumo glicêmico (última glicemia + barra de faixa + média do dia), resumo em texto, indicadores prioritários, período
+   2. Resumo glicêmico (essencial; só o dia atual, recolhido/expandido) e, logo abaixo, o Período de análise (7/30/90 dias, indicadores e texto do período), componente independente
    3. Atalhos contextuais (discretos; nunca registram nada sozinhos)
    4. Acontecimentos importantes (só aparece quando há algo relevante)
    5. Cartões personalizáveis (ordem e visibilidade escolhidas pela pessoa)
@@ -50,53 +50,81 @@ const IN_EVI = { hipo: 'warn', media: 'trend', var: 'scale', exame: 'flask', hba
 const inTone = t => t === 'bad' ? ' st-bad' : t === 'warn' ? ' st-warn' : t === 'ok' ? ' st-ok' : '';
 const inBand = k => k === 'ok' ? 'ok' : (k === 'low' || k === 'vlow') ? 'low' : 'high';
 
-/* ---------- 2. Situação geral ---------- */
+/* ---------- 2. Resumo glicêmico (só o dia atual) e período de análise (componente independente) ---------- */
 /* Barra de faixa glicêmica: mesmas faixas, cores e escala (30–600) do glicosímetro (GZ, GZ_ZONES, gzFrac em charts.js).
-   `pv` = {f, v, st} da última barra desenhada: a animação do marcador (e da cor) parte dali. */
+   `pv` = {f, v, st} da última barra desenhada: a animação do marcador (e da cor) parte dali.
+   g == null (sem medição no dia): barra neutra, todas as faixas atenuadas e sem marcador. */
 let inRsMem = null;
 function inRangeBar(g, anim, pv) {
-  const C = GZ.ult, hi = g > 600, st = gzState(g), act = hi ? 'xhigh' : st, f = hi ? 1 : gzFrac('ult', g), p0 = pv || { f: 0, st };
-  inRsMem = { f, v: g, st };
+  const C = GZ.ult, none = g == null, hi = !none && g > 600, st = none ? 'ok' : gzState(g), act = none ? '' : hi ? 'xhigh' : st, f = none ? 0 : hi ? 1 : gzFrac('ult', g), p0 = pv || { f: 0, st };
+  if (!none) inRsMem = { f, v: g, st };
   const pc = x => (x * 100).toFixed(2);
   const segs = GZ_ZONES.map(z => {
     const a = Math.max(z.from, C.min), b = Math.min(z.to, C.max); if (b <= a) return '';
     return `<i class="in-rb-z${z.k === act ? ' on' : ''}${z.dash ? ' dash' : ''}" style="left:${pc(gzFrac('ult', a))}%;width:${pc(gzFrac('ult', b) - gzFrac('ult', a))}%;--zc:${z.c}"></i>`;
   }).join('');
   const ticks = C.ticks.filter(t => t > C.min && t < C.max).map(t => `<span style="left:${pc(gzFrac('ult', t))}%">${t}</span>`).join('');
-  return `<span class="in-rb s-${st}${anim ? ' in-rb-anim' : ''}" style="--p:${pc(f)}%;--pf:${pc(p0.f)}%;--gc:${GZ_COL[st]};--gc0:${GZ_COL[p0.st]}" aria-hidden="true"><span class="in-rb-bar">${segs}<i class="in-rb-mk"></i></span><span class="in-rb-t">${ticks}</span></span>`;
+  return `<span class="in-rb s-${st}${none ? ' none' : ''}${anim && !none ? ' in-rb-anim' : ''}" style="--p:${pc(f)}%;--pf:${pc(p0.f)}%;--gc:${GZ_COL[st]};--gc0:${GZ_COL[p0.st]}" aria-hidden="true"><span class="in-rb-bar">${segs}${none ? '' : '<i class="in-rb-mk"></i>'}</span><span class="in-rb-t">${ticks}</span></span>`;
 }
-/* Resumo glicêmico: glicemia mais recente em destaque (abre os detalhes), barra de faixa e, em segundo plano, a média do dia selecionado. */
-function inResumo(M, d) {
-  const last = M.last, bnd = M.lastBand, g = last.glucose, hi = g > 600;
-  const gKey = last.id + '|' + g, gAnim = S.gaugeKey !== gKey; S.gaugeKey = gKey;
+/* Cartão "Resumo glicêmico": só medições da data local de hoje (inToday). Recolhido: última glicemia + barra + média e registros do dia.
+   Expandido (toque no cartão): estatísticas do dia e todos os registros, do mais recente ao mais antigo. Não depende do período 7/30/90. */
+const inRsIso = () => isoDate(new Date());
+function inRsRow(r) {
+  return `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-act="open" data-id="${esc(r.id)}"><span class="tm num"><b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`;
+}
+function inHero() {
+  const T = inToday(S.records, Date.now()), has = T.n > 0, last = T.last, g = has ? last.glucose : null, hi = has && g > 600;
+  const bnd = has ? bandOf(g, last.context) : null, open = has && !!S.rsOpen;
+  const gKey = has ? last.id + '|' + g : '', gAnim = has && S.gaugeKey !== gKey; if (has) S.gaugeKey = gKey;
   const pv = inRsMem, bar = inRangeBar(g, gAnim, pv), from = pv ? pv.v : GZ.ult.min;
-  const dl = pnDayLab(d.iso, d.isToday), dayTxt = dl.indexOf('/') >= 0 ? dl : dl + ' · ' + fmtDate(d.iso).slice(0, 5);
-  const ctx = last.context && CONTEXTS[last.context] ? `<span class="tag">${esc(CONTEXTS[last.context])}</span>` : '';
-  const sd = d.sd, has = d.rs.length > 0, dTone = has && bandOf(sd.mean).k === 'ok' ? ' st-ok' : has ? ' st-bad' : '';
-  const when = `${last.noTime ? '' : last.time + ' · '}${fmtDate(last.date).slice(0, 5)} · ${relTime(last.ts)}`;
-  const avg = has
-    ? `<button type="button" class="in-rs-m${dTone}" data-pm="dia" aria-haspopup="dialog" aria-label="Média do dia: ${fn(sd.mean, 1)} mg/dL, ${bandOf(sd.mean).txt}, ${sd.n} medi${sd.n === 1 ? 'ção' : 'ções'}. Toque para ver os detalhes."><span class="in-rs-c"><span class="in-rs-k">Média do dia</span><span class="in-rs-mv num"><b>${fn(sd.mean, 1)}</b><small>mg/dL</small></span>${badge(sd.mean)}</span><span class="in-rs-c"><span class="in-rs-k">Medições</span><span class="in-rs-mv num"><b>${sd.n}</b></span><span class="in-rs-s">usadas na média</span></span></button>`
-    : `<button type="button" class="in-rs-m" data-pm="dia" aria-haspopup="dialog" aria-label="Média do dia: sem medições. Toque para ver os detalhes."><span class="in-rs-c"><span class="in-rs-k">Média do dia</span><span class="in-rs-mv num"><b>—</b></span><span class="in-rs-s">${d.isToday ? 'Nenhuma medição hoje' : 'Nenhuma medição neste dia'}</span></span></button>`;
-  return `<header class="in-rs-h"><h2 class="in-rs-t">Resumo glicêmico</h2><span class="in-rs-d num">${esc(dayTxt)}</span></header>
-    <button type="button" class="in-last${gAnim ? ' in-rs-anim' : ''}" data-pm="ult" aria-haspopup="dialog" aria-label="Glicemia mais recente: ${hi ? 'HI, acima de 600' : fn(g, 1)} mg/dL, ${bnd.txt}, ${esc(when)}. Escala de ${GZ.ult.min} a ${GZ.ult.max} mg/dL. Toque para ver os detalhes.">
-      <span class="in-last-top"><span class="in-last-v num"><span class="in-rs-num" data-to="${hi ? '' : g}" data-from="${from}">${hi ? 'HI' : fn(g, 1)}</span><small>${hi ? 'acima de 600 mg/dL' : 'mg/dL'}</small></span>${badge(g, last.context, true)}</span>
-      <span class="in-when num">${when}${ctx}</span>${bar}
-    </button>${avg}`;
+  const dayTxt = 'Hoje · ' + fmtDate(T.iso).slice(0, 5);
+  const title = has
+    ? `<button type="button" class="in-rs-tg" data-act="in-rs" aria-expanded="${open}" aria-controls="in-rs-x" aria-label="Resumo glicêmico, ${open ? 'expandido' : 'recolhido'}. ${open ? 'Toque para recolher' : 'Toque para ver todos os registros de hoje'}.">Resumo glicêmico</button>`
+    : 'Resumo glicêmico';
+  const head = `<header class="in-rs-h"><h2 class="in-rs-t">${title}</h2><span class="in-rs-d num">${esc(dayTxt)}</span>${has ? '<span class="ds-chev in-rs-chev" aria-hidden="true"></span>' : ''}</header>`;
+  const when = has ? (last.noTime ? '<span>Sem horário</span>' : `<span>${last.time}</span><span class="in-ago" data-ts="${last.ts}">${esc(relTime(last.ts))}</span>`) + (last.context && CONTEXTS[last.context] ? `<span class="tag">${esc(CONTEXTS[last.context])}</span>` : '') : '';
+  const lastBlk = has
+    ? `<div class="in-last${gAnim ? ' in-rs-anim' : ''}" role="group" aria-label="Última glicemia registrada: ${hi ? 'HI, acima de 600' : fn(g, 1)} mg/dL, ${bnd.txt}, ${last.noTime ? 'sem horário' : esc(last.time)}. Escala de ${GZ.ult.min} a ${GZ.ult.max} mg/dL.">
+        <span class="in-last-k">Última glicemia registrada</span>
+        <span class="in-last-top"><span class="in-last-v num"><span class="in-rs-num" data-to="${hi ? '' : g}" data-from="${from}">${hi ? 'HI' : fn(g, 1)}</span><small>${hi ? 'acima de 600 mg/dL' : 'mg/dL'}</small></span>${badge(g, last.context, true)}</span>
+        <span class="in-when num">${when}</span>${bar}</div>`
+    : `<div class="in-last is-none" role="group" aria-label="Última glicemia registrada: nenhuma medição hoje.">
+        <span class="in-last-k">Última glicemia registrada</span>
+        <span class="in-last-top"><span class="in-last-v num"><span class="in-rs-num">—</span></span></span>
+        <span class="in-when">Nenhuma medição hoje</span>${bar}</div>`;
+  const dTone = has && bandOf(T.mean).k === 'ok' ? ' st-ok' : has ? ' st-warn' : '';
+  const ind = `<div class="in-rs-m${dTone}" role="group" aria-label="Indicadores do dia"><span class="in-rs-c"><span class="in-rs-k">Média do dia</span><span class="in-rs-mv num"><b>${has ? fn(T.mean, 1) : '—'}</b>${has ? '<small>mg/dL</small>' : ''}</span></span><span class="in-rs-c"><span class="in-rs-k">Registros do dia</span><span class="in-rs-mv num"><b>${T.n}</b></span></span></div>`;
+  let more = '';
+  if (has) {
+    const st = (k, v, u, tone) => `<span class="in-rs-c${tone ? ' ' + tone : ''}"><span class="in-rs-k">${k}</span><span class="in-rs-mv num"><b>${v}</b>${u ? `<small>${u}</small>` : ''}</span></span>`;
+    more = `<div class="in-rs-xb"><div class="in-rs-xin" id="in-rs-x" role="region" aria-label="Registros de hoje"${open ? '' : ' inert'}>
+      <div class="in-rs-st">${st('Menor', fn(T.min, 1), 'mg/dL')}${st('Maior', fn(T.max, 1), 'mg/dL')}${st('Na faixa', T.inN, '', 'ok')}${st('Fora da faixa', T.outN, '', T.outN ? 'bad' : '')}</div>
+      <h3 class="in-h3 in-rs-lh">Registros de hoje <small class="num">· ${T.n}</small></h3>
+      <div class="in-rs-list">${T.items.map(inRsRow).join('')}</div>
+      <button type="button" class="btn sm in-rs-less" data-act="in-rs">Recolher</button>
+    </div></div>`;
+  }
+  const cls = has ? 'b-' + bnd.k : 'b-none';
+  return `<section class="in-hero ${cls}${open ? ' open' : ''}${has ? ' can-open' : ''}" data-day="${T.iso}" aria-label="Resumo glicêmico">${head}${lastBlk}${ind}${more}</section>`;
 }
-function inHero(M, d) {
-  const last = M.last, bnd = M.lastBand, oor = last.glucose < LIM.low || last.glucose > LIM.high;
+/* Aviso discreto quando a última medição de todas tem mais de 48 h (independe do período e do dia). */
+function inStale(M) {
+  return M.stale ? `<div class="in-stale" role="status"><span>Sem medições há ${Math.round(M.ageMs / 86400e3)} dias.</span><button type="button" class="btn sm" data-act="new">Nova medição</button></div>` : '';
+}
+/* Período de análise: componente independente (fora do cartão). O seletor 7/30/90 dias (data-act="period", S.period) e os indicadores/texto
+   que dependem dele ficam aqui; nada disso altera o Resumo glicêmico. */
+function inPeriodo(M) {
   const pri = inPrefs().pri.map(k => inIndicator(k, M));
   const chip = x => {
     const bar = x.k === 'faixa' && x.pct != null ? `<i class="in-bar" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, x.pct)).toFixed(0)}%"></i></i>` : '';
     const arrow = x.k === 'tend' ? `<span class="in-arr dir-${x.dir || 'none'}" aria-hidden="true">${x.v}</span>` : `<b class="num in-ind-v">${x.v}</b>`;
     return `<button type="button" class="in-ind${inTone(x.tone)}" data-pm="${x.pm}" aria-haspopup="dialog" aria-label="${esc(x.t)}: ${esc(x.v + ' ' + x.u)}, ${esc(x.sub)}. Toque para ver os detalhes."><span class="in-ind-t">${esc(x.t)}</span><span class="in-ind-row">${arrow}<small class="in-ind-u">${esc(x.u)}</small></span>${bar}<span class="in-ind-s">${esc(x.sub)}</span></button>`;
   };
-  const stale = M.stale ? `<div class="in-stale" role="status"><span>Sem medições há ${Math.round(M.ageMs / 86400e3)} dias.</span><button type="button" class="btn sm" data-act="new">Nova medição</button></div>` : '';
-  return `<section class="in-hero b-${bnd.k}${oor ? ' oor' : ''}" aria-label="Situação geral">
-    ${inResumo(M, d)}
-    ${stale}<p class="in-sum">${esc(M.summary)}</p>
+  return `<section class="in-pc" aria-label="Período de análise">
+    <div class="in-per"><span class="eyebrow in-per-t">Período de análise</span><span class="eyebrow num in-per-r">${fmtDM(M.cur[0])} – ${fmtDM(M.cur[1])}</span></div>
+    <div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div>
     <div class="in-inds" style="--n:${pri.length}">${pri.map(chip).join('')}</div>
-    <div class="in-per"><div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div><span class="eyebrow num">${fmtDM(M.cur[0])} – ${fmtDM(M.cur[1])}</span></div>
+    <p class="in-sum">${esc(inSummary(M, { noLast: true }))}</p>
   </section>`;
 }
 
@@ -208,6 +236,7 @@ document.addEventListener('click', e => {
   const a = el.dataset.act, k = el.dataset.k;
   if (a === 'in-cust') openSheet(inCustHTML(''));
   else if (a === 'in-done') closeSheet();
+  else if (a === 'in-rs') inRsToggle(el);
   else if (a === 'in-mv') inApply(inMove(inPrefs(), k, +el.dataset.d || 0));
   else if (a === 'in-vis') inApply(inToggleHidden(inPrefs(), k));
   else if (a === 'in-pri') { const r = inTogglePri(inPrefs(), k); inApply(r.prefs, r.msg); }
@@ -227,3 +256,26 @@ document.addEventListener('click', e => {
     else go('lembretes');
   }
 });
+
+
+/* ---------- Resumo glicêmico: expandir/recolher (sem navegar, sem redesenhar a tela) ---------- */
+function inRsToggle(el) {
+  const sec = el.closest('.in-hero'); if (!sec || !sec.classList.contains('can-open')) return;
+  const open = !sec.classList.contains('open'), tg = sec.querySelector('.in-rs-tg'), x = sec.querySelector('.in-rs-xin');
+  sec.classList.toggle('open', open); S.rsOpen = open;
+  if (tg) { tg.setAttribute('aria-expanded', String(open)); tg.setAttribute('aria-label', `Resumo glicêmico, ${open ? 'expandido' : 'recolhido'}. ${open ? 'Toque para recolher' : 'Toque para ver todos os registros de hoje'}.`); }
+  if (x) { if (open) x.removeAttribute('inert'); else x.setAttribute('inert', ''); }
+  if (!open && el !== tg) { /* "Recolher" no fim da lista: devolve o foco ao título e mantém o cartão à vista */
+    if (tg) { try { tg.focus({ preventScroll: true }); } catch (e) { } }
+    const r = sec.getBoundingClientRect(); if (r.top < 0) { const red = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; sec.scrollIntoView({ block: 'start', behavior: red ? 'auto' : 'smooth' }); }
+  }
+}
+/* "há X min" acompanha o relógio sem redesenhar a tela; na virada do dia (data local) o cartão passa a mostrar o novo dia. */
+setInterval(() => {
+  try {
+    if (typeof S === 'undefined' || S.route !== 'painel') return;
+    document.querySelectorAll('.in-hero .in-ago[data-ts]').forEach(e => { const t = relTime(+e.dataset.ts); if (e.textContent !== t) e.textContent = t; });
+    const h = document.querySelector('.in-hero[data-day]');
+    if (h && h.dataset.day !== inRsIso() && !document.getElementById('sheet-bg') && !S.pm) render();
+  } catch (e) { }
+}, 30000);

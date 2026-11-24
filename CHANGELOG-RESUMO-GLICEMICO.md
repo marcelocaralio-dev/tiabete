@@ -9,3 +9,8 @@ Os cartões "Glicemia mais recente" (glicosímetro circular) e "Média do dia" (
 - Removidos: CSS exclusivo dos dois glicosímetros do Início (`.pn-gauge`, `.pn-mid`, `.pn-ult/.pn-dia`, alinhamento por subgrade) e `S.gaugeKeyD`. O mostrador circular continua nas janelas de detalhe, na tela de medição e no Início clássico.
 - Animação (marcador, cor e número) só quando a glicemia muda e sem `prefers-reduced-motion`.
 - Testes 22 e 27 ajustados para a nova estrutura.
+
+## 0.45.0 — redesenho do card e filtro separado
+- O Resumo glicêmico passou a mostrar **somente o dia atual** em dois níveis (recolhido: última glicemia + barra + média e registros do dia; expandido: estatísticas e todos os registros de hoje). Detalhes em `CHANGELOG-0.45.0.md`.
+- O seletor 7/30/90 dias, os indicadores e o texto do período saíram do card e formam o componente independente **Período de análise**, logo abaixo.
+- As janelas `data-pm="ult"` e `data-pm="dia"` deixaram de ser abertas pelo card (a expansão no próprio cartão as substitui); o código das janelas foi mantido.

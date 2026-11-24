@@ -71,8 +71,8 @@ function pnTrat() {
 }
 
 /* ---------- Painel (Início) ----------
-   Situação geral, atalhos e acontecimentos (inicio.js) + cartões personalizáveis. Todos os cartões e janelas de detalhe de antes continuam existindo:
-   "Glicemia mais recente" e "Média do dia" agora formam o Resumo glicêmico (inicio.js), dentro do painel de situação geral; cada parte abre a sua janela de detalhes e o seletor de período fica no mesmo painel. */
+   Resumo glicêmico (só o dia atual, recolhido/expandido), Período de análise (seletor 7/30/90 independente), atalhos e acontecimentos (inicio.js) + cartões personalizáveis.
+   Todos os cartões e janelas de detalhe de antes continuam existindo; o seletor de período segue valendo para os cartões e indicadores históricos. */
 function viewPainelCards() {
   const d = pnData(), { all, sc, cmp, rc } = d;
   if (!all.length) return viewPainelClassic(); // boas-vindas
@@ -104,7 +104,7 @@ function viewPainelCards() {
     n ? `<span class="pn-bar" aria-hidden="true">${BAND_LIST.filter(b => bc[b.k]).map(b => `<i class="d-${b.k}" style="flex:${bc[b.k]}"></i>`).join('')}</span><span class="pn-leg">${BAND_LIST.filter(b => bc[b.k]).map(b => `<span><i class="d-${b.k}"></i><b class="num">${(bc[b.k] / n * 100).toFixed(0)}%</b> ${b.name.toLowerCase()}</span>`).join('')}</span>` : '<span class="pn-sub">Sem medições neste período.</span>',
     'Distribuição por faixa');
   const cards = inVisible(inPrefs()).map(k => C[k] || '').join('');
-  return h + inHero(M, d) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid">${cards}</div>` + `<div class="in-cust-w"><button type="button" class="btn sm in-cust" data-act="in-cust">${pnIc('sliders')}Personalizar tela</button></div>`;
+  return h + inHero() + inStale(M) + inPeriodo(M) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid">${cards}</div>` + `<div class="in-cust-w"><button type="button" class="btn sm in-cust" data-act="in-cust">${pnIc('sliders')}Personalizar tela</button></div>`;
 }
 
 /* ---------- Janela flutuante (detalhes) ---------- */
