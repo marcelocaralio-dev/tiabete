@@ -17,7 +17,7 @@ ok(C.inToday(day, L.mkTs(iso(NOW + D), '00:01')).n === 1 && C.inToday(day, L.mkT
 const m0 = C.inSituation(day, NOW, 30, null);
 ok(/Última medição/.test(C.inSummary(m0)) && !/Última medição/.test(C.inSummary(m0, { noLast: true })) && /Média de 30 dias/.test(C.inSummary(m0, { noLast: true })), 'texto do período não repete a última medição, mas mantém a parte histórica');
 const si = fs.readFileSync(ROOT + '/src/inicio.js', 'utf8'), sc = fs.readFileSync(ROOT + '/src/inicio.css', 'utf8'), pn = fs.readFileSync(ROOT + '/src/painel2.js', 'utf8');
-ok(/inHero\(\) \+ inStale\(M\) \+ inPeriodo\(M\)/.test(pn), 'tela: filtro logo abaixo do Resumo glicêmico');
+ok(/inHero\(\) \+ inStale\(M\) \+ `<div class="pn-grid/.test(pn) && /C\.per = inPeriodo\(M\)/.test(pn) && require('../src/inicio-core.js').IN_DEF().order[0] === 'per', 'tela: filtro (card Período de análise) é o primeiro card, logo abaixo do Resumo glicêmico');
 const heroFn = si.slice(si.indexOf('function inHero()'), si.indexOf('function inStale'));
 ok(!/S\.period|data-act="period"|inSituation|inModel/.test(heroFn), 'Resumo glicêmico não lê o período (7/30/90)');
 ok(/gzFrac\('ult'/.test(si) && /GZ_ZONES/.test(si) && !/Math\.random/.test(si), 'barra reaproveita a lógica do mostrador existente (GZ, GZ_ZONES, gzFrac)');
@@ -55,7 +55,7 @@ ok(/gzFrac\('ult'/.test(si) && /GZ_ZONES/.test(si) && !/Math\.random/.test(si), 
     const hCol = await pg.evaluate(() => document.querySelector('.in-hero').getBoundingClientRect().height);
     ok(await q('.in-hero [data-act="period"]') === 0 && await q('.in-hero .seg') === 0 && await q('.in-hero .in-sum') === 0 && await q('.in-hero .in-ind') === 0, 'recolhido: sem filtro, médias históricas, tendência, variabilidade, % na faixa ou texto automático dentro do card');
     /* o filtro é independente e vem logo abaixo */
-    ok(await pg.evaluate(() => { const h = document.querySelector('.in-hero'), p = document.querySelector('.in-pc'); return !h.contains(p) && !!p.querySelector('.seg') && (h.nextElementSibling === p || h.nextElementSibling.nextElementSibling === p); }), 'filtro: fora do card, logo abaixo');
+    ok(await pg.evaluate(() => { const h = document.querySelector('.in-hero'), p = document.querySelector('.in-pc'); const g = document.querySelector('.pn-grid'); return !h.contains(p) && !!p.querySelector('.seg') && g.firstElementChild === p && (h.nextElementSibling === g || h.nextElementSibling.nextElementSibling === g); }), 'filtro: fora do card, logo abaixo');
     /* toque em qualquer ponto do cartão expande, sem navegar */
     const route0 = await pg.evaluate(() => S.route), y0 = await pg.evaluate(() => scrollY);
     await tap('.in-hero .in-rb-t'); await sleep(450);
@@ -73,11 +73,11 @@ ok(/gzFrac\('ult'/.test(si) && /GZ_ZONES/.test(si) && !/Math\.random/.test(si), 
       periods.push(await pg.evaluate(() => S.period)); ranges.push(await txt('.in-per-r'));
       ok(await pg.evaluate(p => document.querySelector(`.in-pc [data-act="period"][data-p="${p}"]`).getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.in-pc [aria-pressed="true"]').length === 1, p), 'filtro ' + p + ' dias: opção selecionada e destacada');
       ok(await pg.evaluate(() => document.querySelector('.in-hero').innerText) === heroTxt && await pg.getAttribute('.in-rs-tg', 'aria-expanded') === 'true', 'filtro ' + p + ' dias: Resumo glicêmico não muda (nem recolhe)');
-      const sub = await txt('.in-pc .in-ind-s'), med = await txt('.pn-med'); ok(new RegExp(p + ' dias').test(sub + (await txt('.in-sum'))) && new RegExp(p + ' dias').test(med + (await txt('.pn-evo'))), 'filtro ' + p + ' dias: indicadores e cartões históricos acompanham o período');
+      const sub = await txt('.in-ind .in-ind-s'), med = await txt('.pn-med'); ok(new RegExp(p + ' dias').test(sub + (await txt('.in-sum'))) && new RegExp(p + ' dias').test(med + (await txt('.pn-evo'))), 'filtro ' + p + ' dias: indicadores e cartões históricos acompanham o período');
     }
     ok(periods.join() === '30,90,7' && new Set(ranges).size === 3 && ranges.every(r => /\d\d\/\d\d\s*–\s*\d\d\/\d\d/.test(r)), 'filtro: intervalo de datas muda com o período (' + ranges.join(' | ') + ')');
-    const mean7 = await pg.evaluate(() => document.querySelector('.in-pc .in-ind-v') && document.querySelector('.in-pc .in-ind-v').textContent);
-    await pg.click('.in-pc [data-act="period"][data-p="90"]'); await sleep(300); ok(await pg.evaluate(() => document.querySelector('.in-pc .in-ind-v').textContent) !== mean7, 'filtro: a média do período muda de 7 para 90 dias');
+    const mean7 = await pg.evaluate(() => document.querySelector('.in-ind .in-ind-v') && document.querySelector('.in-ind .in-ind-v').textContent);
+    await pg.click('.in-pc [data-act="period"][data-p="90"]'); await sleep(300); ok(await pg.evaluate(() => document.querySelector('.in-ind .in-ind-v').textContent) !== mean7, 'filtro: a média do período muda de 7 para 90 dias');
     /* recolher */
     await tap('.in-rs-less'); await sleep(450); ok(await pg.getAttribute('.in-rs-tg', 'aria-expanded') === 'false' && !(await vis('.in-rs-list .rec')), 'controle: "Recolher" fecha o cartão');
     await tap('.in-rs-tg'); await sleep(400); ok(await pg.getAttribute('.in-rs-tg', 'aria-expanded') === 'true', 'controle: o título também expande'); await tap('.in-hero .in-last-v'); await sleep(400); ok(await pg.getAttribute('.in-rs-tg', 'aria-expanded') === 'false', 'controle: novo toque recolhe');

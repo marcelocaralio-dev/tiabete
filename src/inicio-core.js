@@ -10,9 +10,30 @@ const INC = (typeof module !== 'undefined' && typeof require === 'function') ? r
 };
 
 /* ---------- catálogo de cartões e indicadores ---------- */
-/* Cartões que o usuário pode reordenar e ocultar. Ficam de fora (essenciais, sempre visíveis): situação geral, acontecimentos
-   importantes, atalhos, avisos/lembretes (banners) e a navegação. */
+/* Indicadores do painel (um card editável cada: id do card = 'ind-' + k). */
+const IN_IND = [
+  { k: 'media', t: 'Média do período', d: 'Média de glicemia do período escolhido.' },
+  { k: 'tend', t: 'Tendência recente', d: 'Últimos 7 dias comparados aos 7 anteriores.' },
+  { k: 'var', t: 'Variabilidade', d: 'Desvio-padrão e amplitude do período.' },
+  { k: 'faixa', t: 'Dentro da faixa', d: 'Percentual das medições dentro da faixa-alvo.' },
+  { k: 'hipo', t: 'Hipoglicemias', d: 'Medições abaixo de 70 mg/dL no período.' },
+  { k: 'hiper', t: 'Acima da faixa', d: 'Medições acima da faixa-alvo no período.' },
+  { k: 'comp', t: 'Comparação com o período anterior', d: 'Variação percentual da média.' },
+  { k: 'hba', t: 'HbA1c estimada', d: 'Estimativa de HbA1c dos últimos 90 dias.' }
+];
+/* Indicadores que aparecem na instalação padrão (os demais começam ocultos, em "Cards disponíveis"). */
+const IN_IND_DEF = ['media', 'tend', 'var', 'faixa'];
+const inIndId = k => 'ind-' + k;
+/* Todos os cards da tela Início que a pessoa pode reordenar e ocultar, na ordem padrão de cima para baixo.
+   Ficam de fora apenas os estruturais (IN_FIXED) e os avisos/lembretes (banners) e a navegação. */
+const IN_TOP = [
+  { k: 'per', t: 'Período de análise', d: 'Seletor de 7, 30 e 90 dias e resumo em texto do período.' },
+  ...IN_IND.map(i => ({ k: inIndId(i.k), t: 'Indicador: ' + i.t, d: i.d, ind: i.k })),
+  { k: 'atalhos', t: 'Atalhos', d: 'Atalhos sugeridos conforme os seus registros (aparece quando há algum).' },
+  { k: 'eventos', t: 'Acontecimentos importantes', d: 'Fatos relevantes dos registros recentes (aparece quando há algum).' }
+];
 const IN_CARDS = [
+  ...IN_TOP,
   { k: 'hoje', t: 'Evolução do dia', d: 'Medições do dia em gráfico e linha do tempo.' },
   { k: 'hba', t: 'Hemoglobina glicada (estimativa)', d: 'HbA1c estimada a partir dos últimos 90 dias.' },
   { k: 'exa', t: 'Exames e HbA1c de laboratório', d: 'Último exame e última HbA1c de laboratório.' },
@@ -31,31 +52,36 @@ const IN_CARDS = [
 /* Cards estruturais: NÃO fazem parte da lista personalizável (não entram em order/hidden, não têm alça nem ocultação).
    Resumo glicêmico fica sempre no topo; Central de Métricas, sempre no final. */
 const IN_FIXED = [{ k: 'resumo', t: 'Resumo glicêmico', pos: 'top' }, { k: 'metricas', t: 'Central de Métricas', pos: 'bottom' }];
-/* Indicadores que podem ir para o painel de situação geral (máximo IN_PRI_MAX). */
-const IN_IND = [
-  { k: 'media', t: 'Média do período' },
-  { k: 'tend', t: 'Tendência recente' },
-  { k: 'var', t: 'Variabilidade' },
-  { k: 'faixa', t: 'Dentro da faixa' },
-  { k: 'hipo', t: 'Hipoglicemias' },
-  { k: 'hiper', t: 'Acima da faixa' },
-  { k: 'comp', t: 'Comparação com o período anterior' },
-  { k: 'hba', t: 'HbA1c estimada' }
-];
-const IN_PRI_MAX = 4, IN_PRI_DEF = ['media', 'tend', 'var', 'faixa'];
-const IN_DEF = () => ({ v: 1, order: IN_CARDS.map(c => c.k), hidden: [], pri: IN_PRI_DEF.slice() });
+/* Padrão: todos visíveis, menos os indicadores extras (hipoglicemias, acima da faixa, comparação, HbA1c), que ficam em "Cards disponíveis". */
+const IN_HIDDEN_DEF = IN_IND.filter(i => !IN_IND_DEF.includes(i.k)).map(i => inIndId(i.k));
+const IN_VER = 2;
+const IN_DEF = () => ({ v: IN_VER, order: IN_CARDS.map(c => c.k), hidden: IN_HIDDEN_DEF.slice() });
 
+/* Formato antigo (v1, até 0.46): 14 cards em order/hidden e os indicadores escolhidos em `pri` (1 a 4, na ordem escolhida).
+   Migração sem perder nada: a escolha de ordem e de ocultos é mantida; os cards que antes eram fixos (período, indicadores, atalhos e
+   acontecimentos) entram no topo, na posição em que sempre ficaram; os indicadores que estavam em `pri` continuam visíveis, na mesma ordem. */
+const IN_V1 = IN_CARDS.filter(c => !IN_TOP.some(t => t.k === c.k)).map(c => c.k);
+function inMigrateV1(v) {
+  const ik = IN_IND.map(i => i.k), seen = new Set();
+  let pri = [...new Set((Array.isArray(v.pri) ? v.pri : []).filter(k => ik.includes(k)))].slice(0, 4);
+  if (!pri.length) pri = IN_IND_DEF.slice();
+  const indOrder = pri.concat(ik.filter(k => !pri.includes(k))).map(inIndId);
+  const top = ['per'].concat(indOrder, ['atalhos', 'eventos']);
+  const old = [];
+  (Array.isArray(v.order) ? v.order : []).forEach(k => { if (IN_V1.includes(k) && !seen.has(k)) { seen.add(k); old.push(k); } });
+  IN_V1.forEach(k => { if (!seen.has(k)) old.push(k); });
+  const hid = (Array.isArray(v.hidden) ? v.hidden : []).filter(k => IN_V1.includes(k));
+  return { v: IN_VER, order: top.concat(old), hidden: [...new Set(hid.concat(ik.filter(k => !pri.includes(k)).map(inIndId)))] };
+}
 /* Limpa qualquer valor vindo do armazenamento: chaves desconhecidas somem, as que faltam voltam ao fim (cartões novos aparecem sozinhos). */
 function inCleanPrefs(v) {
-  const d = IN_DEF(); if (!v || typeof v !== 'object') return d;
+  if (!v || typeof v !== 'object') return IN_DEF();
+  if (v.v !== IN_VER) v = inMigrateV1(v);
   const keys = IN_CARDS.map(c => c.k), seen = new Set(), order = [];
   (Array.isArray(v.order) ? v.order : []).forEach(k => { if (keys.includes(k) && !seen.has(k)) { seen.add(k); order.push(k); } });
   keys.forEach(k => { if (!seen.has(k)) order.push(k); });
   const hidden = [...new Set((Array.isArray(v.hidden) ? v.hidden : []).filter(k => keys.includes(k)))];
-  const ik = IN_IND.map(i => i.k);
-  let pri = [...new Set((Array.isArray(v.pri) ? v.pri : []).filter(k => ik.includes(k)))].slice(0, IN_PRI_MAX);
-  if (!pri.length) pri = IN_PRI_DEF.slice();
-  return { v: 1, order, hidden, pri };
+  return { v: IN_VER, order, hidden };
 }
 function inParsePrefs(raw) { try { return inCleanPrefs(raw ? JSON.parse(raw) : null); } catch (e) { return IN_DEF(); } }
 const inIsDefault = p => JSON.stringify(inCleanPrefs(p)) === JSON.stringify(IN_DEF());
@@ -68,13 +94,6 @@ function inMove(p, k, dir) {
 function inToggleHidden(p, k) {
   const q = inCleanPrefs(p); if (!IN_CARDS.some(c => c.k === k)) return q;
   q.hidden = q.hidden.includes(k) ? q.hidden.filter(x => x !== k) : [...q.hidden, k]; return q;
-}
-/* Liga/desliga um indicador prioritário: sempre fica pelo menos 1 e no máximo IN_PRI_MAX. */
-function inTogglePri(p, k) {
-  const q = inCleanPrefs(p); if (!IN_IND.some(i => i.k === k)) return { prefs: q, msg: '' };
-  if (q.pri.includes(k)) { if (q.pri.length <= 1) return { prefs: q, msg: 'Deixe pelo menos um indicador.' }; q.pri = q.pri.filter(x => x !== k); return { prefs: q, msg: '' }; }
-  if (q.pri.length >= IN_PRI_MAX) return { prefs: q, msg: `Escolha no máximo ${IN_PRI_MAX} indicadores.` };
-  q.pri = [...q.pri, k]; return { prefs: q, msg: '' };
 }
 /* Cartões ocultos, na ordem do catálogo (área "Cards disponíveis"). */
 const inHiddenCards = p => { const q = inCleanPrefs(p); return IN_CARDS.filter(c => q.hidden.includes(c.k)); };
@@ -287,4 +306,4 @@ function inScale(vals, lo, hi) {
   return { min: mn, max: mx, pos: v => Math.max(0, Math.min(100, (v - mn) / span * 100)) };
 }
 
-if (typeof module !== 'undefined') module.exports = { IN_FIXED, inHiddenCards, inMoveVisible, inReorder, inHide, inShow, IN_CARDS, IN_IND, IN_PRI_MAX, IN_PRI_DEF, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inTogglePri, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };
+if (typeof module !== 'undefined') module.exports = { IN_FIXED, inHiddenCards, inMoveVisible, inReorder, inHide, inShow, IN_CARDS, IN_TOP, IN_IND, IN_IND_DEF, IN_HIDDEN_DEF, IN_VER, inIndId, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };

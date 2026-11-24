@@ -2,11 +2,10 @@
    Centro de acompanhamento. A lógica (sem DOM) está em inicio-core.js; aqui só há montagem de HTML e eventos.
    Estrutura da tela (de cima para baixo):
    1. avisos e lembretes (banners existentes, intactos)
-   2. Resumo glicêmico (essencial; só o dia atual, recolhido/expandido) e, logo abaixo, o Período de análise (7/30/90 dias, indicadores e texto do período), componente independente
-   3. Atalhos contextuais (discretos; nunca registram nada sozinhos)
-   4. Acontecimentos importantes (só aparece quando há algo relevante)
-   5. Cartões personalizáveis (ordem e visibilidade escolhidas pela pessoa)
-   6. Central de Métricas (bloco existente, adicionado por viewPainel) */
+   2. Resumo glicêmico (estrutural, fixo no topo; só o dia atual, recolhido/expandido)
+   3. Cards personalizáveis, todos movíveis e ocultáveis (ordem e visibilidade escolhidas pela pessoa): Período de análise (7/30/90 dias e texto),
+      indicadores do painel (um card cada), atalhos contextuais, acontecimentos importantes e os demais cartões do Início
+   4. Central de Métricas (estrutural, fixa no final; bloco existente, adicionado por viewPainel) */
 const IN_LS = 'tb-inicio';
 let inPrefsRaw, inPrefsCache = null, inMemo = { key: '', m: null };
 function inPrefs() {
@@ -114,21 +113,22 @@ function inHero() {
 function inStale(M) {
   return M.stale ? `<div class="in-stale" role="status"><span>Sem medições há ${Math.round(M.ageMs / 86400e3)} dias.</span><button type="button" class="btn sm" data-act="new">Nova medição</button></div>` : '';
 }
-/* Período de análise: componente independente (fora do cartão). O seletor 7/30/90 dias (data-act="period", S.period) e os indicadores/texto
-   que dependem dele ficam aqui; nada disso altera o Resumo glicêmico. */
+/* Período de análise: card editável (movível e ocultável como os demais). O seletor 7/30/90 dias (data-act="period", S.period) e o texto do
+   período ficam aqui; os indicadores são cards próprios (inIndCard). Nada disso altera o Resumo glicêmico. */
 function inPeriodo(M) {
-  const pri = inPrefs().pri.map(k => inIndicator(k, M));
-  const chip = x => {
-    const bar = x.k === 'faixa' && x.pct != null ? `<i class="in-bar" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, x.pct)).toFixed(0)}%"></i></i>` : '';
-    const arrow = x.k === 'tend' ? `<span class="in-arr dir-${x.dir || 'none'}" aria-hidden="true">${x.v}</span>` : `<b class="num in-ind-v">${x.v}</b>`;
-    return `<button type="button" class="in-ind${inTone(x.tone)}" data-pm="${x.pm}" aria-haspopup="dialog" aria-label="${esc(x.t)}: ${esc(x.v + ' ' + x.u)}, ${esc(x.sub)}. Toque para ver os detalhes."><span class="in-ind-t">${esc(x.t)}</span><span class="in-ind-row">${arrow}<small class="in-ind-u">${esc(x.u)}</small></span>${bar}<span class="in-ind-s">${esc(x.sub)}</span></button>`;
-  };
-  return `<section class="in-pc" aria-label="Período de análise">
+  return `<section class="in-pc wide" aria-label="Período de análise">
     <div class="in-per"><span class="eyebrow in-per-t">Período de análise</span><span class="eyebrow num in-per-r">${fmtDM(M.cur[0])} – ${fmtDM(M.cur[1])}</span></div>
     <div class="seg" role="group" aria-label="Período">${[7, 30, 90].map(p => `<button data-act="period" data-p="${p}" aria-pressed="${S.period === p}">${p} dias</button>`).join('')}</div>
-    <div class="in-inds" style="--n:${pri.length}">${pri.map(chip).join('')}</div>
     <p class="in-sum">${esc(inSummary(M, { noLast: true }))}</p>
   </section>`;
+}
+/* Indicador do painel como card próprio (id do card: 'ind-' + indicador). Mesmos valores, textos e janela de detalhes de antes. */
+function inIndCard(k, M) {
+  const x = inIndicator(k, M);
+  const bar = x.k === 'faixa' && x.pct != null ? `<i class="in-bar" aria-hidden="true"><i style="width:${Math.max(2, Math.min(100, x.pct)).toFixed(0)}%"></i></i>` : '';
+  const arrow = x.k === 'tend' ? `<span class="in-arr dir-${x.dir || 'none'}" aria-hidden="true">${x.v}</span>` : `<b class="num in-ind-v">${x.v}</b>`;
+  return `<button type="button" class="in-ind${inTone(x.tone)}" data-pm="${x.pm}" aria-haspopup="dialog" aria-label="${esc(x.t)}: ${esc(x.v + ' ' + x.u)}, ${esc(x.sub)}. Toque para ver os detalhes.">`
+    + `<span class="in-ind-t">${esc(x.t)}</span><span class="in-ind-row">${arrow}<small class="in-ind-u">${esc(x.u)}</small></span>${bar}<span class="in-ind-s">${esc(x.sub)}</span></button>`;
 }
 
 /* ---------- 3. Atalhos contextuais ---------- */
@@ -139,7 +139,7 @@ function inShortcutsHTML() {
   try { irN = irDueNow().length; } catch (e) { }
   const list = inShortcuts({ records: S.records, exams: S.exams, now: Date.now(), remWin, planN, irN });
   if (!list.length) return '';
-  return `<div class="in-sc" role="group" aria-label="Atalhos">${list.map(x => `<button type="button" class="in-chip" data-act="${x.act}"${x.id ? ` data-id="${esc(x.id)}"` : ''}${x.d ? ` data-d="${esc(x.d)}" data-t="${esc(x.t || '')}"` : ''}${x.ctx ? ` data-ctx="${esc(x.ctx)}"` : ''}${x.meal ? ` data-meal="${esc(x.meal)}"` : ''}>${pnIc(x.icon)}<span><b>${esc(x.label)}</b><small>${esc(x.sub)}</small></span></button>`).join('')}</div>`;
+  return `<div class="in-sc wide" role="group" aria-label="Atalhos">${list.map(x => `<button type="button" class="in-chip" data-act="${x.act}"${x.id ? ` data-id="${esc(x.id)}"` : ''}${x.d ? ` data-d="${esc(x.d)}" data-t="${esc(x.t || '')}"` : ''}${x.ctx ? ` data-ctx="${esc(x.ctx)}"` : ''}${x.meal ? ` data-meal="${esc(x.meal)}"` : ''}>${pnIc(x.icon)}<span><b>${esc(x.label)}</b><small>${esc(x.sub)}</small></span></button>`).join('')}</div>`;
 }
 
 /* ---------- 4. Acontecimentos importantes ---------- */
@@ -150,7 +150,7 @@ function inEventItem(e) {
 function inEventsCard(M) {
   const ev = M.events || []; if (!ev.length) return '';
   const top = ev.slice(0, IN_EV_MAX), rest = ev.slice(IN_EV_MAX);
-  return `<section class="in-ev" aria-labelledby="in-ev-h"><div class="in-ev-hd"><h2 id="in-ev-h">Acontecimentos importantes</h2><span class="in-count num" aria-label="${ev.length} acontecimentos">${ev.length}</span></div><ul class="in-evl">${top.map(inEventItem).join('')}</ul>${rest.length ? `<details class="in-more"><summary>Ver mais ${rest.length}</summary><ul class="in-evl">${rest.map(inEventItem).join('')}</ul></details>` : ''}</section>`;
+  return `<section class="in-ev wide" aria-labelledby="in-ev-h"><div class="in-ev-hd"><h2 id="in-ev-h">Acontecimentos importantes</h2><span class="in-count num" aria-label="${ev.length} acontecimentos">${ev.length}</span></div><ul class="in-evl">${top.map(inEventItem).join('')}</ul>${rest.length ? `<details class="in-more"><summary>Ver mais ${rest.length}</summary><ul class="in-evl">${rest.map(inEventItem).join('')}</ul></details>` : ''}</section>`;
 }
 
 /* ---------- 5. Evolução do dia ---------- */
@@ -220,30 +220,30 @@ const inMiniBar = (n, tot, cls) => tot ? `<i class="in-bar ${cls || ''}" aria-hi
    Estado de edição só em memória (S.inEdit); ordem e ocultos vão para 'tb-inicio' (mesmo mecanismo de antes, com cópia durável em persist.js).
    Resumo glicêmico e Central de Métricas são estruturais (IN_FIXED): nunca entram na lista, nunca têm alça nem ocultação. */
 const inEditing = () => !!S.inEdit && S.route === 'painel' && typeof pnlMode !== 'undefined' && pnlMode !== 'classic';
-const inSpan = html => /class="[^"]*\b(wide|in-card)\b/.test(html) ? 'wide' : /class="[^"]*\bmini\b/.test(html) ? 'mini' : '';
+const inSpan = html => /class="[^"]*\b(wide|in-card)\b/.test(html) ? 'wide' : /class="[^"]*\bmini\b/.test(html) ? 'mini' : /class="[^"]*\bin-ind\b/.test(html) ? 'ind' : '';
 const inCardT = k => (IN_CARDS.find(c => c.k === k) || {}).t || k;
 /* Botão discreto "Personalizar", na linha do título "Início". */
 function inTopBtn() {
   return `<div class="in-top"><button type="button" class="in-pbtn" data-act="in-cust" aria-label="Personalizar a tela inicial">${pnIc('sliders')}<span>Personalizar</span></button></div>`;
 }
-/* Barra do modo de edição (fixa ao rolar) + painéis recolhíveis "Cards disponíveis" e "Indicadores do painel". */
+/* Barra do modo de edição (fixa ao rolar) + painel recolhível "Cards disponíveis" (inclui os indicadores do painel ocultos). */
 function inEditBar(msg) {
-  const p = inPrefs(), av = inHiddenCards(p), avOpen = !!S.inAvOpen, indOpen = !!S.inIndOpen;
+  const p = inPrefs(), av = inHiddenCards(p), avOpen = !!S.inAvOpen;
   const items = av.length ? av.map(c => `<li class="in-av-i"><span class="in-av-t"><b>${esc(c.t)}</b><small>${esc(c.d || '')}</small></span><button type="button" class="btn sm in-av-add" data-act="in-add" data-k="${c.k}" aria-label="Adicionar ${esc(c.t)} à tela inicial">${pnIc('plus')}<span>Adicionar à tela inicial</span></button></li>`).join('') : '';
   const body = av.length ? `<ul class="in-av-l">${items}</ul>` : '<p class="in-av-none">Nenhum card oculto. Todos os cards estão na tela inicial.</p>';
-  const pills = IN_IND.map(i => `<button type="button" class="in-pill" data-act="in-pri" data-k="${i.k}" aria-pressed="${p.pri.includes(i.k)}">${esc(i.t)}</button>`).join('');
   const pan = (id, open, act, title, cnt, inner) => `<section class="in-ed-p${open ? ' open' : ''}"><button type="button" class="in-ed-ph" data-act="${act}" aria-expanded="${open}" aria-controls="${id}"><span class="in-ed-pt">${title}</span>${cnt}<span class="ds-chev" aria-hidden="true"></span></button><div class="in-ed-pb" id="${id}"${open ? '' : ' inert'}><div class="in-ed-pin">${inner}</div></div></section>`;
   return `<div class="in-edit" role="region" aria-label="Personalização da tela inicial">
-    <div class="in-ed-bar"><div class="in-ed-ti"><b>Personalizar</b><small>Arraste pela alça para reorganizar.</small></div>
+    <div class="in-ed-bar"><div class="in-ed-ti"><b>Personalizar</b><small>Arraste pela alça para reorganizar. Toque em ✕ para ocultar.</small></div>
       <button type="button" class="btn sm in-ed-rs" data-act="in-reset"${inIsDefault(p) ? ' disabled' : ''}>Restaurar padrão</button><button type="button" class="btn sm pri in-ed-ok" data-act="in-done">Concluir</button></div>
     ${pan('in-av-b', avOpen, 'in-avt', 'Cards disponíveis', `<span class="in-count num" aria-label="${av.length} ocultos">${av.length}</span>`, body)}
-    ${pan('in-ind-b', indOpen, 'in-indt', `Indicadores do painel <small>(1 a ${IN_PRI_MAX})</small>`, '', `<div class="in-pills" role="group" aria-label="Indicadores do painel">${pills}</div><p class="hint in-msg" id="in-msg" role="status" aria-live="polite">${esc(msg || '')}</p>`)}
     <p class="in-sr" id="in-live" role="status" aria-live="polite"></p></div>`;
 }
 const inFixRow = pos => `<div class="in-fixrow" aria-hidden="true">${pnIc('lock')}<span>${pos === 'top' ? 'Resumo glicêmico · fixo no topo' : 'Central de Métricas · fixa no final'}</span></div>`;
 /* Em edição cada cartão ganha uma moldura (alça de arraste + botão de ocultar) sem mudar o cartão nem a sua altura: os controles ficam sobre a borda. */
 function inEditCard(k, html) {
   const t = esc(inCardT(k));
+  /* Atalhos e Acontecimentos só aparecem na tela quando há algo a mostrar; na edição ficam com um espaço reservado, para poderem ser movidos ou ocultados mesmo vazios. */
+  if (!html) html = `<section class="in-card in-ghost wide" aria-label="${t}"><span class="pn-h">${pnIc(k === 'atalhos' ? 'list' : 'star')}<span class="pn-t">${t}</span></span><p class="pn-sub">Nada a mostrar agora. Este card aparece aqui quando houver conteúdo.</p></section>`;
   return `<div class="pn-ed ${inSpan(html)}" data-ed="${k}"><div class="pn-ed-in" inert aria-hidden="true">${html}</div>
     <button type="button" class="in-grip" data-grip="${k}" aria-label="Mover ${t}. Arraste, ou use as setas para cima e para baixo." title="Arrastar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h.01M12 7h.01M16 7h.01M8 12h.01M12 12h.01M16 12h.01"/></svg></button>
     <button type="button" class="in-hide" data-act="in-hide" data-k="${k}" aria-label="Ocultar ${t}">${pnIc('x')}</button></div>`;
@@ -268,7 +268,7 @@ function inRedraw(msg, keepFlip) {
   if (msg != null) { const m = document.getElementById('in-live'); if (m) m.textContent = msg; }
   inFlipPlay(before);
 }
-function inApply(p, msg, live) { inPrefsSave(p); inRedraw(live, true); const m = document.getElementById('in-msg'); if (m && msg) m.textContent = msg; }
+function inApply(p, msg, live) { inPrefsSave(p); inRedraw(live, true); }
 function inEditOn(on) {
   S.inEdit = !!on; inRedraw(null, false);
   if (on) { const t = document.querySelector('.top'); document.documentElement.style.setProperty('--in-top', (t ? t.offsetHeight : 56) + 'px'); const b = document.querySelector('.in-ed-ok'); if (b) b.focus({ preventScroll: true }); }
@@ -288,7 +288,7 @@ document.addEventListener('pointerdown', e => {
   const grid = g.closest('.pn-grid'), card = g.closest('.pn-ed'); if (!grid || !card) return;
   e.preventDefault();
   const k = inScaleK(grid), rect = card.getBoundingClientRect(), gr = grid.getBoundingClientRect();
-  const ph = document.createElement('div'); ph.className = 'pn-ph ' + (card.classList.contains('wide') ? 'wide' : card.classList.contains('mini') ? 'mini' : '');
+  const ph = document.createElement('div'); ph.className = 'pn-ph ' + (card.classList.contains('wide') ? 'wide' : card.classList.contains('mini') ? 'mini' : card.classList.contains('ind') ? 'ind' : '');
   ph.style.height = card.offsetHeight + 'px'; card.after(ph);
   const D = Object.assign(inDrag, { on: true, id: e.pointerId, card, grid, ph, k, gx: e.clientX - rect.left, gy: e.clientY - rect.top, px: e.clientX, py: e.clientY, raf: 0, key: card.dataset.ed, grip: g, w: card.offsetWidth, h: card.offsetHeight });
   card.classList.add('dragging'); card.style.width = D.w + 'px'; card.style.height = D.h + 'px'; grid.classList.add('is-dragging'); document.documentElement.classList.add('in-noselect');
@@ -377,8 +377,6 @@ document.addEventListener('click', e => {
   else if (a === 'in-hide') { const n = inCardT(k); inApply(inHide(inPrefs(), k), '', `${n} ocultado. Está em Cards disponíveis.`); }
   else if (a === 'in-add') { const n = inCardT(k); inApply(inShow(inPrefs(), k), '', `${n} adicionado ao fim da tela inicial.`); }
   else if (a === 'in-avt') { S.inAvOpen = !S.inAvOpen; inPanelToggle(el, S.inAvOpen); }
-  else if (a === 'in-indt') { S.inIndOpen = !S.inIndOpen; inPanelToggle(el, S.inIndOpen); }
-  else if (a === 'in-pri') { const r = inTogglePri(inPrefs(), k); inApply(r.prefs, r.msg); }
   else if (a === 'in-reset') openSheet('<h2>Restaurar padrão?</h2><p style="margin:0 0 14px">A sua organização personalizada será substituída pela configuração original do GLUXO: ordem padrão e todos os cards visíveis de novo. Nenhum registro, dado glicêmico ou histórico é apagado.</p><div class="row"><button type="button" class="btn pri grow" data-act="in-reset-ok" autofocus>Restaurar padrão</button><button type="button" class="btn" data-act="close">Cancelar</button></div>');
   else if (a === 'in-reset-ok') { closeSheet(); inApply(IN_DEF(), 'Organização padrão restaurada.', 'Organização padrão restaurada.'); }
   else if (a === 'in-ev') {

@@ -71,7 +71,7 @@ function pnTrat() {
 }
 
 /* ---------- Painel (Início) ----------
-   Resumo glicêmico (só o dia atual, recolhido/expandido), Período de análise (seletor 7/30/90 independente), atalhos e acontecimentos (inicio.js) + cartões personalizáveis.
+   Resumo glicêmico (só o dia atual, recolhido/expandido; fixo) + cartões personalizáveis (inicio.js): Período de análise (seletor 7/30/90 independente), indicadores, atalhos, acontecimentos e os demais.
    Todos os cartões e janelas de detalhe de antes continuam existindo; o seletor de período segue valendo para os cartões e indicadores históricos. */
 function viewPainelCards() {
   const d = pnData(), { all, sc, cmp, rc } = d;
@@ -104,8 +104,13 @@ function viewPainelCards() {
   C.dist = pnCard('dist', 'wide pn-dist-c', 'pie', 'Distribuição por faixa',
     n ? `<span class="pn-bar" aria-hidden="true">${BAND_LIST.filter(b => bc[b.k]).map(b => `<i class="d-${b.k}" style="flex:${bc[b.k]}"></i>`).join('')}</span><span class="pn-leg">${BAND_LIST.filter(b => bc[b.k]).map(b => `<span><i class="d-${b.k}"></i><b class="num">${(bc[b.k] / n * 100).toFixed(0)}%</b> ${b.name.toLowerCase()}</span>`).join('')}</span>` : '<span class="pn-sub">Sem medições neste período.</span>',
     'Distribuição por faixa');
+  /* cards que antes eram fixos (período, indicadores, atalhos, acontecimentos): agora entram na lista personalizável */
+  C.per = inPeriodo(M);
+  IN_IND.forEach(i => { C[inIndId(i.k)] = inIndCard(i.k, M); });
+  C.atalhos = inShortcutsHTML();
+  C.eventos = inEventsCard(M);
   const vis = inVisible(inPrefs()), cards = ed ? vis.map(k => inEditCard(k, C[k] || '')).join('') : vis.map(k => C[k] || '').join('');
-  return h + (ed ? inFixRow('top') : '') + inHero() + inStale(M) + inPeriodo(M) + inShortcutsHTML() + inEventsCard(M) + `<div class="pn-grid${ed ? ' editing' : ''}">${cards}</div>`;
+  return h + (ed ? inFixRow('top') : '') + inHero() + inStale(M) + `<div class="pn-grid${ed ? ' editing' : ''}">${cards}</div>`;
 }
 
 /* ---------- Janela flutuante (detalhes) ---------- */

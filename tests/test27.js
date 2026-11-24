@@ -5,17 +5,26 @@ const NOW = new Date(2026, 10, 20, 23, 30, 0).getTime(), DAYMS = 86400000, iso =
 let id = 0; const rec = (daysAgo, hm, g, o = {}) => { const d = iso(NOW - daysAgo * DAYMS), ts = L.mkTs(d, hm); return { id: 'r' + (++id), date: d, time: hm, ts, glucose: g, context: 'antes', source: 'manual', ...o }; };
 /* ---- preferências ---- */
 let p = C.inCleanPrefs(null);
-ok(C.inIsDefault(p) && p.order.length === C.IN_CARDS.length && !p.hidden.length && p.pri.join() === C.IN_PRI_DEF.join(), 'prefs: padrão');
-p = C.inCleanPrefs({ order: ['dist', 'xx', 'dist', 'hoje'], hidden: ['hoje', 'lixo'], pri: ['media', 'zzz', 'hipo', 'hiper', 'comp', 'hba'] });
+ok(C.inIsDefault(p) && p.order.length === C.IN_CARDS.length && p.hidden.join() === C.IN_HIDDEN_DEF.join() && C.IN_HIDDEN_DEF.length === 4 && p.v === 2, 'prefs: padrão (indicadores extras começam em Cards disponíveis)');
+p = C.inCleanPrefs({ v: 2, order: ['dist', 'xx', 'dist', 'hoje'], hidden: ['hoje', 'lixo'] });
 ok(p.order[0] === 'dist' && p.order[1] === 'hoje' && p.order.length === C.IN_CARDS.length && new Set(p.order).size === p.order.length, 'prefs: chaves inválidas somem, duplicadas colapsam, as que faltam voltam ao fim');
-ok(p.hidden.join() === 'hoje' && p.pri.length === C.IN_PRI_MAX && !p.pri.includes('zzz'), 'prefs: ocultos e prioritários higienizados (máx. ' + C.IN_PRI_MAX + ')');
-ok(C.inCleanPrefs({ pri: [] }).pri.join() === C.IN_PRI_DEF.join() && C.inParsePrefs('{quebrado').order.length === C.IN_CARDS.length, 'prefs: vazio/lixo volta ao padrão sem erro');
-let q = C.inMove(C.inCleanPrefs(null), 'hba', -1); ok(q.order[0] === 'hba' && q.order[1] === 'hoje', 'prefs: subir');
-ok(C.inMove(q, 'hba', -1).order[0] === 'hba' && C.inMove(C.inCleanPrefs(null), 'dist', 1).order.at(-1) === 'dist', 'prefs: limites do mover não quebram');
-q = C.inToggleHidden(C.inCleanPrefs(null), 'min'); ok(q.hidden.includes('min') && !C.inVisible(q).includes('min') && C.inVisible(q).length === C.IN_CARDS.length - 1, 'prefs: ocultar');
-ok(!C.inToggleHidden(q, 'min').hidden.includes('min') && C.inToggleHidden(q, 'ult').hidden.length === 1, 'prefs: reexibir; "ult"/essenciais não são ocultáveis');
-let r = C.inTogglePri(C.inCleanPrefs({ pri: ['media'] }), 'media'); ok(r.prefs.pri.length === 1 && /pelo menos um/.test(r.msg), 'prefs: não deixa zerar os indicadores');
-r = C.inTogglePri(C.inCleanPrefs(null), 'hipo'); ok(r.prefs.pri.length === C.IN_PRI_MAX && /no máximo/.test(r.msg), 'prefs: respeita o limite');
+ok(p.hidden.join() === 'hoje', 'prefs: ocultos higienizados');
+ok(C.inCleanPrefs({ v: 2 }).order.length === C.IN_CARDS.length && C.inParsePrefs('{quebrado').order.length === C.IN_CARDS.length && C.inIsDefault(C.inParsePrefs('{quebrado')), 'prefs: vazio/lixo volta ao padrão sem erro');
+let q = C.inMove(C.inCleanPrefs(null), 'hba', -1); ok(q.order.indexOf('hba') === C.IN_DEF().order.indexOf('hba') - 1 && q.order.indexOf('hoje') === C.IN_DEF().order.indexOf('hoje') + 1, 'prefs: subir');
+ok(C.inMove(C.inMove(C.inCleanPrefs(null), 'per', -1), 'per', -1).order[0] === 'per' && C.inMove(C.inCleanPrefs(null), 'dist', 1).order.at(-1) === 'dist', 'prefs: limites do mover não quebram');
+q = C.inToggleHidden(C.inCleanPrefs(null), 'min'); ok(q.hidden.includes('min') && !C.inVisible(q).includes('min') && C.inVisible(q).length === C.IN_CARDS.length - C.IN_HIDDEN_DEF.length - 1, 'prefs: ocultar');
+ok(!C.inToggleHidden(q, 'min').hidden.includes('min') && C.inToggleHidden(q, 'ult').hidden.length === C.IN_HIDDEN_DEF.length + 1, 'prefs: reexibir; "ult"/essenciais não são ocultáveis');
+const allInd = C.IN_IND.map(i => C.inIndId(i.k));
+q = allInd.reduce((a, k) => C.inHide(a, k), C.inCleanPrefs(null)); ok(allInd.every(k => q.hidden.includes(k)) && !C.inVisible(q).some(k => allInd.includes(k)) && C.inVisible(q).length === C.IN_CARDS.length - allInd.length, 'prefs: todos os indicadores podem ser ocultados (não há mínimo)');
+q = C.inShow(q, 'ind-hipo'); ok(q.order.at(-1) === 'ind-hipo' && !q.hidden.includes('ind-hipo') && q.hidden.length === allInd.length - 1, 'prefs: indicador oculto volta pelo Cards disponíveis, no fim');
+ok(C.IN_TOP.every(c => C.IN_CARDS.some(x => x.k === c.k)) && ['per', 'atalhos', 'eventos'].every(k => C.IN_CARDS.some(x => x.k === k)) && allInd.length === 8 && C.inCleanPrefs(null).order.slice(0, 11).join() === ['per'].concat(allInd.slice(0, 8), ['atalhos', 'eventos']).join(), 'prefs: período, indicadores, atalhos e acontecimentos são cards personalizáveis, no topo por padrão');
+/* migração do formato antigo (v1: 14 cards + pri): nada se perde e o que era fixo entra no topo */
+const OLD14 = C.IN_CARDS.map(c => c.k).filter(k => !C.IN_TOP.some(t => t.k === k));
+let mg = C.inCleanPrefs({ v: 1, order: OLD14.slice().reverse(), hidden: ['min'], pri: ['hipo', 'media'] });
+ok(mg.v === 2 && mg.order.slice(0, 11).join() === ['per', 'ind-hipo', 'ind-media', 'ind-tend', 'ind-var', 'ind-faixa', 'ind-hiper', 'ind-comp', 'ind-hba', 'atalhos', 'eventos'].join() && mg.order.slice(11).join() === OLD14.slice().reverse().join(), 'migração v1: ordem antiga mantida, fixos no topo, indicadores escolhidos na mesma ordem');
+ok(mg.hidden.includes('min') && !mg.hidden.includes('ind-hipo') && !mg.hidden.includes('ind-media') && ['ind-tend', 'ind-var', 'ind-faixa', 'ind-hiper', 'ind-comp', 'ind-hba'].every(k => mg.hidden.includes(k)), 'migração v1: ocultos mantidos e indicadores não escolhidos passam a ocultos');
+ok(C.inIsDefault({ v: 1, order: OLD14, hidden: [], pri: ['media', 'tend', 'var', 'faixa'] }) && C.inIsDefault({ order: OLD14 }), 'migração v1: configuração antiga padrão equivale ao padrão novo');
+
 ok(!C.inIsDefault(q) && C.inIsDefault(C.inCleanPrefs(JSON.parse(JSON.stringify(C.IN_DEF())))), 'prefs: restaurar = padrão');
 /* ---- situação: muitos, poucos, nenhum registro ---- */
 const many = []; for (let i = 0; i < 60; i++) [['07:00', 110 + (i % 5) * 4], ['12:30', 150], ['19:00', 170 + (i % 3) * 20]].forEach(([t, g]) => many.push(rec(i, t, g)));
@@ -109,7 +118,7 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     await Store.putMany('records', recs); await loadAll(); S.route = 'painel'; render(); })()`;
   await run('muitos registros', seedBase, async pg => {
     const q = s => pg.evaluate(s => document.querySelectorAll(s).length, s), txt = s => pg.evaluate(s => (document.querySelector(s) || {}).textContent || '', s);
-    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 0 && await q('.in-pc .in-ind') === 4 && await q('.in-hero [data-pm]') === 0 && await q('.in-pc [data-act="period"]') === 3 && await q('.in-hero [data-act="period"]') === 0 && await q('.pn-dia') === 0, 'ui: Resumo glicêmico sem indicadores/filtro; período de análise independente com 4 indicadores prioritários');
+    ok(await q('.in-hero') === 1 && await q('.in-hero .in-ind') === 0 && await q('.pn-grid > .in-ind') === 4 && await q('.in-pc .in-ind') === 0 && await q('.pn-grid > .in-pc') === 1 && await q('.in-hero [data-pm]') === 0 && await q('.in-pc [data-act="period"]') === 3 && await q('.in-hero [data-act="period"]') === 0 && await q('.pn-dia') === 0, 'ui: Resumo glicêmico sem indicadores/filtro; período de análise e 4 indicadores padrão como cards editáveis, fora do Resumo');
     ok(await q('.in-ev .in-evi') >= 1 && /Hipoglicemia/.test(await txt('.in-ev')), 'ui: card de acontecimentos mostra a hipoglicemia recente');
     ok(await q('.in-day') === 1 && await q('.in-day .in-pt') >= 0, 'ui: evolução do dia presente');
     ok(await q('.pn-grid > *') >= 13 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: cartões, bloco de métricas e navegação preservados');
@@ -117,18 +126,24 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     await pg.evaluate(() => closeSheet()); await sleep(100);
     await pg.click('.in-ind[data-pm="med"], .in-ind'); await sleep(250); ok(await q('#pm-bg') === 1, 'ui: indicador abre os detalhes'); await pg.evaluate(() => pmClose(true));
     /* personalização: mover, ocultar, indicador, persistir, restaurar */
-    const keys = () => pg.evaluate(() => [...document.querySelectorAll('.pn-grid > *')].map(e => e.dataset.pm || (e.classList.contains('in-day') ? 'hoje' : e.classList.contains('in-exa') ? 'exa' : '')).join(','));
+    const keys = () => pg.evaluate(() => inVisible(inPrefs()).join(','));
     const before = await keys(); await pg.click('[data-act="in-cust"]'); await sleep(250);
-    ok(await q('.in-grip') === 14 && await q('.in-hide') === 14 && await q('.in-hero .in-grip, .mt-blk .in-grip, .in-hero .in-hide, .mt-blk .in-hide') === 0, 'ui: modo de edição no Início: alça e ocultar nos 14 cartões, nenhum nos dois estruturais');
+    ok(await q('.in-grip') === 21 && await q('.in-hide') === 21 && await q('.pn-ed[data-ed="per"] .in-grip') === 1 && await q('.pn-ed[data-ed="eventos"] .in-hide') === 1 && await q('.pn-ed[data-ed="ind-media"] .in-grip') === 1 && await q('.in-hero .in-grip, .mt-blk .in-grip, .in-hero .in-hide, .mt-blk .in-hide') === 0, 'ui: modo de edição no Início: alça e ocultar em todos os cards (período, indicadores e acontecimentos inclusive), nenhum nos dois estruturais');
     await pg.focus('.in-grip[data-grip="dist"]'); await pg.keyboard.press('ArrowUp'); await pg.click('.in-hide[data-k="min"]'); await sleep(250);
     await pg.click('[data-act="in-done"]'); await sleep(250);
-    const after = await keys(); ok(after !== before && !/\bmin\b/.test(after) && after.indexOf('dist') < before.indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
-    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-indt"]'); await sleep(350);
-    await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(100); ok(/no máximo/.test(await txt('#in-msg')) && await q('.in-ed-pb .in-pill[aria-pressed="true"]') === 4, 'ui: limite de indicadores é avisado e respeitado');
-    await pg.click('[data-act="in-pri"][data-k="faixa"]'); await pg.click('[data-act="in-pri"][data-k="hipo"]'); await sleep(150); ok(await q('.in-pc .in-ind') === 4 && /Abaixo de/.test(await txt('.in-inds')), 'ui: escolha dos indicadores prioritários');
-    await pg.click('[data-act="in-done"]'); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { } await noGate(pg);
-    const kept = await keys(); ok(kept === after && /Abaixo de/.test(await txt('.in-inds')), 'ui: preferências persistem depois de reabrir');
-    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-reset"]'); await pg.click('[data-act="in-reset-ok"]'); await sleep(250); await pg.click('[data-act="in-done"]'); await sleep(200); ok(await keys() === before && !/Abaixo de/.test(await txt('.in-inds')), 'ui: restaurar organização padrão');
+    const after = await keys(); ok(after !== before && !after.split(',').includes('min') && after.split(',').indexOf('dist') < before.split(',').indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
+    /* indicadores do painel: cada um é um card; todos podem ser ocultados, movidos e readicionados */
+    await pg.click('[data-act="in-cust"]'); await sleep(250);
+    for (const k of ['ind-media', 'ind-tend', 'ind-var', 'ind-faixa']) await pg.click(`.in-hide[data-k="${k}"]`);
+    await sleep(250); ok(await q('.pn-ed .in-ind') === 0 && await q('.in-grip') === 16, 'ui: todos os indicadores podem ser ocultados (inclusive o último)');
+    await pg.click('[data-act="in-done"]'); await sleep(250); ok(await q('.in-ind') === 0 && await q('.in-pc') === 1 && await q('.in-hero') === 1, 'ui: sem indicadores, o resto do Início segue normal');
+    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-avt"]'); await sleep(350);
+    ok(await q('.in-av-add[data-k="ind-hipo"]') === 1 && await q('.in-av-add[data-k="ind-media"]') === 1, 'ui: indicadores ocultos aparecem em Cards disponíveis');
+    await pg.click('.in-av-add[data-k="ind-hipo"]'); await sleep(250); await pg.click('.in-av-add[data-k="ind-media"]'); await sleep(250);
+    await pg.click('[data-act="in-done"]'); await sleep(250); ok(await q('.in-ind') === 2 && /Abaixo de/.test(await txt('.pn-grid')), 'ui: readicionar indicadores pelo Cards disponíveis');
+    const snap = await keys(); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { } await noGate(pg);
+    const kept = await keys(); ok(kept === snap && kept !== after && await q('.in-ind') === 2 && /Abaixo de/.test(await txt('.pn-grid')), 'ui: preferências persistem depois de reabrir');
+    await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-reset"]'); await pg.click('[data-act="in-reset-ok"]'); await sleep(250); await pg.click('[data-act="in-done"]'); await sleep(200); ok(await keys() === before && !/Abaixo de/.test(await txt('.pn-grid')) && await q('.in-ind') === 4, 'ui: restaurar organização padrão');
     ok(await q('.in-hero') === 1 && await q('.in-pc') === 1 && await q('.mt-blk') === 1 && await q('.nav-in') === 1, 'ui: elementos essenciais continuam mesmo com tudo personalizável');
     /* tema claro e escuro: nenhum texto invisível nos elementos novos */
     for (const th of ['dark', 'light']) { await pg.evaluate(t => setTheme(t), th); await sleep(200);
@@ -145,7 +160,7 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     const q = s => pg.evaluate(s => document.querySelectorAll(s).length, s), txt = s => pg.evaluate(s => (document.querySelector(s) || {}).textContent || '', s);
     ok(await q('.in-hero') === 1 && await q('.in-stale') === 1 && /Sem medições há/.test(await txt('.in-stale')), 'ui: sem medições recentes → aviso discreto com atalho para nova medição');
     ok(!await q('.in-ev'), 'ui: sem acontecimentos relevantes, o card não aparece (nada de enchimento)');
-    ok(/—/.test(await txt('.in-inds')) && /sem dados suficientes|precisa de|sem medições/.test(await txt('.in-inds')), 'ui: indicadores sem base mostram "—" e explicam');
+    const indTxt = await pg.evaluate(() => [...document.querySelectorAll('.in-ind')].map(e => e.textContent).join(' | ')); ok(/—/.test(indTxt) && /sem dados suficientes|precisa de|sem medições/.test(indTxt), 'ui: indicadores sem base mostram "—" e explicam');
     ok(await q('.in-exa') === 1 && /Nenhum exame/.test(await txt('.in-exa')), 'ui: ausência de exames tratada');
     ok(await q('.in-day') === 1 && /Nenhuma medição hoje/.test(await txt('.in-day')), 'ui: dia sem medições');
   });

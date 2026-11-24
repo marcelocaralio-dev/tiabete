@@ -64,7 +64,6 @@
 @keyframes in-rbmk { from { left: var(--pf); } }
 .in-sum { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--fg); }
 .in-stale { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: 12px; border: 1px dashed rgba(var(--ds-warn-rgb), .6); font-size: 14px; }
-.in-inds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .in-ind { position: relative; display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; color: var(--fg); font: inherit; cursor: pointer; padding: 9px 10px 9px 13px; border-radius: 14px; border: 1px solid var(--line); background: var(--s2); }
 .in-ind::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tone, transparent); }
 .in-ind.st-ok, .in-evi.st-ok { --tone: var(--ds-pos); } .in-ind.st-bad, .in-evi.st-bad { --tone: var(--ds-neg); } .in-ind.st-warn, .in-evi.st-warn { --tone: var(--ds-warn); }
@@ -76,7 +75,7 @@
 .in-bar { display: block; height: 5px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 3px 0 1px; }
 .in-bar > i { display: block; height: 100%; border-radius: 99px; background: var(--ds-pos); }
 .in-bar.bad > i { background: var(--ds-neg); } .in-bar.warn > i { background: var(--ds-warn); }
-.in-pc { display: grid; gap: 10px; margin: 0 0 12px; padding: 4px 2px 0; }
+.in-pc { display: grid; gap: 10px; margin: 0; padding: 4px 2px 0; }
 .in-per { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 10px; }
 .in-per-t, .in-per-r { font-size: 12.5px; }
 .in-pc > .seg { display: flex; width: 100%; } .in-pc > .seg button { flex: 1 1 0; }
@@ -97,7 +96,7 @@
 @media (prefers-reduced-motion: reduce) { .in-rs-xb, .in-rs-xin, .in-rs-chev { transition: none; } }
 
 /* atalhos */
-.in-sc { display: flex; gap: 8px; overflow-x: auto; padding: 2px 1px 6px; margin: 0 0 6px; scrollbar-width: none; }
+.in-sc { display: flex; gap: 8px; overflow-x: auto; padding: 2px 1px 6px; margin: 0; scrollbar-width: none; }
 .in-sc::-webkit-scrollbar { display: none; }
 .in-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 9px; max-width: 78%; text-align: left; color: var(--fg); font: inherit; cursor: pointer; padding: 8px 14px 8px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--s1); }
 .in-chip .pn-ic { width: 18px; height: 18px; flex: none; }
@@ -106,7 +105,7 @@
 @keyframes in-flash { 0%, 55% { box-shadow: 0 0 0 3px rgba(var(--ds-warn-rgb), .75); } 100% { box-shadow: 0 0 0 0 rgba(var(--ds-warn-rgb), 0); } }
 
 /* acontecimentos */
-.in-ev { margin: 0 0 12px; padding: 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--s1); }
+.in-ev { margin: 0; padding: 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--s1); }
 .in-ev-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .in-ev-hd h2 { margin: 0; font-family: var(--f-mono); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); font-weight: 500; }
 .in-count { min-width: 24px; text-align: center; padding: 1px 8px; border-radius: 99px; background: var(--s2); border: 1px solid var(--line); font-size: 13px; }
@@ -148,18 +147,14 @@
 
 /* personalização */
 .in-h3 { font-family: var(--f-mono); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); font-weight: 500; margin: 14px 0 8px; } .in-h3 small { text-transform: none; letter-spacing: 0; }
-.in-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-.in-pill { min-height: 40px; padding: 8px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--s2); color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
-.in-pill[aria-pressed="true"] { border-color: var(--ds-pos); background: rgba(var(--ds-pos-rgb), .14); font-weight: 700; }
-.in-msg { min-height: 1.3em; margin: 6px 0 0; color: var(--ds-warn); }
 .in-cl { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .in-cr { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--s2); }
 .in-cr.off .in-cr-t { color: var(--mut); text-decoration: line-through; text-decoration-thickness: 1px; } .in-cr.off small { text-decoration: none; display: inline-block; }
 .in-cr-t { min-width: 0; font-size: 14.5px; overflow-wrap: anywhere; } .in-cr-b { display: flex; gap: 6px; flex: none; }
 .in-cr-b .btn { min-height: 40px; min-width: 40px; padding: 6px 10px; } .in-cr-b .pn-ic { width: 18px; height: 18px; }
 
-@media (max-width: 360px) { .in-inds { grid-template-columns: 1fr; } .in-rs-mv b { font-size: 20px; } }
-@media (min-width: 600px) { .in-inds { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } .in-rs-mv b { font-size: 21px; } .in-rb, .in-rs-m, .in-rs-st { max-width: 520px; } .in-rb { width: calc(100% - 18px); } .in-rs-st { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: none; } }
+@media (max-width: 360px) { .in-rs-mv b { font-size: 20px; } }
+@media (min-width: 600px) { .in-rs-mv b { font-size: 21px; } .in-rb, .in-rs-m, .in-rs-st { max-width: 520px; } .in-rb { width: calc(100% - 18px); } .in-rs-st { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .banner.in-flash { animation: none; box-shadow: 0 0 0 3px rgba(var(--ds-warn-rgb), .75); } }
 .in-card > .btn { align-self: flex-start; }
 
@@ -209,3 +204,13 @@ html.in-noselect, html.in-noselect * { -webkit-user-select: none; user-select: n
 @media (prefers-reduced-motion: reduce) { .in-ed-pb, .pn-ph, .in-pbtn { transition: none; } }
 @media (max-width: 360px) { .in-ed-ti small { display: none; } .in-av-add span { display: none; } .in-av-add { max-width: none; } }
 button.in-grip:not(:disabled):not(.acb):not(.sc-thumb) { touch-action: none; }
+
+/* ===== Cards antes fixos, agora personalizáveis (período, indicadores, atalhos e acontecimentos) ===== */
+.pn-grid > .in-pc, .pn-grid > .in-sc, .pn-grid > .in-ev { grid-column: 1 / -1; min-width: 0; }
+.pn-grid > .in-ind { grid-column: span 6; }
+.pn-ed.ind { grid-column: span 6; } .pn-ph.ind { grid-column: span 6; }
+@container vw (min-width: 600px) { .pn-grid > .in-ind, .pn-ed.ind, .pn-ph.ind { grid-column: span 3; } }
+.pn-ed-in > .in-sc { overflow: hidden; }
+.in-ghost { background: transparent; border-style: dashed; }
+.pn-ed .in-pc { padding: 12px 10px 10px; }
+.pn-ed .in-per { padding-right: 20px; }
