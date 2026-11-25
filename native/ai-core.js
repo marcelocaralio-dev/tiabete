@@ -14,7 +14,7 @@
       r.onupgradeneeded = () => r.result.createObjectStore('k');
       r.onsuccess = () => { const d = r.result; d.onclose = () => { dbp = null; }; d.onversionchange = () => { try { d.close(); } catch (e) { } dbp = null; }; ok(d); }; r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
     }).catch(e => { dbp = null; throw e; }));
-    const tx = async (mode, f) => { const db = await open(); return new Promise((ok, no) => { const t = db.transaction('k', mode), q = f(t.objectStore('k')); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); };
+    const tx = async (mode, f) => { const db = await open(); return new Promise((ok, no) => { const t = db.transaction('k', mode), q = f(t.objectStore('k')); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); t.onabort = () => no(t.error || new Error('abort')); }); };
     const raw = { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)), del: k => tx('readwrite', s => s.delete(k)) };
     /* Uma única chave mestra por vez: chamadas simultâneas na primeira abertura não geram chaves diferentes (a última apagaria a anterior e os itens
        já cifrados, como o login do Google, ficariam ilegíveis). Falha de leitura nunca gera chave nova por cima da existente. */
@@ -52,9 +52,11 @@
     if (!isHttps(url)) throw { code: 'ai_insecure', aiMsg: 'Por segurança, só são aceitos endereços que começam com https://.' };
     const method = o.method || 'POST', headers = Object.assign({}, o.headers), P = window.Capacitor && window.Capacitor.Plugins, CH = P && P.CapacitorHttp;
     const abort = o.signal ? new Promise((_, no) => { if (o.signal.aborted) no({ code: 'aborted' }); o.signal.addEventListener('abort', () => no({ code: 'aborted' })); }) : null;
+    /* limite de tempo opcional (o.timeout, em ms): sem ele a chamada pode ficar pendurada para sempre */
+    let tmoId = null, ac = null; const tmo = o.timeout ? new Promise((_, no) => { tmoId = setTimeout(() => { try { ac && ac.abort(); } catch (e) { } no({ code: 'ai_timeout', timeout: true }); }, o.timeout); }) : null;
     const run = (async () => {
       if (CH && CH.request) {
-        const r = await CH.request({ url, method, headers, data: o.body, responseType: o.text ? 'text' : 'json', connectTimeout: 30000, readTimeout: 180000 });
+        const r = await CH.request({ url, method, headers, data: o.body, responseType: o.text ? 'text' : 'json', connectTimeout: Math.min(30000, o.timeout || 30000), readTimeout: o.timeout || 180000 });
         let d = r.data;
         if (!o.text && typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { } }
         if (o.text && d && typeof d === 'object') d = JSON.stringify(d);
@@ -62,12 +64,14 @@
       }
       const form = /x-www-form-urlencoded/i.test(headers['content-type'] || headers['Content-Type'] || '');
       const fb = o.body == null ? undefined : typeof o.body === 'string' ? o.body : form ? new URLSearchParams(o.body).toString() : JSON.stringify(o.body);
-      const r = await fetch(url, { method, headers, body: fb, signal: o.signal });
+      if (o.timeout && typeof AbortController !== 'undefined') ac = new AbortController(); const r = await fetch(url, { method, headers, body: fb, signal: ac ? ac.signal : o.signal });
       const t = await r.text(); let d = t; if (!o.text) { try { d = JSON.parse(t); } catch (e) { } }
       return { status: r.status, data: d };
     })();
-    try { return await (abort ? Promise.race([run, abort]) : run); }
-    catch (e) { if (e && (e.code === 'aborted' || e.aiMsg)) throw e; throw { code: 'ai_network', aiMsg: 'Não consegui falar com o provedor de IA. Verifique a internet e tente de novo.' + (e && (e.message || e.errorMessage) ? ' (' + String(e.message || e.errorMessage).slice(0, 80) + ')' : '') }; }
+    run.catch(() => { });
+    try { return await Promise.race([run].concat(abort ? [abort] : [], tmo ? [tmo] : [])); }
+    catch (e) { if (e && (e.code === 'aborted' || e.code === 'ai_timeout' || e.aiMsg)) throw e; throw { code: 'ai_network', net: true, aiMsg: 'Não consegui falar com o provedor de IA. Verifique a internet e tente de novo.' + (e && (e.message || e.errorMessage) ? ' (' + String(e.message || e.errorMessage).slice(0, 80) + ')' : '') }; }
+    finally { clearTimeout(tmoId); }
   }
   window.TB_HTTP = http;
 

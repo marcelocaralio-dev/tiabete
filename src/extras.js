@@ -1144,70 +1144,99 @@ function drvErrTxt(e) {
   if (c === 'needs_reauth') return 'A conexão com o Google Drive expirou. Reconecte em Configurações → Conectores no claude.ai.';
   if (c === 'not_in_manifest' || c === 'approval_required' || c === 'consent_required') return 'Você não autorizou o app a usar o Google Drive. Toque de novo e permita.';
   if (c === 'blocked_by_policy') return 'Sua organização bloqueou este acesso ao Drive.';
+  if (c === 'drv_timeout') return 'O Google Drive demorou demais para responder. Tente de novo.';
+  if (c === 'drv_network') return 'Sem conexão com o Google. Verifique a internet e tente de novo.';
   if (c === 'server_unavailable' || c === 'upstream_error') return 'O Drive não respondeu. Tente de novo em instantes.';
   return 'Não foi possível falar com o Drive' + (e && e.message ? ': ' + String(e.message).slice(0, 80) : '.');
 }
 const drvFiles = p => (p && Array.isArray(p.files)) ? p.files : Array.isArray(p) ? p : [];
-async function drvSavePref() { const d = S.drv; try { await Store.put('meta', { id: 'drive-pref', auto: d.auto, folderId: d.folderId, lastTs: d.lastTs, freq: d.freq, custom: d.custom, notify: d.notify, lastStatus: d.lastStatus, lastMsg: d.lastMsg, lastAt: d.lastAt, failSeen: d.failSeen }); } catch (e) { } }
-async function drvFolder() {
+async function drvSavePref() { const d = S.drv; try { await Store.put('meta', { id: 'drive-pref', auto: d.auto, folderId: d.folderId, lastTs: d.lastTs, freq: d.freq, custom: d.custom, notify: d.notify, lastStatus: d.lastStatus, lastMsg: d.lastMsg, lastAt: d.lastAt, failSeen: d.failSeen, lastHash: d.lastHash || '' }); } catch (e) { } }
+async function drvFolder(create) {
   if (S.drv.folderId) return S.drv.folderId;
   const find = nm => drvCall('search_files', { query: `title = '${nm}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and owner = 'me'`, excludeContentSnippets: true, pageSize: 5 });
   const f = drvFiles(await find(DRV_FOLDER))[0] || drvFiles(await find(DRV_FOLDER_OLD))[0]; /* cópias antigas continuam na pasta antiga: nada é perdido nem duplicado */
   if (f && f.id) { S.drv.folderId = f.id; await drvSavePref(); return f.id; }
+  if (create === false) return null; /* só consultando: não cria pasta */
   const c = await drvCall('create_file', { title: DRV_FOLDER, mimeType: 'application/vnd.google-apps.folder' });
   if (!c || !c.id) throw { code: 'upstream_error', message: 'pasta não criada' };
   S.drv.folderId = c.id; await drvSavePref(); return c.id;
 }
+/* Uma operação do Drive por vez (cliques repetidos não duplicam). Cada operação tem identificação própria e limite de tempo: se uma ficar
+   pendurada, ela é descartada depois do prazo e NUNCA deixa o botão em "Aguarde…" nem trava as cópias automáticas. */
+const DRV_DEADLINE = 120000, DRV_STALE = 150000;
+const drvDeadline = (p, ms) => new Promise((ok, no) => { const t = setTimeout(() => no({ code: 'drv_timeout', aiMsg: 'O Google Drive demorou demais para responder. Tente de novo.' }), ms || DRV_DEADLINE); Promise.resolve(p).then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); no(e); }); });
+function drvBegin(op) { const d = S.drv; if (d.busy && Date.now() - (d.busyAt || 0) < DRV_STALE) return 0; d.busy = true; d.busyAt = Date.now(); d.op = op; d.opId = (d.opId || 0) + 1; return d.opId; }
+function drvEnd(id) { const d = S.drv; if (d.opId !== id) return; d.busy = false; d.op = ''; }
+const drvIsBusy = () => !!(S.drv.busy && Date.now() - (S.drv.busyAt || 0) < DRV_STALE);
+/* impressão digital dos dados (sem a hora da exportação): evita enviar de novo, sem necessidade, uma cópia idêntica à última enviada */
+async function drvFingerprint(txt) { try { const o = JSON.parse(txt); delete o.exportedAt; const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(o))); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { return ''; } }
 async function drvBackup(manual) {
-  const d = S.drv; if (d.busy) return false;
-  const txt = backupText(); if (!txt) { if (manual) toast('Ainda não há dados reais para salvar.'); return false; }
-  d.busy = true; d.msg = ''; if (manual) render();
+  const d = S.drv;
+  const txt = backupText(); if (!txt) { d.lastCode = 'nodata'; if (manual) toast('Ainda não há dados reais para salvar.'); return false; }
+  const id = drvBegin('backup'); if (!id) { d.lastCode = 'busy'; if (manual) toast('Já há uma operação com o Drive em andamento. Aguarde.'); return false; }
+  d.msg = ''; d.lastCode = ''; if (manual || S.route === 'backup') render();
   try {
-    const ek = await secDriveKey(), body = ek ? await secSeal(txt, ek.key, b64d(ek.salt), ek.iter) : txt;
-    let pid = await drvFolder(), now = new Date(), name = `gluxo-backup-${isoDate(now)}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
-    const mk = id => drvCall('create_file', { title: name, textContent: body, contentMimeType: 'application/json', disableConversionToGoogleType: true, parentId: id });
-    try { await mk(pid); }
-    catch (e) { if (e && e.code === 'tool_error') { S.drv.folderId = null; pid = await drvFolder(); await mk(pid); } else throw e; }
-    d.lastTs = Date.now(); d.lastAt = d.lastTs; d.lastStatus = 'ok'; d.lastMsg = ''; d.failAt = 0; await drvSavePref(); await markBackup();
+    const fp = await drvFingerprint(txt);
+    if (!manual && fp && fp === d.lastHash && d.lastTs) { d.checkedAt = Date.now(); return true; } /* nada mudou desde a última cópia enviada */
+    await drvDeadline((async () => {
+      const ek = await secDriveKey(), body = ek ? await secSeal(txt, ek.key, b64d(ek.salt), ek.iter) : txt;
+      let pid = await drvFolder(), now = new Date(), name = `gluxo-backup-${isoDate(now)}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+      const mk = fid => drvCall('create_file', { title: name, textContent: body, contentMimeType: 'application/json', disableConversionToGoogleType: true, parentId: fid });
+      let up;
+      try { up = await mk(pid); }
+      catch (e) { if (e && e.code === 'tool_error') { S.drv.folderId = null; pid = await drvFolder(); up = await mk(pid); } else throw e; }
+      if (!up || !up.id) throw { code: 'upstream_error', aiMsg: 'O Drive não confirmou o envio da cópia. Tente de novo.' }; /* só vale como concluído com o arquivo confirmado pelo Drive */
+    })());
+    d.lastTs = Date.now(); d.lastAt = d.lastTs; d.lastStatus = 'ok'; d.lastMsg = ''; d.failAt = 0; d.lastHash = fp; d.checkedAt = d.lastTs; d.list = null; d.listState = ''; await drvSavePref(); await markBackup();
     d.msg = 'ok'; if (manual) toast('Cópia salva no Google Drive.');
     return true;
-  } catch (e) { d.failAt = Date.now(); d.msg = drvErrTxt(e); d.lastAt = d.failAt; d.lastStatus = 'fail'; d.lastMsg = d.msg; await drvSavePref(); if (manual) toast(d.msg); else if (d.notify) { try { window.dispatchEvent(new CustomEvent('tb-drv-fail', { detail: d.msg })); } catch (x) { } } return false; }
-  finally { d.busy = false; if (S.route === 'backup') render(); }
+  } catch (e) { d.lastCode = (e && e.code) || 'error'; d.failAt = Date.now(); d.msg = drvErrTxt(e); d.lastAt = d.failAt; d.lastStatus = 'fail'; d.lastMsg = d.msg; await drvSavePref(); if (manual) toast(d.msg); else if (d.notify) { try { window.dispatchEvent(new CustomEvent('tb-drv-fail', { detail: d.msg })); } catch (x) { } } return false; }
+  finally { drvEnd(id); if (S.route === 'backup') render(); }
 }
+/* Cópia programada: roda com o app aberto (ao abrir, ao voltar ao app, ao conectar a conta e a cada 15 min). O Android/navegador não deixam o app agir fechado. */
 function drvAuto() {
-  const d = S.drv; if (!HAS_CLAUDE || !d.auto || d.busy || !hasRealData()) return;
-  if (Date.now() - d.lastTs < drvGap() || Date.now() - d.failAt < 30 * 60000) return;
+  const d = S.drv; if (!(window.TB_DRV || HAS_CLAUDE) || !d.auto || drvIsBusy() || !hasRealData()) return;
+  const quick = /^(drv_timeout|drv_network|upstream_error)$/.test(d.lastCode || '');
+  if (Date.now() - d.lastTs < drvGap() || Date.now() - d.failAt < (quick ? 10 : 30) * 60000 || Date.now() - (d.checkedAt || 0) < 15 * 60000) return;
   drvBackup(false);
 }
-async function drvList() {
-  const d = S.drv; d.busy = true; d.msg = ''; render();
-  try {
-    const pid = await drvFolder();
-    d.list = drvFiles(await drvCall('search_files', { query: `parentId = '${pid}' and trashed = false`, excludeContentSnippets: true, orderBy: 'modifiedTime desc', pageSize: 15 })).filter(f => f && f.id && /\.json$/i.test(f.title || ''));
-    if (!d.list.length) d.msg = 'Nenhuma cópia encontrada na pasta do Drive.';
-  } catch (e) { d.msg = drvErrTxt(e); }
-  finally { d.busy = false; render(); }
+async function drvFetchList() {
+  const q = async () => { const pid = await drvFolder(false); if (!pid) return []; return drvFiles(await drvCall('search_files', { query: `parentId = '${pid}' and trashed = false`, excludeContentSnippets: true, orderBy: 'modifiedTime desc', pageSize: 30 })); };
+  let r; try { r = await q(); } catch (e) { if (e && e.code === 'tool_error') { S.drv.folderId = null; r = await q(); } else throw e; }
+  return r.filter(f => f && f.id && /\.json$/i.test(f.title || '')).sort((a, b) => String(b.createdTime || b.modifiedTime || '').localeCompare(String(a.createdTime || a.modifiedTime || '')));
 }
-async function drvLoad(id) {
-  const d = S.drv; d.busy = true; d.msg = ''; render();
+async function drvList() {
+  const d = S.drv, id = drvBegin('list'); if (!id) return;
+  d.msg = ''; d.listState = 'load'; render();
   try {
-    const p = await drvCall('download_file_content', { fileId: id }); let s = p && typeof p === 'object' ? p.content : p;
+    d.list = await drvDeadline(drvFetchList(), 60000); d.listState = d.list.length ? 'ok' : 'empty'; d.listAt = Date.now();
+    if (!d.list.length) d.msg = 'Nenhuma cópia do GLUXO encontrada no seu Drive.';
+  } catch (e) { d.list = null; d.listState = 'error'; d.msg = drvErrTxt(e); }
+  finally { drvEnd(id); render(); }
+}
+async function drvLoad(fid) {
+  const d = S.drv, id = drvBegin('load'); if (!id) return;
+  d.msg = ''; render(); let s;
+  try {
+    const p = await drvDeadline(drvCall('download_file_content', { fileId: fid }), 90000); s = p && typeof p === 'object' ? p.content : p;
     if (typeof s !== 'string') throw { code: 'tool_error', message: 'conteúdo vazio' };
     if (!s.trim().startsWith('{')) { const bin = atob(s.replace(/\s/g, '')); s = new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); }
-    d.busy = false; await readBackupFile(new Blob([s], { type: 'application/json' }));
-  } catch (e) { d.msg = drvErrTxt(e); d.busy = false; render(); }
+  } catch (e) { d.msg = drvErrTxt(e); d.listState = 'error'; drvEnd(id); render(); return; }
+  drvEnd(id); try { await readBackupFile(new Blob([s], { type: 'application/json' })); } catch (e) { console.error(e); d.msg = 'Não foi possível ler esta cópia.'; d.listState = 'error'; render(); }
 }
 function driveCardBody(intro) {
   const d = S.drv, fmt = t => new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   const acct = window.TB_DRV ? '' : '<p class="hint" style="margin:0 0 10px">Conta: a do conector Google Drive do seu Claude (o app não enxerga o e-mail).</p>';
-  const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px">${d.list.map(f => `<button class="btn full" data-act="drv-load" data-id="${esc(f.id)}" ${d.busy ? 'disabled' : ''}>${esc(f.title.replace(/^(?:gluxo|tiabete)-backup-/, '').replace(/\.json$/i, ''))} · restaurar</button>`).join('')}</div>` : '';
+  const sz = n => n ? (n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB') : '';
+  const list = d.list && d.list.length ? `<div class="stack" style="margin-top:12px" aria-label="Cópias encontradas no Google Drive">${d.list.map((f, k) => `<button class="btn full drv-it" data-act="drv-load" data-id="${esc(f.id)}" ${drvIsBusy() ? 'disabled' : ''}><span class="drv-tx"><b>${esc(f.title.replace(/^(?:gluxo|tiabete)-backup-/, '').replace(/\.json$/i, ''))}${k === 0 ? '<span class="drv-new">mais recente</span>' : ''}</b><small>${f.createdTime || f.modifiedTime ? 'Criada em ' + fmt(f.createdTime || f.modifiedTime) : ''}${sz(f.size) ? ' · ' + sz(f.size) : ''}</small></span><span class="drv-go">restaurar</span></button>`).join('')}</div><p class="hint" style="margin:8px 0 0">Lista consultada agora no seu Google Drive${d.listAt ? ' (' + fmt(d.listAt) + ')' : ''}.</p>` : '';
+  const note = d.listState === 'empty' ? `<p class="hint" style="margin:12px 0 0" role="status">${esc(d.msg)}</p>` : d.listState === 'error' && d.msg ? `<p class="hint" style="margin:12px 0 0;color:var(--red-t)" role="alert">${esc(d.msg)} Toque em “Ver cópias no Drive” para tentar de novo.</p>` : '';
   const ok = d.lastStatus === 'ok' && d.lastTs, bad = d.lastStatus === 'fail';
   const status = `<div class="bl-facts" style="margin:0 0 12px"><div class="row sp"><span>Última cópia</span><b class="num">${d.lastTs ? fmt(d.lastTs) : 'nenhum ainda'}</b></div>
     <div class="row sp"><span>Status</span><b>${ok ? '✓ Concluído' : bad ? '✗ Falhou' : '—'}</b></div>${bad ? `<div class="row sp"><span>Última tentativa</span><b class="num">${fmt(d.lastAt)}</b></div>` : ''}
     ${d.auto && d.lastTs ? `<div class="row sp"><span>Próxima verificação</span><b class="num">depois de ${fmt(d.lastTs + drvGap())}</b></div>` : ''}</div>${bad ? `<p class="hint" style="margin:0 0 12px;color:var(--red-t)" role="alert">${esc(d.lastMsg || d.msg || 'A cópia não foi concluída.')}</p>` : ''}`;
   return `<p class="hint" style="margin:0 0 12px">${intro}</p>${acct}${status}
-    <div class="stack"><button class="btn pri full" data-act="drv-now" ${d.busy ? 'disabled aria-busy="true"' : ''}>${d.busy ? 'Aguarde…' : 'Fazer cópia agora'}</button>
-    <button class="btn full" data-act="drv-list" ${d.busy ? 'disabled' : ''}>Ver cópias no Drive</button></div>${list}
+    <div class="stack"><button class="btn pri full" data-act="drv-now" ${drvIsBusy() ? 'disabled' : ''} ${drvIsBusy() && d.op === 'backup' ? 'aria-busy="true"' : ''}>${drvIsBusy() && d.op === 'backup' ? 'Aguarde…' : 'Fazer cópia agora'}</button>
+    <button class="btn full" data-act="drv-list" ${drvIsBusy() ? 'disabled' : ''} ${drvIsBusy() && d.op === 'list' ? 'aria-busy="true"' : ''}>${drvIsBusy() && d.op === 'list' ? 'Consultando o Drive…' : 'Ver cópias no Drive'}</button></div>${note}${list}
     <div class="fl" style="margin:18px 0 8px">Cópia programada</div>
     <label class="al-l pl-sw"><input type="checkbox" class="swt" role="switch" id="drv-auto" ${d.auto ? 'checked' : ''}><span><b>Fazer cópia ao abrir o app</b><small>Quando passar o intervalo escolhido, a cópia é feita na próxima vez que você abrir ou voltar ao app.</small></span></label>
     <div class="form-grid" style="margin-top:10px"><div class="field"><label class="fl" for="drv-freq">Frequência</label><select class="in" id="drv-freq">${[['1', 'A cada 1 dia'], ['7', 'A cada 7 dias'], ['15', 'A cada 15 dias'], ['30', 'A cada 30 dias'], ['custom', 'Personalizado']].map(([v, l]) => `<option value="${v}" ${String(d.freq) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -1228,6 +1257,7 @@ function driveCard() {
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act^="drv-"]'); if (!el) return;
   const a = el.dataset.act;
+  if (['drv-now', 'drv-list', 'drv-load', 'drv-retry'].includes(a) && drvIsBusy()) return; /* clique repetido enquanto trabalha */
   try { if (a === 'drv-retry') { await drvBackup(true); render(); } else if (a === 'drv-dismiss') { S.drv.failSeen = S.drv.lastAt; await drvSavePref(); render(); } else if (a === 'drv-now') await drvBackup(true); else if (a === 'drv-list') await drvList(); else if (a === 'drv-load') await drvLoad(el.dataset.id); }
   catch (err) { console.error(err); }
 });
@@ -1237,10 +1267,16 @@ document.addEventListener('change', async e => {
   if (id === 'drv-custom') { const n = Math.round(+e.target.value); if (n >= 1 && n <= 90) { S.drv.custom = n; await drvSavePref(); render(); } else { toast('Informe de 1 a 90 dias.'); e.target.value = S.drv.custom; } return; }
   if (id === 'drv-notify') { S.drv.notify = e.target.checked; await drvSavePref(); return; }
   S.drv.auto = e.target.checked; S.drv.failAt = 0; await drvSavePref();
-  if (S.drv.auto) { const ok = await drvBackup(true); if (!ok) { S.drv.auto = false; await drvSavePref(); render(); } else toast('Cópia programada ligada.'); }
+  if (S.drv.auto) {
+    const ok = await drvBackup(true);
+    if (ok) toast('Cópia programada ligada.');
+    else if (/^(drv_not_connected|needs_reauth|drv_forbidden|drv_auth|no_mcp|not_granted|server_not_connected|consent_required|approval_required)$/.test(S.drv.lastCode || '')) { S.drv.auto = false; await drvSavePref(); render(); } /* sem permissão: não finge que está ligada */
+    else { toast('Cópia programada ligada. A primeira cópia será tentada de novo em breve.'); render(); }
+  }
   else toast('Cópia programada desligada.');
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(drvAuto, 1500); });
+window.addEventListener('tb-auth', ev => { const t = ev && ev.detail && ev.detail.type; if (t === 'restored' || t === 'connected') setTimeout(drvAuto, 1500); });
 setInterval(drvAuto, 15 * 60000);
 
 

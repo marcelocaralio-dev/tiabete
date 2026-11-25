@@ -18,7 +18,7 @@ const RM_KEEP = /^\s*(Atenção|Aviso|Importante|Privacidade|Cobrança|Limites|E
     const rest = [...el.parentElement.children].slice([...p.children].indexOf(el) + 1).filter(x => !x.matches('.rm-b') && !x.matches('.hint, p.dim') && !x.hidden);
     if (!rest.length) return;
     if (p === view) { const last = view.lastElementChild; if (last && last.matches('.sf-note.bottom, .sf-note')) view.insertBefore(el, last); else view.appendChild(el); }
-    else if (p.matches(MOVE_IN)) p.appendChild(el);
+    else if (p.matches(MOVE_IN)) { const foot = p.querySelector(':scope > .gx-out-wrap'); if (foot) p.insertBefore(el, foot); else p.appendChild(el); } /* o botão de sair da conta fica sempre por último no cartão */
   }
   function setup(el, route) {
     const lh = lineH(el), k = key(el, route); el.dataset.rm = '1'; el.classList.add('rm-t'); el.dataset.lh = String(lh);

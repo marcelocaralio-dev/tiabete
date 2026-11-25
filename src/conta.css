@@ -20,3 +20,17 @@
 .gx-acct-tx span { color: var(--mut); font-size: 14px; overflow-wrap: anywhere; }
 .gx-acct-tx small { color: var(--good); font-size: 13px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .gx-out-btn { transition: none; } }
+
+/* Botão "Sair da conta Google": sempre por último no cartão, alinhado às bordas do conteúdo e com o mesmo respiro dos demais blocos */
+.gx-out-wrap { margin: 16px 0 0; padding: 0; width: 100%; box-sizing: border-box; align-self: stretch; }
+.gx-out-btn { box-sizing: border-box; margin: 0; max-width: 100%; text-align: center; line-height: 1.2; }
+.gx-out-btn span { min-width: 0; overflow-wrap: anywhere; }
+.rm-t + .rm-b + .gx-out-wrap, .rm-b + .gx-out-wrap { margin-top: 14px; }
+@media (max-width: 340px) { .gx-out-btn { padding: 12px 14px; font-size: 15px; gap: 10px; } }
+/* lista de cópias no Drive */
+.drv-it { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; min-height: 56px; }
+.drv-it .drv-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.drv-it .drv-tx b { overflow-wrap: anywhere; font-size: 14.5px; }
+.drv-it .drv-tx small { color: var(--mut); font-size: 12.5px; }
+.drv-it .drv-go { flex: none; color: var(--brand-l); font-weight: 700; font-size: 13.5px; }
+.drv-new { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px; font-size: 11px; font-weight: 800; background: rgba(var(--brand-rgb, var(--red-rgb)), .18); color: var(--brand-l); vertical-align: middle; }

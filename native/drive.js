@@ -22,22 +22,36 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   }
   /* evento "tb-auth": detail.type = 'restored' (conta lida do aparelho na abertura), 'connected' (login concluído), 'disconnected' ou 'changed' */
   const notify = type => { try { window.dispatchEvent(new CustomEvent('tb-auth', { detail: { type: type || 'changed' } })); } catch (e) { try { window.dispatchEvent(new Event('tb-auth')); } catch (x) { } } };
-  async function tokenCall(params) {
-    const r = await http(TOK, Object.assign({ method: 'POST' }, form(Object.assign({ client_id: G.cid }, params))));
-    return r;
+  /* Toda chamada ao Google tem limite de tempo e erro de rede/tempo vira mensagem do Drive (não a da IA). Nunca fica pendurada. */
+  async function gcall(url, o, ms) {
+    try { return await http(url, Object.assign({}, o, { timeout: ms || 30000 })); }
+    catch (e) {
+      if (e && e.code === 'ai_timeout') throw E('drv_timeout', 'O Google demorou demais para responder. Verifique a internet e tente de novo.');
+      if (e && (e.net || e.code === 'ai_network')) throw E('drv_network', 'Sem conexão com o Google. Verifique a internet e tente de novo.');
+      throw e;
+    }
   }
-  async function accessToken(force) {
-    if (!force && G.access && Date.now() < G.exp - 60000) return G.access;
+  async function tokenCall(params) {
+    return gcall(TOK, Object.assign({ method: 'POST' }, form(Object.assign({ client_id: G.cid }, params))), 20000);
+  }
+  let tokFlight = null; /* uma renovação por vez: chamadas simultâneas esperam a mesma resposta */
+  function accessToken(force) {
+    if (!force && G.access && Date.now() < G.exp - 60000) return Promise.resolve(G.access);
+    return tokFlight || (tokFlight = accessToken0().finally(() => { tokFlight = null; }));
+  }
+  async function accessToken0() {
     const rt = await SEC.get('g-refresh'); if (!rt) { G.conn = false; throw E('drv_not_connected', 'Conecte sua conta Google em Mais → Cópia de segurança.'); }
     const r = await tokenCall({ grant_type: 'refresh_token', refresh_token: rt });
-    if (r.status === 400 || r.status === 401) { await SEC.del('g-refresh'); G.conn = false; G.access = null; throw reauth(); }
+    /* só apaga o login guardado quando o Google diz que ele não vale mais (invalid_grant); outro erro 400/401 (ex.: ID do cliente errado) não destrói a conexão */
+    if ((r.status === 400 || r.status === 401) && r.data && r.data.error === 'invalid_grant') { await SEC.del('g-refresh'); G.conn = false; G.access = null; throw reauth(); }
+    if (r.status === 400 || r.status === 401) throw E('drv_auth', 'O Google recusou a autorização' + (r.data && r.data.error ? ' (' + String(r.data.error).slice(0, 40) + ')' : '') + '. Confira o ID do cliente ou saia e entre de novo com o Google.');
     if (r.status >= 300 || !r.data || !r.data.access_token) throw E('upstream_error', 'O Google não respondeu. Tente de novo em instantes.');
     G.access = r.data.access_token; G.exp = Date.now() + (r.data.expires_in || 3600) * 1000; return G.access;
   }
   async function api(url, o, retry) {
-    const t = await accessToken(false);
-    const r = await http(url, Object.assign({}, o, { headers: Object.assign({ authorization: 'Bearer ' + t }, o.headers) }));
-    if (r.status === 401 && !retry) { await accessToken(true); return api(url, o, true); }
+    const t = await accessToken(retry === true);
+    const r = await gcall(url, Object.assign({}, o, { headers: Object.assign({ authorization: 'Bearer ' + t }, o.headers) }), o.ms || 30000);
+    if (r.status === 401 && !retry) { G.access = null; return api(url, o, true); }
     if (r.status === 401) throw reauth();
     if (r.status === 404) throw E('tool_error', 'Item não encontrado no Drive.');
     if (r.status === 403) { const m = JSON.stringify(r.data || '').slice(0, 300); throw E('drv_forbidden', /rateLimit|quota/i.test(m) ? 'O Google limitou as consultas. Tente de novo em alguns minutos.' : /accessNotConfigured|has not been used|disabled/i.test(m) ? 'A API do Google Drive não está ativada no projeto do app (veja o guia de configuração).' : 'O Google negou o acesso. Reconecte a conta e aceite a permissão do Drive.'); }
@@ -60,7 +74,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     const em = G.profile && G.profile.email ? G.profile.email : '', nm = G.profile && G.profile.name ? G.profile.name : '', ini = String(nm || em || 'G').trim().charAt(0).toUpperCase();
     return `<h2 class="sec">Conta Google</h2><div class="card gx-acct"><div class="gx-acct-id"><span class="gx-acct-av" aria-hidden="true">${esc(ini)}</span><div class="gx-acct-tx"><b>${esc(nm || em || 'Conta Google conectada')}</b>${em && nm ? `<span>${esc(em)}</span>` : ''}<small>${G.conn ? 'Conectada' : 'Conexão expirada · entre de novo para usar o Drive'}</small></div></div>
       <p class="hint" style="margin:12px 0 0">Sair encerra só o login do Google neste aparelho. <b>Seus registros, histórico e configurações não são apagados.</b></p>
-      <div class="stack" style="margin-top:12px">${outBtn()}</div></div>`;
+      <div class="stack gx-out-wrap">${outBtn()}</div></div>`;
   }
   /* Confirmação antes de desconectar: explica o que acontece e o que NÃO acontece. */
   function askSignOut() {
@@ -75,9 +89,9 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     async call(tool, input) {
       input = input || {};
       if (tool === 'search_files') {
-        const u = `${API}/files?q=${encodeURIComponent(qOf(input.query))}&pageSize=${input.pageSize || 10}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime)')}${input.orderBy ? '&orderBy=' + encodeURIComponent(input.orderBy) : ''}`;
+        const u = `${API}/files?q=${encodeURIComponent(qOf(input.query))}&pageSize=${input.pageSize || 10}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,createdTime,size)')}${input.orderBy ? '&orderBy=' + encodeURIComponent(input.orderBy) : ''}`;
         const r = await api(u, { method: 'GET' });
-        return { files: ((r.data && r.data.files) || []).map(f => ({ id: f.id, title: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime })) };
+        return { files: ((r.data && r.data.files) || []).map(f => ({ id: f.id, title: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, createdTime: f.createdTime, size: f.size == null ? null : +f.size })) };
       }
       if (tool === 'create_file') {
         if (input.mimeType === 'application/vnd.google-apps.folder') {
@@ -87,11 +101,12 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
         const meta = { name: input.title }; if (input.parentId) meta.parents = [input.parentId];
         const bd = 'tb' + rnd(12);
         const body = `--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${json(meta)}\r\n--${bd}\r\nContent-Type: ${input.contentMimeType || 'application/json'}\r\n\r\n${input.textContent || ''}\r\n--${bd}--`;
-        const r = await api(`${UP}/files?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'content-type': `multipart/related; boundary=${bd}` }, body });
-        return { id: r.data && r.data.id };
+        const r = await api(`${UP}/files?uploadType=multipart&fields=id,name,size,createdTime`, { method: 'POST', headers: { 'content-type': `multipart/related; boundary=${bd}` }, body, ms: 90000 });
+        if (!r.data || !r.data.id) throw E('upstream_error', 'O Drive não confirmou o envio da cópia. Tente de novo.');
+        return { id: r.data.id, name: r.data.name, size: r.data.size == null ? null : +r.data.size, createdTime: r.data.createdTime };
       }
       if (tool === 'download_file_content') {
-        const r = await api(`${API}/files/${encodeURIComponent(input.fileId)}?alt=media`, { method: 'GET', text: true });
+        const r = await api(`${API}/files/${encodeURIComponent(input.fileId)}?alt=media`, { method: 'GET', text: true, ms: 60000 });
         return { content: typeof r.data === 'string' ? r.data : json(r.data) };
       }
       throw E('tool_error', 'Operação não suportada.');
@@ -100,7 +115,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     card(drv, body) {
       if (!G.loaded) load();
       const intro = `Salva uma cópia completa na pasta <b>GLUXO Backups</b> do <b>seu</b> Google Drive. O app só enxerga os arquivos que ele mesmo criou. Os dados vão do seu aparelho direto ao seu Drive.`;
-      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack" style="margin-top:12px">${outBtn()}</div></div>`;
+      if (G.conn) return `<h2 class="sec">Google Drive</h2><div class="card">${G.profile && G.profile.email ? `<p class="hint" style="margin:0 0 12px">Conectado como <b>${esc(G.profile.email)}</b></p>` : ''}${body(intro)}<div class="stack gx-out-wrap">${outBtn()}</div></div>`;
       const idField = G.baked ? '' : `<div class="field" style="margin-top:12px"><label class="fl" for="g-cid">ID do cliente Google (OAuth)</label><input class="in" id="g-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid)}"></div>`;
       return `<h2 class="sec">Google Drive</h2><div class="card"><p class="hint" style="margin:0">${intro}</p>${idField}
         <div class="stack" style="margin-top:12px"><button class="btn pri full" data-act="g-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Conectar conta Google'}</button></div>
@@ -113,7 +128,7 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   async function connect() {
     const cidEl = document.getElementById('g-cid') || document.getElementById('gate-cid'); if (cidEl) { G.cid = cidEl.value.trim(); if (G.cid) await SEC.setCfg('g-client', G.cid); }
     if (!G.cid) { G.msg = 'Informe o ID do cliente Google.'; render(); notify(); return; }
-    const B = P('Browser'); if (!B) { G.msg = 'O navegador do sistema não está disponível neste aparelho.'; return render(); }
+    const B = P('Browser'); if (!B) { G.msg = 'Entrar com o Google só funciona no aplicativo Android do GLUXO. Na versão web/PWA seus dados ficam neste aparelho; use “Exportar cópia” para guardá-los.'; render(); notify(); return; }
     const verifier = rnd(48), state = rnd(16);
     const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
     G.pending = { verifier, state }; G.msg = ''; G.busy = true; render(); notify('changed');

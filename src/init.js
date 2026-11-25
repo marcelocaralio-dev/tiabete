@@ -32,7 +32,7 @@
   try { const ad = (await Store.all('meta')).find(x => x.id === 'alert-day'); if (ad) adLoad(ad.value); } catch (e) { }
   S.adReady = true; S.irReady = true; try { acSync(); } catch (e) { }
   try { if (typeof tbCfgReady === 'function') tbCfgReady(); } catch (e) { }
-  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0 }); } catch (e) { }
+  try { const dp = (await Store.all('meta')).find(x => x.id === 'drive-pref'); if (dp) Object.assign(S.drv, { auto: !!dp.auto, folderId: dp.folderId || null, lastTs: dp.lastTs || 0, freq: ['1', '7', '15', '30', 'custom'].includes(String(dp.freq)) ? String(dp.freq) : '1', custom: dp.custom >= 1 && dp.custom <= 90 ? dp.custom : 3, notify: dp.notify !== false, lastStatus: dp.lastStatus || '', lastMsg: dp.lastMsg || '', lastAt: dp.lastAt || 0, failSeen: dp.failSeen || 0, lastHash: dp.lastHash || '' }); setTimeout(() => { try { drvAuto(); } catch (e) { } }, 3000); } catch (e) { }
   try { const ip = (await Store.all('meta')).find(x => x.id === 'ics-pref'); if (ip && ip.value) S.icsPref = ip.value; } catch (e) { }
   try { const sv = (await Store.all('meta')).find(x => x.id === 'saved-meals'); if (sv && Array.isArray(sv.value)) S.saved = sv.value; } catch (e) { }
   askPersist();
