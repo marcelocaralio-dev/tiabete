@@ -905,6 +905,7 @@ function render() {
   try { acSync(); } catch (e) { }
   try { ambSync(); } catch (e) { }
   attachCharts(view);
+  try { if (typeof inFit === 'function') inFit(); } catch (e) { }   /* encaixe dos cards do Início (0.49.0) */
   try { if (S.pm) pmDraw(); } catch (e) { }
   try { iaMount(view, route); } catch (e) { }
   rewardSoon();

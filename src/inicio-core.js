@@ -32,11 +32,12 @@ const IN_TOP = [
   { k: 'atalhos', t: 'Atalhos', d: 'Atalhos sugeridos conforme os seus registros (aparece quando há algum).' },
   { k: 'eventos', t: 'Acontecimentos importantes', d: 'Fatos relevantes dos registros recentes (aparece quando há algum).' }
 ];
+/* 0.49.0: o card "Exames" (exa) foi retirado do catálogo: exames laboratoriais são recurso Premium (LIC_PREMIUM.exames) e não podem estar na
+   personalização do plano gratuito. Chaves desconhecidas somem das preferências guardadas em inCleanPrefs (visível ou oculto, tanto faz). */
 const IN_CARDS = [
   ...IN_TOP,
   { k: 'hoje', t: 'Evolução do dia', d: 'Medições do dia em gráfico e linha do tempo.' },
   { k: 'hba', t: 'Hemoglobina glicada (estimativa)', d: 'HbA1c estimada a partir dos últimos 90 dias.' },
-  { k: 'exa', t: 'Exames e HbA1c de laboratório', d: 'Último exame e última HbA1c de laboratório.' },
   { k: 'evo', t: 'Evolução da glicemia', d: 'Gráfico resumido das medições do período.' },
   { k: 'trat', t: 'Meu tratamento', d: 'Resumo de insulina e medicamentos.' },
   { k: 'var', t: 'Variabilidade', d: 'Desvio-padrão e amplitude das medições.' },
@@ -55,6 +56,9 @@ const IN_FIXED = [{ k: 'resumo', t: 'Resumo glicêmico', pos: 'top' }, { k: 'met
 /* Padrão: todos visíveis, menos os indicadores extras (hipoglicemias, acima da faixa, comparação, HbA1c), que ficam em "Cards disponíveis". */
 const IN_HIDDEN_DEF = IN_IND.filter(i => !IN_IND_DEF.includes(i.k)).map(i => inIndId(i.k));
 const IN_VER = 2;
+/* Tamanhos (0.49.0): 'c' recolhido, 'n' normal (padrão), 'x' expandido. Guardados em `sz` ({ chave: 'c' | 'x' }); 'n' não é gravado.
+   Campo opcional dentro do mesmo formato v2: preferências antigas (sem `sz`) continuam valendo e todos os cards ficam em 'n'. */
+const IN_SIZES = ['c', 'n', 'x'], IN_SIZE_DEF = 'n';
 const IN_DEF = () => ({ v: IN_VER, order: IN_CARDS.map(c => c.k), hidden: IN_HIDDEN_DEF.slice() });
 
 /* Formato antigo (v1, até 0.46): 14 cards em order/hidden e os indicadores escolhidos em `pri` (1 a 4, na ordem escolhida).
@@ -81,7 +85,18 @@ function inCleanPrefs(v) {
   (Array.isArray(v.order) ? v.order : []).forEach(k => { if (keys.includes(k) && !seen.has(k)) { seen.add(k); order.push(k); } });
   keys.forEach(k => { if (!seen.has(k)) order.push(k); });
   const hidden = [...new Set((Array.isArray(v.hidden) ? v.hidden : []).filter(k => keys.includes(k)))];
-  return { v: IN_VER, order, hidden };
+  const out = { v: IN_VER, order, hidden }, sz = {};
+  if (v.sz && typeof v.sz === 'object') keys.forEach(k => { if (v.sz[k] === 'c' || v.sz[k] === 'x') sz[k] = v.sz[k]; });
+  if (Object.keys(sz).length) out.sz = sz;
+  return out;
+}
+const inSize = (p, k) => { const q = inCleanPrefs(p); return (q.sz && q.sz[k]) || IN_SIZE_DEF; };
+/* Define o tamanho de UM card; os demais (e ordem/ocultos) não mudam. */
+function inSetSize(p, k, s) {
+  const q = inCleanPrefs(p); if (!IN_CARDS.some(c => c.k === k) || !IN_SIZES.includes(s)) return q;
+  const sz = Object.assign({}, q.sz); if (s === IN_SIZE_DEF) delete sz[k]; else sz[k] = s;
+  if (Object.keys(sz).length) q.sz = sz; else delete q.sz;
+  return q;
 }
 function inParsePrefs(raw) { try { return inCleanPrefs(raw ? JSON.parse(raw) : null); } catch (e) { return IN_DEF(); } }
 const inIsDefault = p => JSON.stringify(inCleanPrefs(p)) === JSON.stringify(IN_DEF());
@@ -231,16 +246,10 @@ function inEvents(inp) {
   }
   /* 4) exames novos (14 dias) e 5) HbA1c novas (30 dias). Exame de exemplo nunca gera acontecimento. */
   const nowD = INC.isoDate(new Date(now)), dAgo = iso => Math.round((INC.startOfDay(now) - INC.startOfDay(INC.mkTs(iso, '12:00'))) / 86400e3);
-  const exams = (inp.exams || []).filter(e => e && e.id && e.source !== 'exemplo' && e.example !== true), hbaAll = (inp.hba || []).filter(x => x && x.source !== 'exemplo' && x.example !== true && typeof x.value === 'number');
-  const examHba = {}; hbaAll.forEach(x => { if (x.examId) examHba[x.examId] = x; });
-  exams.forEach(e => {
-    const t = e.addedAt || (e.date ? INC.mkTs(e.date, '12:00') : 0); if (!t || now - t > 14 * 86400e3 || now - t < -86400e3) return;
-    const h = examHba[e.id], n = Array.isArray(e.items) ? e.items.length : 0;
-    ev.push({ id: 'ex-' + e.id, kind: 'exame', tone: 'info', ts: t, title: 'Novo exame', text: `${e.title && e.title !== 'Exame' ? e.title : 'Exame laboratorial'}${e.date ? ' · ' + INC.fmtDate(e.date) : ''}${n ? ` · ${n} resultado${n === 1 ? '' : 's'}` : ''}${h ? ` · HbA1c ${f1(h.value)}%` : ''}.`, act: { type: 'exam', id: e.id } });
-  });
+  /* 0.49.0: exames laboratoriais (Premium) não geram acontecimento nem atalho no Início. A HbA1c de laboratório continua gratuita e segue aparecendo. */
+  const hbaAll = (inp.hba || []).filter(x => x && x.source !== 'exemplo' && x.example !== true && typeof x.value === 'number');
   const labs = hbaAll.filter(x => x.date).sort((a, b) => a.date.localeCompare(b.date));
   labs.forEach((x, i) => {
-    if (x.examId && exams.some(e => e.id === x.examId && ev.some(v => v.id === 'ex-' + e.id))) return;
     if (dAgo(x.date) > 30 || dAgo(x.date) < -1) return;
     const p = labs[i - 1];
     ev.push({ id: 'hba-' + x.id, kind: 'hba', tone: 'info', ts: INC.mkTs(x.date, '12:00'), title: 'Novo resultado de HbA1c', text: `${f1(x.value)}% em ${INC.fmtDate(x.date)}${p ? `. O anterior foi ${f1(p.value)}% em ${INC.fmtDate(p.date)}` : ''}.`, act: { type: 'go', id: 'hba1c' } });
@@ -257,13 +266,8 @@ function inEvents(inp) {
     days.forEach((d, i) => { const consecutive = i && Math.round((INC.mkTs(d, '12:00') - INC.mkTs(days[i - 1], '12:00')) / 86400e3) === 1; if (okDay(d)) { run = consecutive && okDay(days[i - 1]) ? run + 1 : 1; } else run = 0; if (run > best) best = run; if (i === days.length - 1) endsRecent = run > 0 && dAgo(d) <= 1; });
     if (endsRecent && run >= 5 && run >= best) ev.push({ id: 'rec-seq-' + run, kind: 'recorde', tone: 'ok', ts: now - 2, title: 'Maior sequência na faixa', text: `${run} dias seguidos com todas as medições dentro da faixa (${run === best ? 'a maior já registrada' : ''}).`.replace(' ()', ''), act: { type: 'go', id: 'historico' } });
   }
-  /* 7) padrões descritivos do aplicativo (no máximo 1) */
-  try {
-    const notes = INC.patternNotes(rs, inp.markLabels || {}, nowD);
-    const pn = notes.find(x => x.k === 'baixas') || notes[0];
-    if (pn) ev.push({ id: 'pad-' + pn.k, kind: 'padrao', tone: 'info', ts: now - 3, title: pn.t, text: pn.d, act: { type: 'go', id: 'padroes' } });
-  } catch (e) { }
-  const rank = { hipo: 0, exame: 1, hba: 1, recorde: 2, media: 3, var: 4, padrao: 5 };
+  /* 7) (0.49.0) padrões e observações automáticas são Premium (LIC_PREMIUM.padroes): não entram nos acontecimentos do Início. */
+  const rank = { hipo: 0, hba: 1, recorde: 2, media: 3, var: 4 };
   ev.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (b.ts - a.ts));
   return ev;
 }
@@ -279,8 +283,6 @@ function inShortcuts(inp) {
   /* refeição registrada nas últimas 3 h (medição de antes/durante a refeição) que ainda não teve uma medição "depois" */
   const meal = [...rs].reverse().find(r => r.meal && r.context !== 'depois' && now - r.ts >= 0 && now - r.ts <= 3 * 3600e3) || null;
   if (meal && !rs.some(r => r.ts > meal.ts && r.context === 'depois')) out.push({ k: 'meal', icon: 'plate', label: 'Acompanhar depois da refeição', sub: `Refeição registrada às ${meal.time || inHM(meal.ts)}`, act: 'new', ctx: 'depois', meal: meal.meal });
-  const newEx = (inp.exams || []).filter(e => e && e.id && e.source !== 'exemplo' && e.example !== true && (e.addedAt || 0) > 0 && now - e.addedAt >= 0 && now - e.addedAt <= 7 * 86400e3).sort((a, b) => b.addedAt - a.addedAt)[0];
-  if (newEx) out.push({ k: 'exam', icon: 'flask', label: 'Ver resultados do exame', sub: newEx.title && newEx.title !== 'Exame' ? newEx.title : 'Novo exame', act: 'ex-open', id: newEx.id });
   return out.slice(0, 3);
 }
 
@@ -306,4 +308,4 @@ function inScale(vals, lo, hi) {
   return { min: mn, max: mx, pos: v => Math.max(0, Math.min(100, (v - mn) / span * 100)) };
 }
 
-if (typeof module !== 'undefined') module.exports = { IN_FIXED, inHiddenCards, inMoveVisible, inReorder, inHide, inShow, IN_CARDS, IN_TOP, IN_IND, IN_IND_DEF, IN_HIDDEN_DEF, IN_VER, inIndId, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };
+if (typeof module !== 'undefined') module.exports = { IN_SIZES, IN_SIZE_DEF, inSize, inSetSize, IN_FIXED, inHiddenCards, inMoveVisible, inReorder, inHide, inShow, IN_CARDS, IN_TOP, IN_IND, IN_IND_DEF, IN_HIDDEN_DEF, IN_VER, inIndId, IN_DEF, inCleanPrefs, inParsePrefs, inIsDefault, inMove, inToggleHidden, inVisible, inReal, inTrend, inSituation, inSummary, inToday, inIndicator, inDay, inEvents, inShortcuts, inScale, inGap, IN_EV_MAX };

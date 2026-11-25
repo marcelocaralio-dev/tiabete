@@ -3,19 +3,19 @@ const C = require('../src/inicio-core.js'), fs = require('fs'), path = require('
 let fail = 0, n = 0; const ok = (c, m) => { n++; if (!c) { fail++; console.log('FALHOU:', m); } };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b), ALL = C.IN_CARDS.map(c => c.k);
 /* ---- lógica pura ---- */
-ok(ALL.length === 25 && new Set(ALL).size === 25 && ['per', 'atalhos', 'eventos'].every(k => ALL.includes(k)) && C.IN_IND.every(i => ALL.includes('ind-' + i.k)) && C.IN_CARDS.every(c => c.t && c.d), 'catálogo: ids estáveis, únicos, com nome e descrição');
+ok(ALL.length === 24 && new Set(ALL).size === 24 && ['per', 'atalhos', 'eventos'].every(k => ALL.includes(k)) && C.IN_IND.every(i => ALL.includes('ind-' + i.k)) && C.IN_CARDS.every(c => c.t && c.d), 'catálogo: ids estáveis, únicos, com nome e descrição');
 ok(!ALL.includes('resumo') && !ALL.includes('metricas') && same(C.IN_FIXED.map(x => x.k + ':' + x.pos), ['resumo:top', 'metricas:bottom']), 'estruturais fora do catálogo personalizável');
 const dirty = C.inCleanPrefs({ v: 2, order: ['resumo', 'metricas', 'dist', 'dist', 'x'], hidden: ['resumo', 'metricas', 'min', 'min'] });
-ok(!dirty.order.includes('resumo') && !dirty.order.includes('metricas') && !dirty.hidden.includes('resumo') && !dirty.hidden.includes('metricas') && dirty.order.length === 25 && new Set(dirty.order).size === 25 && same(dirty.hidden, ['min']), 'estruturais nunca entram em ordem/ocultos; sem duplicações');
+ok(!dirty.order.includes('resumo') && !dirty.order.includes('metricas') && !dirty.hidden.includes('resumo') && !dirty.hidden.includes('metricas') && dirty.order.length === 24 && new Set(dirty.order).size === 24 && same(dirty.hidden, ['min']), 'estruturais nunca entram em ordem/ocultos; sem duplicações');
 let p = C.IN_DEF(); p = C.inHide(p, 'min'); p = C.inHide(p, 'max'); p = C.inHide(p, 'resumo');
-ok(same(p.hidden, C.IN_HIDDEN_DEF.concat(['min', 'max'])) && C.inVisible(p).length === 19, 'ocultar vários; ocultar estrutural é ignorado');
+ok(same(p.hidden, C.IN_HIDDEN_DEF.concat(['min', 'max'])) && C.inVisible(p).length === 18, 'ocultar vários; ocultar estrutural é ignorado');
 ok(same(C.inHiddenCards(p).map(c => c.k), ['ind-hipo', 'ind-hiper', 'ind-comp', 'ind-hba', 'min', 'max']), 'cards disponíveis = ocultos');
 const mv = C.inMoveVisible(p, 'n', -1); ok(mv.order.indexOf('n') < mv.order.indexOf('cmp') && same(mv.hidden, p.hidden), 'mover pula os ocultos');
-const ro = C.inReorder(p, ['dist', 'hoje']); ok(ro.order[0] === 'dist' && ro.order[1] === 'hoje' && ro.order.length === 25 && same(ro.hidden, p.hidden) && ro.order.indexOf('min') > 0, 'reordenar mantém ocultos e todos os cartões (sem perda)');
-const sh = C.inShow(p, 'min'); ok(sh.order[sh.order.length - 1] === 'min' && !sh.hidden.includes('min') && sh.order.length === 25, 'readicionar vai para o fim da lista personalizável');
+const ro = C.inReorder(p, ['dist', 'hoje']); ok(ro.order[0] === 'dist' && ro.order[1] === 'hoje' && ro.order.length === 24 && same(ro.hidden, p.hidden) && ro.order.indexOf('min') > 0, 'reordenar mantém ocultos e todos os cartões (sem perda)');
+const sh = C.inShow(p, 'min'); ok(sh.order[sh.order.length - 1] === 'min' && !sh.hidden.includes('min') && sh.order.length === 24, 'readicionar vai para o fim da lista personalizável');
 ok(C.inIsDefault(C.IN_DEF()) && !C.inIsDefault(p), 'padrão reconhecido');
 const old = C.inCleanPrefs({ v: 2, order: ALL.filter(k => k !== 'dist').reverse(), hidden: ['hoje'], pri: ['media'] });
-ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && same(old.hidden, ['hoje']) && old.order.length === 25, 'novo card futuro entra no fim sem sobrescrever a escolha do usuário');
+ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && same(old.hidden, ['hoje']) && old.order.length === 24, 'novo card futuro entra no fim sem sobrescrever a escolha do usuário');
 /* ---- navegador ---- */
 (async () => {
   let chromium, devices; try { ({ chromium, devices } = require('playwright')); } catch (e) { console.log('parte do navegador ignorada: playwright ausente'); return end(); }
@@ -42,7 +42,7 @@ ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && sam
     ok(await q('[data-act="in-cust"]') === 1 && /Personalizar/.test(await txt('.in-pbtn')) && await q('.in-grip') === 0 && await q('.in-hide') === 0, 'botão Personalizar visível, sem alças fora da edição');
     const heroH = await pg.evaluate(() => document.querySelector('.in-hero').offsetHeight), cardH = await pg.evaluate(() => document.querySelector('.pn-med').offsetHeight);
     await pg.click('[data-act="in-cust"]'); await sleep(300);
-    ok(await q('.in-grip') === 21 && await q('.in-hide') === 21 && await q('.in-ed-ok') === 1 && await q('.in-ed-rs') === 1 && await q('.in-av-add') === 4, 'edição: alça e ocultar nos 21 cards visíveis (25 no catálogo, 4 indicadores extras ocultos por padrão); Concluir e Restaurar padrão');
+    ok(await q('.in-grip') === 20 && await q('.in-hide') === 20 && await q('.in-ed-ok') === 1 && await q('.in-ed-rs') === 1 && await q('.in-av-add') === 4, 'edição: alça e ocultar nos 20 cards visíveis (24 no catálogo (0.49.0: sem Exames), 4 indicadores extras ocultos por padrão); Concluir e Restaurar padrão');
     ok(await pg.evaluate(() => ['per', 'ind-media', 'ind-tend', 'ind-var', 'ind-faixa', 'atalhos', 'eventos'].every(k => document.querySelectorAll(`.pn-ed[data-ed="${k}"] .in-grip, .pn-ed[data-ed="${k}"] .in-hide`).length === 2)), 'edição: período, os 4 indicadores, atalhos e acontecimentos agora têm alça e ocultar');
     ok(await pg.evaluate(() => [...document.querySelectorAll('.pn-grid > .pn-ed')].map(e => e.dataset.ed).join() === inVisible(inPrefs()).join()), 'edição: ordem na tela = ordem salva');
     ok(await q('.in-hero .in-grip, .in-hero .in-hide, .mt-blk .in-grip, .mt-blk .in-hide, .in-hero [data-grip], .mt-blk [data-grip]') === 0 && await q('.in-fixrow') === 2 && await q('.in-hero') === 1 && await q('.mt-blk') === 1, 'edição: Resumo glicêmico e Central de Métricas visíveis, sem alça nem ocultar, com marca discreta de fixo');
@@ -55,15 +55,15 @@ ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && sam
     /* arrastar com mouse: para baixo */
     let g = await grip('hba'); await pg.mouse.move(g.x, g.y); await pg.mouse.down(); for (let i = 1; i <= 24; i++) { await pg.mouse.move(g.x, g.y + i * 12); await sleep(16); }
     ok(await q('.pn-ph') === 1 && await q('.pn-ed.dragging') === 1, 'arraste: marcador de destino e cartão flutuante');
-    await pg.mouse.up(); await sleep(300); let k1 = await keys(); ok(k1.split(',').indexOf('hba') > 1 && k1.split(',').length === 21 && new Set(k1.split(',')).size === 21 && await q('.pn-ph') === 0 && await q('.pn-ed.dragging') === 0, 'mouse: arrastar para baixo (' + k1 + ')');
+    await pg.mouse.up(); await sleep(300); let k1 = await keys(); ok(k1.split(',').indexOf('hba') > 1 && k1.split(',').length === 20 && new Set(k1.split(',')).size === 20 && await q('.pn-ph') === 0 && await q('.pn-ed.dragging') === 0, 'mouse: arrastar para baixo (' + k1 + ')');
     /* para cima */
     g = await grip('hba'); await pg.mouse.move(g.x, g.y); await pg.mouse.down(); for (let i = 1; i <= 40; i++) { await pg.mouse.move(g.x, Math.max(130, g.y - i * 12)); await sleep(16); } await pg.mouse.up(); await sleep(300);
-    let k2 = await keys(); ok(k2.split(',').indexOf('hba') < k1.split(',').indexOf('hba') && k2.split(',').length === 21, 'mouse: arrastar para cima (' + k2 + ')');
+    let k2 = await keys(); ok(k2.split(',').indexOf('hba') < k1.split(',').indexOf('hba') && k2.split(',').length === 20, 'mouse: arrastar para cima (' + k2 + ')');
     const sv = JSON.parse(await stored() || 'null'); ok(sv != null && same(sv.order.filter(k => !sv.hidden.includes(k)), k2.split(',')), 'ordem do arraste salva na hora');
     /* toque (Android): gesto real */
     const cdp = await ctx.newCDPSession(pg), touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
     g = await grip('dist'); await touch('touchStart', g.x, g.y); await sleep(40); for (let i = 1; i <= 24; i++) { await touch('touchMove', g.x, g.y - i * 14); await sleep(16); } await touch('touchEnd'); await sleep(300);
-    const k3 = await keys(); ok(k3.split(',').indexOf('dist') < k2.split(',').indexOf('dist') && k3.split(',').length === 21, 'toque: arrastar pela alça reordena (' + k3 + ')');
+    const k3 = await keys(); ok(k3.split(',').indexOf('dist') < k2.split(',').indexOf('dist') && k3.split(',').length === 20, 'toque: arrastar pela alça reordena (' + k3 + ')');
     ok(await pg.evaluate(() => getComputedStyle(document.querySelector('.in-grip')).touchAction) === 'none', 'alça não rola a página (touch-action: none)');
     /* rolagem automática */
     await pg.evaluate(() => scrollTo(0, 0)); g = await grip('hoje'); await pg.evaluate(() => scrollTo(0, 400)); await sleep(150); g = await grip('hoje');
@@ -71,15 +71,15 @@ ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && sam
     const y1 = await pg.evaluate(() => scrollY); await pg.mouse.up(); await sleep(200); ok(y1 > y0 + 60, 'rolagem automática ao arrastar perto da borda inferior (' + y0 + ' → ' + y1 + ')');
     ok(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sem rolagem horizontal');
     /* o estrutural não pode ser arrastado nem derrubado: soltar acima do Resumo/abaixo da Central mantém dentro da grade */
-    const kk = (await keys()).split(','); ok(kk.length === 21 && new Set(kk).size === 21 && ALL.filter(k => !C.IN_HIDDEN_DEF.includes(k)).every(k => kk.includes(k)), 'nenhum cartão perdido ou duplicado');
+    const kk = (await keys()).split(','); ok(kk.length === 20 && new Set(kk).size === 20 && ALL.filter(k => !C.IN_HIDDEN_DEF.includes(k)).every(k => kk.includes(k)), 'nenhum cartão perdido ou duplicado');
     ok(await pg.evaluate(() => { const h = document.querySelector('.in-hero'), gr = document.querySelector('.pn-grid'), m = document.querySelector('.mt-blk'); return h.getBoundingClientRect().top < gr.getBoundingClientRect().top && (h.compareDocumentPosition(gr) & 4) && (gr.compareDocumentPosition(m) & 4) && !gr.contains(h) && !gr.contains(m); }), 'estrutura: Resumo → personalizáveis → Central de Métricas');
     /* ocultar vários */
     await pg.evaluate(() => scrollTo(0, 0)); for (const k of ['min', 'max', 'n']) { await pg.click(`.in-hide[data-k="${k}"]`); await sleep(250); }
-    ok(await q('.pn-ed') === 18 && await q('.pn-ed[data-ed="min"], .pn-ed[data-ed="max"], .pn-ed[data-ed="n"]') === 0 && /^7$/.test((await txt('.in-ed-p .in-count')).trim()), 'ocultar vários: sai da tela na hora e entra em Cards disponíveis');
+    ok(await q('.pn-ed') === 17 && await q('.pn-ed[data-ed="min"], .pn-ed[data-ed="max"], .pn-ed[data-ed="n"]') === 0 && /^7$/.test((await txt('.in-ed-p .in-count')).trim()), 'ocultar vários: sai da tela na hora e entra em Cards disponíveis');
     ok(await pg.evaluate(() => !!document.querySelector('.in-hero') && !!document.querySelector('.mt-blk')), 'ocultar vários: estruturais intactos');
     await pg.click('[data-act="in-avt"]'); await sleep(350); ok(await q('.in-av-i') === 7 && /Menor/.test(await txt('.in-av-l')) && /Menor glicemia/.test(await txt('.in-av-l')) && await q('.in-av-add') === 7, 'Cards disponíveis: nome, descrição e "Adicionar à tela inicial"');
     const before = await keys(); await pg.click('[data-act="in-add"][data-k="max"]'); await sleep(300);
-    const after = (await keys()).split(','); ok(after[after.length - 1] === 'max' && after.length === 19 && await q('.in-av-i') === 6, 'adicionar: volta ao fim dos personalizáveis, acima da Central');
+    const after = (await keys()).split(','); ok(after[after.length - 1] === 'max' && after.length === 18 && await q('.in-av-i') === 6, 'adicionar: volta ao fim dos personalizáveis, acima da Central');
     /* sair, reabrir, persistir */
     await pg.click('[data-act="in-done"]'); await sleep(300); ok(await q('.in-grip') === 0 && await q('.in-edit') === 0 && await q('.in-pbtn') === 1, 'Concluir encerra a edição');
     const saved = await keys(), raw = await stored(); await pg.reload(); await sleep(1000); try { await pg.getByText('Continuar sem conta').click({ timeout: 1000 }); } catch (e) { } await pg.evaluate(() => { for (const i of ['tb-gate', 'tb-splash']) { const e = document.getElementById(i); if (e) e.remove(); } });
@@ -109,7 +109,7 @@ ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && sam
     /* mover um indicador: arrastar "Na faixa" para a posição da "Média" */
     const g = await grip('ind-faixa'), tg = await pg.evaluate(() => { const r = document.querySelector('.pn-ed[data-ed="ind-media"]').getBoundingClientRect(); return { x: r.left + 20, y: r.top + 20 }; });
     await pg.mouse.move(g.x, g.y); await pg.mouse.down(); for (let i = 1; i <= 20; i++) { await pg.mouse.move(g.x + (tg.x - g.x) * i / 20, g.y + (tg.y - g.y) * i / 20); await sleep(16); } await pg.mouse.up(); await sleep(300);
-    const k1 = (await keys()).split(','); ok(k1.indexOf('ind-faixa') < k1.indexOf('ind-media') && k1.length === 21 && new Set(k1).size === 21, 'mover: indicador arrastado para outra posição (' + k1.join() + ')');
+    const k1 = (await keys()).split(','); ok(k1.indexOf('ind-faixa') < k1.indexOf('ind-media') && k1.length === 20 && new Set(k1).size === 20, 'mover: indicador arrastado para outra posição (' + k1.join() + ')');
     /* mover pelo teclado */
     await pg.focus('.in-grip[data-grip="ind-var"]'); await pg.keyboard.press('ArrowUp'); await sleep(200);
     const k2 = (await keys()).split(','); ok(k2.indexOf('ind-var') === k1.indexOf('ind-var') - 1, 'mover: setas movem o indicador');
@@ -137,13 +137,13 @@ ok(old.order[old.order.length - 1] === 'dist' && old.order[0] === 'hiper' && sam
     /* preferências salvas na versão anterior (14 cards + indicadores em pri) */
     await pg.evaluate(() => { localStorage.setItem('tb-inicio', JSON.stringify({ v: 1, order: ['dist', 'hoje', 'hba', 'exa', 'evo', 'trat', 'var', 'med', 'cmp', 'min', 'max', 'n', 'hipo', 'hiper'], hidden: ['hba', 'min'], pri: ['hipo', 'media'] })); inPrefsCache = null; render(); }); await sleep(400);
     const vis = await pg.evaluate(() => inVisible(inPrefs()).join());
-    ok(vis === 'per,ind-hipo,ind-media,atalhos,eventos,dist,hoje,exa,evo,trat,var,med,cmp,max,n,hipo,hiper', 'migração: ordem e ocultos antigos mantidos; indicadores escolhidos na mesma ordem (' + vis + ')');
+    ok(vis === 'per,ind-hipo,ind-media,atalhos,eventos,dist,hoje,evo,trat,var,med,cmp,max,n,hipo,hiper', 'migração: ordem e ocultos antigos mantidos; indicadores escolhidos na mesma ordem (' + vis + ')');
     ok(await q('.pn-grid > .in-ind') === 2 && /Abaixo de/.test(await pg.evaluate(() => document.querySelector('.pn-grid > .in-ind').textContent)), 'migração: a tela mostra só os 2 indicadores que a pessoa tinha escolhido');
     await pg.evaluate(() => { inPrefsSave(inPrefs()); }); ok(await pg.evaluate(() => JSON.parse(localStorage.getItem('tb-inicio')).v) === 2, 'migração: ao salvar, o formato novo (v2) é gravado');
   });
   for (const [w, hh] of [[320, 640], [768, 1024]]) await run('viewport ' + w, async pg => {
     await pg.click('[data-act="in-cust"]'); await sleep(300);
-    ok(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth) && await pg.evaluate(() => document.querySelectorAll('.in-grip').length) === 21, 'tela ' + w + 'px: edição sem rolagem horizontal');
+    ok(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth) && await pg.evaluate(() => document.querySelectorAll('.in-grip').length) === 20, 'tela ' + w + 'px: edição sem rolagem horizontal');
     const bad = await pg.evaluate(() => [...document.querySelectorAll('.in-ed-bar .btn, .in-grip, .in-hide')].filter(e => { const r = e.getBoundingClientRect(); return r.width < 22 || r.height < 22; }).length); ok(!bad, 'tela ' + w + 'px: controles com tamanho de toque');
   }, { viewport: { width: w, height: hh }, isMobile: w < 600, hasTouch: true });
   end();

@@ -147,9 +147,9 @@ function inEventItem(e) {
   const a = e.act || {};
   return `<li><button type="button" class="in-evi${inTone(e.tone)}" data-act="in-ev" data-t="${esc(a.type || '')}" data-id="${esc(a.id || '')}"><span class="in-evi-ic">${pnIc(IN_EVI[e.kind] || 'bars')}</span><span class="in-evi-b"><b>${esc(e.title)}</b><span>${esc(e.text)}</span></span><span class="in-evi-go" aria-hidden="true">›</span></button></li>`;
 }
-function inEventsCard(M) {
+function inEventsCard(M, sz) {
   const ev = M.events || []; if (!ev.length) return '';
-  const top = ev.slice(0, IN_EV_MAX), rest = ev.slice(IN_EV_MAX);
+  const top = ev.slice(0, sz === 'x' ? ev.length : IN_EV_MAX), rest = ev.slice(top.length);
   return `<section class="in-ev wide" aria-labelledby="in-ev-h"><div class="in-ev-hd"><h2 id="in-ev-h">Acontecimentos importantes</h2><span class="in-count num" aria-label="${ev.length} acontecimentos">${ev.length}</span></div><ul class="in-evl">${top.map(inEventItem).join('')}</ul>${rest.length ? `<details class="in-more"><summary>Ver mais ${rest.length}</summary><ul class="in-evl">${rest.map(inEventItem).join('')}</ul></details>` : ''}</section>`;
 }
 
@@ -171,7 +171,7 @@ function inTlItem(it) {
   const dv = it.delta == null ? '<span class="tag first">1ª do dia</span>' : `<span class="tag ${it.delta > 0 ? 'up' : ''}">${it.delta > 0 ? '▲' : it.delta < 0 ? '▼' : '■'} ${stepFmt(it.delta)} mg/dL</span>`;
   return gap + `<li><button type="button" class="in-tli g-${it.band}" data-act="open" data-id="${r.id}"><span class="in-tl-t num">${r.noTime ? '—:—' : r.time}</span><i class="in-tl-d p-${inBand(it.band)}" aria-hidden="true"></i><span class="in-tl-b"><span class="chips">${dv}${recChips(r)}</span></span><span class="in-tl-v num">${fn(r.glucose, 1)}<small>${it.out === 'low' ? ' ▼' : it.out === 'high' ? ' ▲' : ''}</small></span></button></li>`;
 }
-function inDayCard(d) {
+function inDayCard(d, sz) {
   const iso = d.iso, D = inDay(S.records, iso, S.events), isToday = d.isToday;
   const nav = `<div class="day-nav">${isToday ? '' : '<button class="btn sm" data-act="day-today">Hoje</button>'}<button class="btn sm" data-act="day-prev" aria-label="Dia anterior">‹</button><button class="btn sm" data-act="day-next" aria-label="Próximo dia" ${isToday ? 'disabled' : ''}>›</button></div>`;
   let body;
@@ -181,32 +181,20 @@ function inDayCard(d) {
   } else {
     const seq = `<span class="in-seq" aria-hidden="true">${D.items.map(i => `<i class="p-${inBand(i.band)}"></i>`).join('')}</span>`;
     const facts = [`${D.n} medi${D.n === 1 ? 'ção' : 'ções'}`, `${D.inRange} na faixa`, D.out ? `${D.out} fora` : '', D.maxGapMin != null ? `maior intervalo ${gapFmt(D.maxGapMin)}` : '', D.n > 1 ? `amplitude ${f0(D.max - D.min)} mg/dL` : ''].filter(Boolean).join(' · ');
-    const first = D.items.slice(0, 4), more = D.items.slice(4);
+    const first = D.items.slice(0, sz === 'x' ? D.items.length : 4), more = D.items.slice(sz === 'x' ? D.items.length : 4);
     const ev = D.events.length ? `<p class="in-dev">${D.events.map(e => `<span class="tag">${esc(e.text)}</span>`).join('')}</p>` : '';
     body = `${seq}<p class="pn-sub in-facts">${esc(facts)}</p>${inDayChart(D, isToday)}${D.untimed ? `<p class="hint">${D.untimed} medição(ões) sem horário não aparecem no gráfico.</p>` : ''}<p class="in-leg"><span><i class="in-pt p-ok"></i>na faixa</span><span><i class="in-pt p-low"></i>baixa</span><span><i class="in-pt p-high"></i>alta</span><span class="dim">Pontos são medições reais; a linha liga as medições em sequência e fica tracejada quando o intervalo passa de 6 h (nada é estimado entre elas).</span></p>${ev}<ol class="in-tl">${first.map(inTlItem).join('')}</ol>${more.length ? `<details class="in-more"><summary>Ver todas as ${D.n} medições</summary><ol class="in-tl">${more.map(inTlItem).join('')}</ol></details>` : ''}`;
   }
   return `<section class="in-card in-day wide" aria-label="Evolução do dia"><div class="row sp in-card-h"><span class="pn-h">${pnIc('clock')}<span class="pn-t">Evolução · ${esc(pnDayLab(iso, isToday))}${isToday ? '' : ' ' + esc(fmtDate(iso).slice(0, 5))}</span></span>${nav}</div>${body}</section>`;
 }
 
-/* ---------- cartões novos: variabilidade e exames ---------- */
+/* ---------- cartões novos: variabilidade (o card Exames saiu em 0.49.0: exames são Premium) ---------- */
 function inVarCard(M) {
   const v = M.vari;
   if (!v) return pnCard('var', '', 'scale', 'Variabilidade', `<span class="pn-big num">—</span><span class="pn-sub">${M.sc.n ? 'Precisa de 5 medições no período' : 'Sem medições no período'}</span>`, 'Variabilidade: sem dados suficientes');
   const sc = inScale([M.sc.min, M.sc.max], LIM.low, LIM.high), a = sc.pos(LIM.low), b = sc.pos(LIM.high), x0 = sc.pos(M.sc.min), x1 = sc.pos(M.sc.max), mm = sc.pos(M.sc.mean);
   const cv = typeof mtAllowed === 'function' && mtAllowed() && v.cv != null ? ` · CV ${fn(v.cv, 0)}%` : '';
   return pnCard('var', 'wide', 'scale', 'Variabilidade', `<span class="pn-row"><span class="pn-big num">${f0(v.sd)}<small>mg/dL de desvio-padrão</small></span></span><span class="in-rng" aria-hidden="true"><i class="in-rng-ok" style="left:${a.toFixed(1)}%;width:${(b - a).toFixed(1)}%"></i><i class="in-rng-sp" style="left:${x0.toFixed(1)}%;width:${Math.max(1, x1 - x0).toFixed(1)}%"></i><i class="in-rng-m" style="left:${mm.toFixed(1)}%"></i></span><span class="pn-sub num">Menor ${f0(M.sc.min)} · média ${f0(M.sc.mean)} · maior ${f0(M.sc.max)} mg/dL${cv}</span>`, `Variabilidade: desvio-padrão de ${f0(v.sd)} mg/dL, amplitude de ${f0(v.amp)} mg/dL`);
-}
-function inExamCard() {
-  const ex = S.exams.filter(e => e.date && e.source !== 'exemplo').sort((a, b) => b.date.localeCompare(a.date) || (b.addedAt || 0) - (a.addedAt || 0))[0];
-  const lab = S.hba.filter(x => !isEx(x) && x.date).sort((a, b) => b.date.localeCompare(a.date))[0];
-  const ago = iso => { const n = Math.round((startOfDay(Date.now()) - startOfDay(mkTs(iso, '12:00'))) / DAY); return n <= 0 ? 'hoje' : n === 1 ? 'ontem' : n < 60 ? `há ${n} dias` : `há ${Math.round(n / 30)} meses`; };
-  let body;
-  if (!ex && !lab) body = `<p class="pn-sub">Nenhum exame registrado ainda.</p><button type="button" class="btn sm" data-act="go" data-r="exames">Adicionar exame</button>`;
-  else {
-    const est = est90();
-    body = `<div class="in-exl">${ex ? `<button type="button" class="in-exr" data-act="ex-open" data-id="${esc(ex.id)}"><span class="dim">Último exame</span><b>${esc(ex.title && ex.title !== 'Exame' ? ex.title : 'Exame laboratorial')}</b><span class="num dim">${fmtDate(ex.date)} · ${ago(ex.date)}</span></button>` : ''}${lab ? `<button type="button" class="in-exr" data-act="go" data-r="hba1c"><span class="dim">HbA1c de laboratório</span><b class="num">${fn(lab.value, 1)}%</b><span class="num dim">${fmtDate(lab.date)} · ${ago(lab.date)}${est.ok ? ` · estimativa atual ≈ ${fn(est.value, 1)}%` : ''}</span></button>` : ''}</div>`;
-  }
-  return `<section class="in-card in-exa" aria-label="Exames"><span class="pn-h">${pnIc('flask')}<span class="pn-t">Exames</span></span>${body}</section>`;
 }
 /* barras de comparação (período atual x anterior) usadas no cartão Comparação */
 function inCmpBars(a, b, per) {
@@ -215,6 +203,64 @@ function inCmpBars(a, b, per) {
   return `<span class="in-cmpb" aria-hidden="true"><span><i style="width:${(a / mx * 100).toFixed(0)}%"></i><em class="num">${f0(a)}</em></span><span class="prev"><i style="width:${(b / mx * 100).toFixed(0)}%"></i><em class="num">${f0(b)}</em></span></span>`;
 }
 const inMiniBar = (n, tot, cls) => tot ? `<i class="in-bar ${cls || ''}" aria-hidden="true"><i style="width:${Math.max(n ? 3 : 0, n / tot * 100).toFixed(0)}%"></i></i>` : '';
+
+/* ---------- Tamanhos dos cards (0.49.0) ----------
+   Três estados por card: c recolhido · n normal (padrão) · x expandido. A escolha mora em `sz` das preferências (inicio-core.js).
+   O conteúdo é adaptado, não só o contêiner: o recolhido esconde (por CSS, ver inicio.css) tudo que é secundário; o normal é o card de sempre;
+   o expandido acrescenta linhas complementares calculadas com os MESMOS dados e fórmulas já usados nas janelas de detalhes (nada novo é calculado). */
+const IN_SZ_LAB = { c: 'recolhido', n: 'normal', x: 'expandido' };
+const inSzOf = k => inSize(inPrefs(), k);
+function inSized(k, html, extra) {
+  if (!html) return html;
+  const sz = inSzOf(k);
+  html = html.replace(/^(\s*<(?:button|section|div)\b)/, `$1 data-sz="${sz}"`);
+  if (sz === 'x' && extra) { const i = html.lastIndexOf('</'); if (i > 0) html = html.slice(0, i) + extra + html.slice(i); }
+  return html;
+}
+const inXr = rows => { rows = rows.filter(r => r && r[1] != null && r[1] !== ''); return rows.length ? `<span class="in-xr">${rows.map(([a, b]) => `<span class="in-xrr"><span class="dim">${a}</span><b class="num">${b}</b></span>`).join('')}</span>` : ''; };
+/* Linhas complementares do tamanho expandido, por janela de detalhes (mesmos números de pmDetail em painel2.js). */
+function inXRows(pm, d, M) {
+  const { sc, sp, cmp, rc } = d, mm = v => (v == null ? '—' : fm(v) + ' mg/dL');
+  switch (pm) {
+    case 'med': return [['Média no período anterior', sp.n ? mm(sp.mean) : '—'], ['Diferença', cmp.diff != null ? fsign(cmp.diff) + ' mg/dL' : '—'], ['Medições no período', sc.n]];
+    case 'cmp': return [['Média atual', sc.n ? mm(sc.mean) : '—'], ['Média anterior', sp.n ? mm(sp.mean) : '—'], ['Medições (atual · anterior)', sc.n + ' · ' + sp.n], ['Abaixo de 70 (atual · anterior)', sc.hypo + ' · ' + sp.hypo]];
+    case 'min': case 'max': return [['Média no período', sc.n ? mm(sc.mean) : '—'], [pm === 'min' ? 'Maior' : 'Menor', sc.n ? f0(pm === 'min' ? sc.max : sc.min) + ' mg/dL' : '—'], ['Medições no período', sc.n]];
+    case 'n': { const days = new Set(rc.map(x => x.date)).size; return [['Dias com medição', days], ['Período anterior', sp.n], ['Média por dia com medição', days ? fm(sc.n / days) : '—']]; }
+    case 'hipo': case 'hiper': { const lo = pm === 'hipo', v = lo ? sc.hypo : sc.hyper; return [['Parte das medições', sc.n ? (v / sc.n * 100).toFixed(0) + '%' : '—'], ['Período anterior', lo ? sp.hypo : sp.hyper], ['Medições no período', sc.n]]; }
+    case 'var': { const v = M.vari; return v ? [['Amplitude (maior − menor)', f0(v.amp) + ' mg/dL'], ['Menor · maior', f0(sc.min) + ' · ' + f0(sc.max) + ' mg/dL'], ['Média', mm(sc.mean)], ['Desvio-padrão no período anterior', v.prevSd != null ? f0(v.prevSd) + ' mg/dL' : '—']] : []; }
+    case 'dist': { const bc = bandCounts(rc), n = rc.length; return BAND_LIST.filter(b => bc[b.k]).map(b => [b.name, `${bc[b.k]} · ${(bc[b.k] / n * 100).toFixed(0)}%`]); }
+    case 'hba': { const e = est90(), lab = S.hba.filter(x => !isEx(x) && x.date).sort((a, b) => b.date.localeCompare(a.date))[0]; return [['Medições usadas (90 dias)', e.st.n], ['Dias com medição', e.days], lab ? ['HbA1c de laboratório', `${fn(lab.value, 1)}% · ${fmtDate(lab.date)}`] : null].filter(Boolean); }
+    case 'per': return [['Medições no período', sc.n], ['Média', sc.n ? mm(sc.mean) : '—'], ['Menor · maior', sc.n ? f0(sc.min) + ' · ' + f0(sc.max) + ' mg/dL' : '—'], ['Período anterior', sp.n + ' medições']];
+  }
+  return [];
+}
+
+/* ---------- Encaixe automático (0.49.0) ----------
+   CSS Grid de 12 colunas com posicionamento automático denso (já existente) + linhas de 4 px: cada card ocupa `span N` linhas, N medido a partir
+   da sua altura real. Assim, ao recolher ou expandir um card, o grid recalcula a posição de todos e os vizinhos sobem para ocupar o espaço livre,
+   sem lacunas verticais. Só é ligado quando há card recolhido/expandido: com tudo em Normal o visual continua exatamente o de antes (linhas de altura igual). */
+const IN_ROW = 4;
+let inFitSig = '', inFitRaf = 0, inFitGrid = null, inFitRO = null;
+function inFitDo(grid) {
+  const kids = [...grid.children], gap = grid.classList.contains('editing') ? 18 : 10;
+  const sig = grid.offsetWidth + '|' + kids.map(c => c.offsetHeight + (c.dataset.sz || '')).join(',');
+  if (sig === inFitSig && grid.classList.contains('in-fit')) return;
+  kids.forEach(c => { if (c.classList.contains('dragging')) return; c.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((c.offsetHeight + gap) / IN_ROW)); });
+  inFitSig = grid.offsetWidth + '|' + kids.map(c => c.offsetHeight + (c.dataset.sz || '')).join(',');
+}
+function inFit() {
+  const grid = document.querySelector('.pn-grid'); if (!grid) return;
+  const on = !!grid.querySelector('[data-sz="c"], [data-sz="x"]');
+  grid.classList.toggle('in-fit', on);
+  if (!on) { [...grid.children].forEach(c => { c.style.gridRowEnd = ''; }); inFitSig = ''; return; }
+  inFitSig = ''; inFitDo(grid);
+  if (inFitGrid !== grid) {     /* acompanha mudanças de largura/orientação, conteúdo que cresce e cards que entram/saem (arraste) */
+    inFitGrid = grid;
+    const again = () => { if (inFitRaf) return; inFitRaf = requestAnimationFrame(() => { inFitRaf = 0; if (grid.isConnected && grid.classList.contains('in-fit')) inFitDo(grid); }); };
+    try { if (inFitRO) inFitRO.disconnect(); inFitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(again) : null; if (inFitRO) { inFitRO.observe(grid); [...grid.children].forEach(c => inFitRO.observe(c)); } new MutationObserver(m => { if (inFitRO) [...grid.children].forEach(c => inFitRO.observe(c)); again(); }).observe(grid, { childList: true }); } catch (e) { }
+  } else if (inFitRO) [...grid.children].forEach(c => inFitRO.observe(c));
+}
+window.addEventListener('resize', () => { try { const g = document.querySelector('.pn-grid.in-fit'); if (g) { inFitSig = ''; inFitDo(g); } } catch (e) { } });
 
 /* ---------- 6. Personalização direto no Início ----------
    Estado de edição só em memória (S.inEdit); ordem e ocultos vão para 'tb-inicio' (mesmo mecanismo de antes, com cópia durável em persist.js).
@@ -233,18 +279,24 @@ function inEditBar(msg) {
   const body = av.length ? `<ul class="in-av-l">${items}</ul>` : '<p class="in-av-none">Nenhum card oculto. Todos os cards estão na tela inicial.</p>';
   const pan = (id, open, act, title, cnt, inner) => `<section class="in-ed-p${open ? ' open' : ''}"><button type="button" class="in-ed-ph" data-act="${act}" aria-expanded="${open}" aria-controls="${id}"><span class="in-ed-pt">${title}</span>${cnt}<span class="ds-chev" aria-hidden="true"></span></button><div class="in-ed-pb" id="${id}"${open ? '' : ' inert'}><div class="in-ed-pin">${inner}</div></div></section>`;
   return `<div class="in-edit" role="region" aria-label="Personalização da tela inicial">
-    <div class="in-ed-bar"><div class="in-ed-ti"><b>Personalizar</b><small>Arraste pela alça para reorganizar. Toque em ✕ para ocultar.</small></div>
+    <div class="in-ed-bar"><div class="in-ed-ti"><b>Personalizar</b><small>Arraste pela alça para mover · ✕ oculta · os ícones da base mudam o tamanho.</small></div>
       <button type="button" class="btn sm in-ed-rs" data-act="in-reset"${inIsDefault(p) ? ' disabled' : ''}>Restaurar padrão</button><button type="button" class="btn sm pri in-ed-ok" data-act="in-done">Concluir</button></div>
     ${pan('in-av-b', avOpen, 'in-avt', 'Cards disponíveis', `<span class="in-count num" aria-label="${av.length} ocultos">${av.length}</span>`, body)}
     <p class="in-sr" id="in-live" role="status" aria-live="polite"></p></div>`;
 }
 const inFixRow = pos => `<div class="in-fixrow" aria-hidden="true">${pnIc('lock')}<span>${pos === 'top' ? 'Resumo glicêmico · fixo no topo' : 'Central de Métricas · fixa no final'}</span></div>`;
 /* Em edição cada cartão ganha uma moldura (alça de arraste + botão de ocultar) sem mudar o cartão nem a sua altura: os controles ficam sobre a borda. */
+const IN_SZ_IC = { c: '<rect x="8" y="10" width="8" height="4" rx="1.5"/>', n: '<rect x="6" y="8" width="12" height="8" rx="2"/>', x: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/>' };
+function inSizeCtl(k, t, sz) {
+  return `<div class="in-sz" role="group" aria-label="Tamanho de ${t}">${['c', 'n', 'x'].map(s => `<button type="button" data-act="in-size" data-k="${k}" data-s="${s}" aria-pressed="${sz === s}" aria-label="${IN_SZ_LAB[s][0].toUpperCase() + IN_SZ_LAB[s].slice(1)}: ${t}" title="${IN_SZ_LAB[s][0].toUpperCase() + IN_SZ_LAB[s].slice(1)}"><svg viewBox="0 0 24 24" aria-hidden="true">${IN_SZ_IC[s]}</svg></button>`).join('')}</div>`;
+}
 function inEditCard(k, html) {
-  const t = esc(inCardT(k));
+  const t = esc(inCardT(k)), sz = inSzOf(k), pc = /^\s*<[a-z]+ [^>]*class="[^"]*\bpn-c\b/.test(html);
   /* Atalhos e Acontecimentos só aparecem na tela quando há algo a mostrar; na edição ficam com um espaço reservado, para poderem ser movidos ou ocultados mesmo vazios. */
   if (!html) html = `<section class="in-card in-ghost wide" aria-label="${t}"><span class="pn-h">${pnIc(k === 'atalhos' ? 'list' : 'star')}<span class="pn-t">${t}</span></span><p class="pn-sub">Nada a mostrar agora. Este card aparece aqui quando houver conteúdo.</p></section>`;
-  return `<div class="pn-ed ${inSpan(html)}" data-ed="${k}"><div class="pn-ed-in" inert aria-hidden="true">${html}</div>
+  if (!/^\s*<[a-z]+ [^>]*data-sz=/.test(html)) html = html.replace(/^(\s*<[a-z]+)/, `$1 data-sz="${sz}"`);
+  return `<div class="pn-ed ${inSpan(html)}${pc ? ' is-pc' : ''}" data-ed="${k}" data-sz="${sz}"><div class="pn-ed-in" inert aria-hidden="true">${html}</div>
+    ${inSizeCtl(k, t, sz)}
     <button type="button" class="in-grip" data-grip="${k}" aria-label="Mover ${t}. Arraste, ou use as setas para cima e para baixo." title="Arrastar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h.01M12 7h.01M16 7h.01M8 12h.01M12 12h.01M16 12h.01"/></svg></button>
     <button type="button" class="in-hide" data-act="in-hide" data-k="${k}" aria-label="Ocultar ${t}">${pnIc('x')}</button></div>`;
 }
@@ -289,7 +341,7 @@ document.addEventListener('pointerdown', e => {
   e.preventDefault();
   const k = inScaleK(grid), rect = card.getBoundingClientRect(), gr = grid.getBoundingClientRect();
   const ph = document.createElement('div'); ph.className = 'pn-ph ' + (card.classList.contains('wide') ? 'wide' : card.classList.contains('mini') ? 'mini' : card.classList.contains('ind') ? 'ind' : '');
-  ph.style.height = card.offsetHeight + 'px'; card.after(ph);
+  ph.style.height = card.offsetHeight + 'px'; ph.dataset.sz = card.dataset.sz || 'n'; if (card.classList.contains('is-pc')) ph.classList.add('is-pc'); ph.style.gridRowEnd = card.style.gridRowEnd; card.after(ph);
   const D = Object.assign(inDrag, { on: true, id: e.pointerId, card, grid, ph, k, gx: e.clientX - rect.left, gy: e.clientY - rect.top, px: e.clientX, py: e.clientY, raf: 0, key: card.dataset.ed, grip: g, w: card.offsetWidth, h: card.offsetHeight });
   card.classList.add('dragging'); card.style.width = D.w + 'px'; card.style.height = D.h + 'px'; grid.classList.add('is-dragging'); document.documentElement.classList.add('in-noselect');
   try { g.setPointerCapture(e.pointerId); } catch (err) { }
@@ -376,8 +428,14 @@ document.addEventListener('click', e => {
   else if (a === 'in-rs') inRsToggle(el);
   else if (a === 'in-hide') { const n = inCardT(k); inApply(inHide(inPrefs(), k), '', `${n} ocultado. Está em Cards disponíveis.`); }
   else if (a === 'in-add') { const n = inCardT(k); inApply(inShow(inPrefs(), k), '', `${n} adicionado ao fim da tela inicial.`); }
+  else if (a === 'in-size') {
+    const sz = el.dataset.s, n = inCardT(k); if (sz === inSzOf(k)) return;
+    inApply(inSetSize(inPrefs(), k, sz), '', `${n}: tamanho ${IN_SZ_LAB[sz]}.`);
+    const c = document.querySelector(`.pn-ed[data-ed="${k}"]`); if (c && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) c.classList.add('sz-pop');
+    const b = document.querySelector(`.in-sz [data-k="${k}"][data-s="${sz}"]`); if (b) b.focus({ preventScroll: true });
+  }
   else if (a === 'in-avt') { S.inAvOpen = !S.inAvOpen; inPanelToggle(el, S.inAvOpen); }
-  else if (a === 'in-reset') openSheet('<h2>Restaurar padrão?</h2><p style="margin:0 0 14px">A sua organização personalizada será substituída pela configuração original do GLUXO: ordem padrão e todos os cards visíveis de novo. Nenhum registro, dado glicêmico ou histórico é apagado.</p><div class="row"><button type="button" class="btn pri grow" data-act="in-reset-ok" autofocus>Restaurar padrão</button><button type="button" class="btn" data-act="close">Cancelar</button></div>');
+  else if (a === 'in-reset') openSheet('<h2>Restaurar padrão?</h2><p style="margin:0 0 14px">A sua organização personalizada será substituída pela configuração original do GLUXO: ordem padrão, tamanho normal em todos os cards e todos os cards visíveis de novo. Nenhum registro, dado glicêmico ou histórico é apagado.</p><div class="row"><button type="button" class="btn pri grow" data-act="in-reset-ok" autofocus>Restaurar padrão</button><button type="button" class="btn" data-act="close">Cancelar</button></div>');
   else if (a === 'in-reset-ok') { closeSheet(); inApply(IN_DEF(), 'Organização padrão restaurada.', 'Organização padrão restaurada.'); }
   else if (a === 'in-ev') {
     const t = el.dataset.t, id = el.dataset.id;

@@ -56,7 +56,7 @@ setInterval(() => {
 }, 500);
 function pnTrat() {
   const p = S.plan, on = k => p.types.includes(k), lines = []; let big = '—', unit = '', st = null;
-  if (!p.types.length) return { big, unit, sub: 'Escolha como você trata o diabetes.' };
+  if (!p.types.length) return { big, unit, sub: 'Escolha como você trata o diabetes.', lines: [] };
   if (on('insulina')) {
     try { insRoll(); } catch (e) { }
     const b = basalInfo(), done = ['fast', 'lunch', 'dinner'].filter(k => S.ins[k]).length, sk = skipped('basal');
@@ -67,7 +67,7 @@ function pnTrat() {
   }
   if (on('remedios')) { const n = p.meds.filter(x => x.name || x.times.length).length; lines.push(`Medicamentos: ${n || 'nenhum'} cadastrado${n === 1 ? '' : 's'}`); if (big === '—' && !on('insulina')) { big = String(n); unit = n === 1 ? 'medicamento' : 'medicamentos'; } }
   if (on('bomba')) lines.push('Bomba de insulina');
-  return { big, unit, sub: lines.join(' · '), st };
+  return { big, unit, sub: lines.join(' · '), st, lines };
 }
 
 /* ---------- Painel (Início) ----------
@@ -80,13 +80,12 @@ function viewPainelCards() {
   const ed = inEditing();
   let h = (ed ? inEditBar() : inTopBtn()) + banners() + labelBanner() + pfInvite() + prNotice('painel');
   const C = {};
-  C.hoje = inDayCard(d);
+  C.hoje = inDayCard(d, inSzOf('hoje'));
   const e = est90();
   C.hba = pnCard('hba', 'wide', 'hb', 'Hemoglobina glicada (HbA1c)',
     e.ok ? `<span class="pn-row"><span class="pn-big num">≈ ${fn(e.value, 1)}<small>%</small></span>${a1cBadge(e.value)}<span class="pn-sub pn-r">Estimativa: 90 dias</span></span>`
       : `<span class="pn-row"><span class="pn-big num">—</span><span class="pn-sub pn-r">Estimativa indisponível: ${e.st.n} medições em ${e.days} dias</span></span>`,
     e.ok ? `HbA1c estimada: aproximadamente ${fn(e.value, 1)} por cento` : 'HbA1c estimada indisponível', e.ok ? a1cEval(e.value, S.a1cT).k === 'ok' : null);
-  C.exa = inExamCard();
   C.evo = pnCard('evo', '', 'trend',  'Evolução da glicemia',
     `<span class="pn-spark">${rc.length > 1 ? sparkline(rc) : ''}</span><span class="pn-sub">${rc.length ? `${rc.length} medi${rc.length > 1 ? 'ções' : 'ção'} · ${S.period} dias` : 'Sem medições em ' + S.period + ' dias'}</span>`,
     'Evolução da glicemia', sc.n ? bandOf(sc.mean).k === 'ok' : null);
@@ -108,7 +107,17 @@ function viewPainelCards() {
   C.per = inPeriodo(M);
   IN_IND.forEach(i => { C[inIndId(i.k)] = inIndCard(i.k, M); });
   C.atalhos = inShortcutsHTML();
-  C.eventos = inEventsCard(M);
+  C.eventos = inEventsCard(M, inSzOf('eventos'));
+  /* tamanhos (0.49.0): marca cada card com data-sz e, no expandido, acrescenta as linhas complementares */
+  const pmOf = { med: 'med', cmp: 'cmp', min: 'min', max: 'max', n: 'n', hipo: 'hipo', hiper: 'hiper', var: 'var', dist: 'dist', hba: 'hba', per: 'per' };
+  Object.keys(C).forEach(k => {
+    if (!C[k]) return;
+    const pm = k.startsWith('ind-') ? inIndicator(k.slice(4), M).pm : pmOf[k];
+    let x = pm && inSzOf(k) === 'x' ? inXRows(pm, d, M) : [];
+    if (k === 'evo' && inSzOf(k) === 'x') x = [['Menor · média · maior', sc.n ? `${f0(sc.min)} · ${f0(sc.mean)} · ${f0(sc.max)} mg/dL` : '—'], ['Medições no período', sc.n]];
+    if (k === 'trat' && inSzOf(k) === 'x') x = tr.lines.filter(l => l.indexOf(':') > 0).map(l => { const i = l.indexOf(':'); return [l.slice(0, i), l.slice(i + 1).trim()]; });
+    C[k] = inSized(k, C[k], (k === 'evo' ? (rc.length > 1 ? `<span class="in-xch">${glucoseChart(rc, d.cur[0], d.cur[1], { h: 150 })}</span>` : '') : '') + inXr(x));
+  });
   const vis = inVisible(inPrefs()), cards = ed ? vis.map(k => inEditCard(k, C[k] || '')).join('') : vis.map(k => C[k] || '').join('');
   return h + (ed ? inFixRow('top') : '') + inHero() + inStale(M) + `<div class="pn-grid${ed ? ' editing' : ''}">${cards}</div>`;
 }

@@ -26,6 +26,15 @@ ok(mg.hidden.includes('min') && !mg.hidden.includes('ind-hipo') && !mg.hidden.in
 ok(C.inIsDefault({ v: 1, order: OLD14, hidden: [], pri: ['media', 'tend', 'var', 'faixa'] }) && C.inIsDefault({ order: OLD14 }), 'migração v1: configuração antiga padrão equivale ao padrão novo');
 
 ok(!C.inIsDefault(q) && C.inIsDefault(C.inCleanPrefs(JSON.parse(JSON.stringify(C.IN_DEF())))), 'prefs: restaurar = padrão');
+/* ---- tamanhos dos cards (0.49.0) ---- */
+let sz = C.inSetSize(C.inCleanPrefs(null), 'med', 'x'); sz = C.inSetSize(sz, 'hoje', 'c');
+ok(C.inSize(sz, 'med') === 'x' && C.inSize(sz, 'hoje') === 'c' && C.inSize(sz, 'cmp') === 'n' && C.inSize(null, 'med') === 'n', 'tamanho: padrão normal; cada card guarda o seu sem afetar os demais');
+ok(C.inIsDefault(C.inSetSize(sz, 'med', 'n') && C.inSetSize(C.inSetSize(sz, 'med', 'n'), 'hoje', 'n')) && !C.inIsDefault(sz), 'tamanho: voltar a normal remove o registro (volta ao padrão)');
+let sz2 = C.inHide(C.inMove(sz, 'med', -1), 'min'); sz2 = C.inShow(sz2, 'min'); sz2 = C.inReorder(sz2, C.inVisible(sz2).reverse());
+ok(C.inSize(sz2, 'med') === 'x' && C.inSize(sz2, 'hoje') === 'c', 'tamanho: coexiste com mover, ocultar, readicionar e arrastar');
+ok(JSON.stringify(C.inCleanPrefs({ v: 2, order: ['med'], hidden: [], sz: { med: 'zzz', hoje: 'x', exa: 'x', cmp: 'n' } }).sz) === '{"hoje":"x"}' && C.inCleanPrefs({ v: 2, sz: 'lixo' }).sz === undefined, 'tamanho: valores inválidos, chaves removidas e "n" são descartados');
+ok(C.inSize(C.inParsePrefs(JSON.stringify({ v: 2, order: ['dist', 'hoje'], hidden: ['min'] })), 'dist') === 'n' && C.inParsePrefs(JSON.stringify({ v: 2, order: ['dist'], hidden: ['min'] })).hidden.join() === 'min', 'tamanho: preferências antigas (sem sz) continuam intactas');
+ok(C.inSetSize(sz, 'xxx', 'x').sz.med === 'x' && !('xxx' in C.inSetSize(sz, 'xxx', 'x').sz) && C.inSetSize(sz, 'med', 'q').sz.med === 'x', 'tamanho: card/tamanho inexistente é ignorado');
 /* ---- situação: muitos, poucos, nenhum registro ---- */
 const many = []; for (let i = 0; i < 60; i++) [['07:00', 110 + (i % 5) * 4], ['12:30', 150], ['19:00', 170 + (i % 3) * 20]].forEach(([t, g]) => many.push(rec(i, t, g)));
 let m = C.inSituation(many, NOW, 30, null);
@@ -60,7 +69,7 @@ const vr = []; for (let i = 0; i < 20; i++) { vr.push(rec(i, '08:00', i % 2 ? 60
 ok(C.inEvents({ records: vr, hba: [], exams: [], now: NOW, period: 30 }).some(e => e.kind === 'var'), 'eventos: mudança de variabilidade (desvio-padrão)');
 const ex1 = { id: 'e1', date: iso(NOW - 2 * DAYMS), addedAt: NOW - 2 * DAYMS, title: 'Hemograma', items: [{}, {}, {}] }, ex0 = { id: 'e0', date: iso(NOW - 80 * DAYMS), addedAt: NOW - 80 * DAYMS, title: 'Antigo', items: [] };
 ev = C.inEvents({ records: many, hba: [{ id: 'ex-e1', examId: 'e1', source: 'exame', date: ex1.date, value: 6.8 }], exams: [ex1, ex0], now: NOW, period: 30 });
-ok(ev.filter(e => e.kind === 'exame').length === 1 && ev.find(e => e.kind === 'exame').act.type === 'exam' && /HbA1c 6,8%/.test(ev.find(e => e.kind === 'exame').text) && !ev.some(e => e.kind === 'hba'), 'eventos: exame novo (14 dias) com HbA1c junto, sem duplicar; exame antigo ignorado');
+ok(!ev.some(e => e.kind === 'exame') && ev.filter(e => e.kind === 'hba').length === 1 && /6,8%/.test(ev.find(e => e.kind === 'hba').text), 'eventos (0.49.0): exame Premium não gera acontecimento; a HbA1c de laboratório (gratuita) continua aparecendo');
 ev = C.inEvents({ records: many, hba: [{ id: 'h0', source: 'manual', date: iso(NOW - 120 * DAYMS), value: 7.4 }, { id: 'h1', source: 'manual', date: iso(NOW - 5 * DAYMS), value: 6.9 }], exams: [], now: NOW, period: 30 });
 ok(ev.some(e => e.kind === 'hba' && /6,9%/.test(e.text) && /7,4%/.test(e.text)), 'eventos: novo resultado de HbA1c compara com o anterior');
 ok(!C.inEvents({ records: many, hba: [{ id: 'h2', source: 'exemplo', date: iso(NOW), value: 9 }], exams: [{ ...ex1, source: 'exemplo' }], now: NOW, period: 30 }).some(e => e.kind === 'hba' || e.kind === 'exame'), 'eventos: exame/HbA1c de exemplo não geram acontecimento');
@@ -70,8 +79,8 @@ ok(!C.inEvents({ records: rc.slice(-10), hba: [], exams: [], now: NOW, period: 3
 const seq = []; for (let i = 0; i < 40; i++) { seq.push(rec(i, '08:00', 120)); seq.push(rec(i, '14:00', 130)); }
 ok(C.inEvents({ records: seq, hba: [], exams: [], now: NOW, period: 30 }).some(e => e.kind === 'recorde' && /sequência/i.test(e.title)), 'eventos: maior sequência de dias na faixa');
 const lows = []; for (let i = 0; i < 40; i++) lows.push(rec(i, i % 2 ? '02:00' : '03:00', 62 + (i % 3)), rec(i, '12:00', 130)); lows.forEach(x => { x.ts = L.mkTs(x.date, x.time); });
-ev = C.inEvents({ records: lows, hba: [], exams: [], now: NOW, period: 30 }); ok(ev.some(e => e.kind === 'padrao' && e.act.id === 'padroes'), 'eventos: padrão recorrente do aplicativo (horário das baixas)');
-ok(ev.map(e => e.kind).indexOf('hipo') < ev.map(e => e.kind).indexOf('padrao'), 'eventos: hipoglicemia vem antes de padrão');
+ev = C.inEvents({ records: lows, hba: [], exams: [], now: NOW, period: 30 }); ok(!ev.some(e => e.kind === 'padrao') && ev.some(e => e.kind === 'hipo'), 'eventos (0.49.0): padrões automáticos (Premium) não entram; hipoglicemia continua');
+ok(!C.IN_CARDS.some(c => c.k === 'exa') && !C.inCleanPrefs({ v: 2, order: ['exa', 'hoje'], hidden: ['exa'] }).order.includes('exa') && !C.inCleanPrefs({ v: 2, hidden: ['exa'] }).hidden.includes('exa'), 'catálogo (0.49.0): card Exames (Premium) fora da personalização, visível ou oculto');
 /* ---- evolução do dia ---- */
 const day = [rec(0, '07:00', 62, { context: 'jejum' }), rec(0, '09:30', 150), rec(0, '19:00', 210), rec(0, '23:10', 140), rec(0, '12:00', 100, { noTime: true })];
 const D = C.inDay(day, iso(NOW), [{ date: iso(NOW), text: 'Gripe' }, { date: '2000-01-01', text: 'x' }]);
@@ -85,7 +94,7 @@ ok(!C.inShortcuts(base).length, 'atalhos: nada em contexto neutro (sem ruído)')
 let sc = C.inShortcuts({ ...base, records: many.concat([rec(0, '23:00', 130)]) }); ok(sc[0].act === 'in-hist' && sc[0].d === iso(NOW), 'atalhos: depois de registrar glicemia, acesso ao histórico');
 sc = C.inShortcuts({ ...base, records: many.concat([rec(0, '21:10', 130, { meal: 'jantar' })]) }); ok(sc.some(s => s.act === 'new' && s.ctx === 'depois' && s.meal === 'jantar'), 'atalhos: depois de refeição, acompanhamento posterior (registro "depois")');
 sc = C.inShortcuts({ ...base, records: many.concat([rec(0, '21:10', 130, { meal: 'jantar' }), rec(0, '22:40', 140, { context: 'depois', meal: 'jantar' })]) }); ok(!sc.some(s => s.k === 'meal'), 'atalhos: já acompanhado, não sugere de novo');
-sc = C.inShortcuts({ ...base, exams: [{ id: 'e1', addedAt: NOW - DAYMS, title: 'Lipídios' }] }); ok(sc[0].act === 'ex-open' && sc[0].id === 'e1', 'atalhos: exame novo leva aos resultados');
+sc = C.inShortcuts({ ...base, exams: [{ id: 'e1', addedAt: NOW - DAYMS, title: 'Lipídios' }] }); ok(!sc.some(x => x.act === 'ex-open'), 'atalhos (0.49.0): exame (Premium) não gera atalho');
 sc = C.inShortcuts({ ...base, irN: 1 }); ok(sc[0].act === 'in-rem' && /Lembrete pendente/.test(sc[0].label), 'atalhos: lembrete pendente leva ao aviso (não confirma sozinho)');
 sc = C.inShortcuts({ ...base, remWin: { t: 'em jejum', ctx: 'jejum', meal: '' } }); ok(sc[0].act === 'new' && sc[0].ctx === 'jejum', 'atalhos: medição pendente abre o registro já no contexto');
 ok(C.inShortcuts({ ...base, irN: 2, planN: 1, remWin: { t: 'x', ctx: 'a' }, records: many.concat([rec(0, '22:40', 130, { meal: 'jantar' })]), exams: [{ id: 'e', addedAt: NOW - 1000 }] }).length <= 3, 'atalhos: no máximo 3, discretos');
@@ -128,14 +137,32 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     /* personalização: mover, ocultar, indicador, persistir, restaurar */
     const keys = () => pg.evaluate(() => inVisible(inPrefs()).join(','));
     const before = await keys(); await pg.click('[data-act="in-cust"]'); await sleep(250);
-    ok(await q('.in-grip') === 21 && await q('.in-hide') === 21 && await q('.pn-ed[data-ed="per"] .in-grip') === 1 && await q('.pn-ed[data-ed="eventos"] .in-hide') === 1 && await q('.pn-ed[data-ed="ind-media"] .in-grip') === 1 && await q('.in-hero .in-grip, .mt-blk .in-grip, .in-hero .in-hide, .mt-blk .in-hide') === 0, 'ui: modo de edição no Início: alça e ocultar em todos os cards (período, indicadores e acontecimentos inclusive), nenhum nos dois estruturais');
+    ok(await q('.in-grip') === 20 && await q('.in-hide') === 20 && await q('.pn-ed[data-ed="per"] .in-grip') === 1 && await q('.pn-ed[data-ed="eventos"] .in-hide') === 1 && await q('.pn-ed[data-ed="ind-media"] .in-grip') === 1 && await q('.in-hero .in-grip, .mt-blk .in-grip, .in-hero .in-hide, .mt-blk .in-hide') === 0, 'ui: modo de edição no Início: alça e ocultar em todos os cards (período, indicadores e acontecimentos inclusive), nenhum nos dois estruturais');
     await pg.focus('.in-grip[data-grip="dist"]'); await pg.keyboard.press('ArrowUp'); await pg.click('.in-hide[data-k="min"]'); await sleep(250);
     await pg.click('[data-act="in-done"]'); await sleep(250);
     const after = await keys(); ok(after !== before && !after.split(',').includes('min') && after.split(',').indexOf('dist') < before.split(',').indexOf('dist'), 'ui: reordenar e ocultar valem na hora');
+    /* tamanhos (0.49.0): controle em cada card, persistência individual, encaixe sem sobreposição e sem rolagem horizontal */
+    await pg.click('[data-act="in-cust"]'); await sleep(250);
+    ok(await q('.in-sz') === await q('.in-grip') && await q('.in-sz') >= 15 && await q('.pn-ed[data-ed="med"] .in-sz button') === 3 && await q('.in-hero .in-sz, .mt-blk .in-sz') === 0 && await q('.pn-ed[data-ed="med"][data-sz="n"]') === 1, 'ui (0.49.0): três tamanhos em todos os cards personalizáveis (normal por padrão); nenhum nos estruturais');
+    const szc = (k, v) => pg.evaluate(([k, v]) => document.querySelector(`.in-sz [data-k="${k}"][data-s="${v}"]`).click(), [k, v]);
+    await szc('med', 'c'); await szc('hoje', 'x'); await szc('cmp', 'x'); await szc('hba', 'c'); await sleep(350);
+    const sv = await pg.evaluate(() => JSON.parse(localStorage.getItem('tb-inicio')));
+    ok(sv.sz && sv.sz.med === 'c' && sv.sz.hoje === 'x' && sv.sz.cmp === 'x' && sv.sz.hba === 'c' && !('var' in sv.sz) && sv.order && sv.hidden, 'ui (0.49.0): tamanho salvo por card, junto de ordem e ocultos');
+    ok(await q('.pn-grid.in-fit') === 1 && await q('.pn-ed[data-ed="med"][data-sz="c"]') === 1 && await q('.pn-ed[data-ed="hoje"][data-sz="x"]') === 1 && await q('.pn-ed[data-ed="var"][data-sz="n"]') === 1, 'ui (0.49.0): encaixe ligado e cards não alterados continuam normais');
+    await pg.click('[data-act="in-done"]'); await sleep(300);
+    ok(await q('.pn-med[data-sz="c"]') === 1 && await q('.pn-med[data-sz="c"] .pn-big') === 1 && await q('.pn-cmp[data-sz="x"] .in-xr .in-xrr') >= 3 && await q('.in-day[data-sz="x"]') === 1 && await q('.pn-hba[data-sz="c"]') === 1, 'ui (0.49.0): conteúdo se adapta ao tamanho (recolhido essencial, expandido complementar)');
+    const lay = await pg.evaluate(() => { const g = document.querySelector('.pn-grid'), r = [...g.children].map(c => c.getBoundingClientRect()); let ov = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], b = r[j]; if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2) ov++; } return { ov, hs: document.documentElement.scrollWidth - document.documentElement.clientWidth, out: r.filter(x => x.right > innerWidth + 1 || x.left < -1).length }; });
+    ok(lay.ov === 0 && lay.hs <= 1 && lay.out === 0, 'ui (0.49.0): sem sobreposição, sem rolagem horizontal e nada fora da tela com tamanhos mistos');
+    await pg.evaluate(() => { S.route = 'mais'; render(); S.route = 'painel'; render(); }); await sleep(200);
+    ok(await q('.pn-med[data-sz="c"]') === 1 && await q('.in-day[data-sz="x"]') === 1, 'ui (0.49.0): tamanhos permanecem ao sair e voltar para o Início');
+    await pg.click('[data-act="in-cust"]'); await sleep(250);
+    for (const [k, v] of [['med', 'n'], ['hoje', 'n'], ['cmp', 'n'], ['hba', 'n']]) await szc(k, v);
+    await sleep(300); ok(await pg.evaluate(() => { const v = JSON.parse(localStorage.getItem('tb-inicio') || 'null'); return !v || !v.sz; }) && await q('.pn-grid.in-fit') === 0, 'ui (0.49.0): tudo em normal = visual e armazenamento de antes');
+    await pg.click('[data-act="in-done"]'); await sleep(250);
     /* indicadores do painel: cada um é um card; todos podem ser ocultados, movidos e readicionados */
     await pg.click('[data-act="in-cust"]'); await sleep(250);
     for (const k of ['ind-media', 'ind-tend', 'ind-var', 'ind-faixa']) await pg.click(`.in-hide[data-k="${k}"]`);
-    await sleep(250); ok(await q('.pn-ed .in-ind') === 0 && await q('.in-grip') === 16, 'ui: todos os indicadores podem ser ocultados (inclusive o último)');
+    await sleep(250); ok(await q('.pn-ed .in-ind') === 0 && await q('.in-grip') === 15, 'ui: todos os indicadores podem ser ocultados (inclusive o último)');
     await pg.click('[data-act="in-done"]'); await sleep(250); ok(await q('.in-ind') === 0 && await q('.in-pc') === 1 && await q('.in-hero') === 1, 'ui: sem indicadores, o resto do Início segue normal');
     await pg.click('[data-act="in-cust"]'); await pg.click('[data-act="in-avt"]'); await sleep(350);
     ok(await q('.in-av-add[data-k="ind-hipo"]') === 1 && await q('.in-av-add[data-k="ind-media"]') === 1, 'ui: indicadores ocultos aparecem em Cards disponíveis');
@@ -161,13 +188,13 @@ ok(!/Math\.random|interpol/i.test(core.replace(/\/\*[\s\S]*?\*\//g, '').replace(
     ok(await q('.in-hero') === 1 && await q('.in-stale') === 1 && /Sem medições há/.test(await txt('.in-stale')), 'ui: sem medições recentes → aviso discreto com atalho para nova medição');
     ok(!await q('.in-ev'), 'ui: sem acontecimentos relevantes, o card não aparece (nada de enchimento)');
     const indTxt = await pg.evaluate(() => [...document.querySelectorAll('.in-ind')].map(e => e.textContent).join(' | ')); ok(/—/.test(indTxt) && /sem dados suficientes|precisa de|sem medições/.test(indTxt), 'ui: indicadores sem base mostram "—" e explicam');
-    ok(await q('.in-exa') === 1 && /Nenhum exame/.test(await txt('.in-exa')), 'ui: ausência de exames tratada');
+    ok(await q('.in-exa') === 0, 'ui (0.49.0): card Exames não existe mais');
     ok(await q('.in-day') === 1 && /Nenhuma medição hoje/.test(await txt('.in-day')), 'ui: dia sem medições');
   });
   await run('dados incompletos', `(async () => { await Store.put('meta', { id: 'seeded', at: 1 }); await removeExamples(); const t = new Date(), d = isoDate(t), hm = String(t.getHours()).padStart(2, '0') + ':00'; await Store.putMany('records', [{ id: 'n1', date: d, time: '', noTime: true, ts: mkTs(d, '12:00'), glucose: 99, source: 'manual' }, { id: 'n2', date: d, time: hm, ts: mkTs(d, hm), glucose: 301, source: 'manual' }]); await Store.put('exams', { id: 'x1', date: d, title: 'Exame', items: [], addedAt: Date.now() }); await loadAll(); S.route = 'painel'; render(); })()`, async pg => {
     const q = s => pg.evaluate(s => document.querySelectorAll(s).length, s);
-    ok(await q('.in-hero') === 1 && await q('.in-day .in-tli') === 2 && await q('.in-exa') === 1, 'ui: registro sem horário e exame sem itens não quebram a tela');
-    ok(await q('.in-sc [data-act="ex-open"]') === 1, 'ui: exame novo → atalho para ver os resultados');
+    ok(await q('.in-hero') === 1 && await q('.in-day .in-tli') === 2 && await q('.in-exa') === 0, 'ui: registro sem horário e exame sem itens não quebram a tela');
+    ok(await q('.in-sc [data-act="ex-open"]') === 0, 'ui (0.49.0): exame novo não vira atalho');
   });
   await run('tela estreita', seedBase, async pg => {
     const over = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth); ok(over <= 1, 'responsivo: sem rolagem horizontal em 320 px (' + over + ')');
