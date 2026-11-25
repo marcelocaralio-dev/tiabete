@@ -92,7 +92,7 @@ document.addEventListener('keydown', e => {
   const W = () => Math.min(320, window.innerWidth * .86); let g = null;
   const EDGE = 40;
   /* Vale sobre qualquer superfície, menos campos, controles deslizantes e áreas que rolam na horizontal */
-  const SKIP = '.in-grip, input, textarea, select, [contenteditable], [role=slider]';
+  const SKIP = '.gx-bar, .in-grip, input, textarea, select, [contenteditable], [role=slider]';
   const hScroll = el => { for (let n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return true; } return false; };
   const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || !!el.closest('#acb, #acp, #acz') || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
   document.addEventListener('touchstart', e => {
@@ -133,7 +133,7 @@ document.addEventListener('click', async e => {
    A zona é decidida pela posição inicial do toque. Desligar isto não afeta o gesto do menu. */
 const NAV_EDGE = 0, NAV_PAGES = ['painel', 'historico', 'analise', 'mais'];
 S.swipeNav = true;
-const navZone = () => S.swipeNav !== false && NAV_PAGES.includes(S.route);
+const navZone = () => S.swipeNav !== false && (typeof gxG !== 'function' || gxG('tabs')) && NAV_PAGES.includes(S.route);
 function swipeNavCard() {
   const on = S.swipeNav !== false;
   return `<h2 class="sec">Navegação entre páginas por gestos</h2><div class="card"><div class="sw-row"><div style="min-width:0"><b>Navegação entre páginas por gestos</b><div class="dim" style="font-size:14px;margin-top:2px">Deslize para os lados para trocar entre as páginas principais (Início, Histórico, Análise e Mais). O menu lateral abre pelo botão da foto.</div></div><button class="tgl" role="switch" aria-checked="${on}" aria-label="Navegação entre páginas por gestos" data-act="swipe-nav"><i>${on ? '✓' : ''}</i></button></div></div>`;
@@ -144,7 +144,7 @@ document.addEventListener('click', async e => {
 });
 (function navSwipe() {
   let g = null;
-  const SKIP = 'input, textarea, select, button[role=slider], [contenteditable], [role=slider], svg, canvas, .tbl-wrap, [data-noswipe], #acb, #acp, #acz';
+  const SKIP = 'input, textarea, select, button[role=slider], [contenteditable], [role=slider], svg, canvas, .tbl-wrap, [data-noswipe], .in-pc, #acb, #acp, #acz';
   const hScroll = el => { for (let n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return true; } return false; };
   const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || DR.open || !!S.pm || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
   const target = dx => { const i = NAV_PAGES.indexOf(S.route), j = dx > 0 ? i - 1 : i + 1; return j >= 0 && j < NAV_PAGES.length ? NAV_PAGES[j] : null; };

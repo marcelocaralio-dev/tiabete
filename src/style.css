@@ -1211,3 +1211,11 @@ html.gx-strong .gx-n.gx-new { animation: gx-big .5s ease-out 2; } @keyframes gx-
 html.gx-home #nav [data-r="painel"] { position: relative; } html.gx-home #nav [data-r="painel"]::after { content: var(--gx-h); position: absolute; top: 2px; left: calc(50% + 6px); color: var(--brand-l); font: 700 11px var(--f-mono); }
 @media (prefers-reduced-motion: reduce) { .gx-pb { animation: none !important; } }
 .acr-a[hidden] { display: none; }
+.gx-bar { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0; scrollbar-width: none; grid-column: 1 / -1; }
+.gx-bar button { flex: none; width: 68px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--mut); font: inherit; font-size: 11px; cursor: pointer; }
+.gx-bar i { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--brand); background: var(--s1); font-style: normal; font-size: 21px; }
+.gx-bar.small button { width: 56px; } .gx-bar.small i { width: 40px; height: 40px; font-size: 17px; }
+#gxs-q { width: 100%; box-sizing: border-box; min-height: 44px; }
+.gx-bar i svg { width: 22px; height: 22px; fill: none; stroke: var(--brand-l); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gx-bar button, [data-act="open"][data-id], #view [data-pm] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.gx-bar.grid { flex-wrap: wrap; justify-content: center; } html.gx-ptr-compact #ptr { scale: .7; }
