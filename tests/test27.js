@@ -77,7 +77,7 @@ const day = [rec(0, '07:00', 62, { context: 'jejum' }), rec(0, '09:30', 150), re
 const D = C.inDay(day, iso(NOW), [{ date: iso(NOW), text: 'Gripe' }, { date: '2000-01-01', text: 'x' }]);
 ok(D.n === 5 && D.items[0].out === 'low' && D.items.some(i => i.out === 'high') && D.out >= 2 && D.events.length === 1, 'dia: fora da faixa identificado e eventos do dia relacionados');
 const timed = D.timed; ok(timed.every(i => !i.r.noTime) && D.untimed === 1, 'dia: sem horário fica fora do gráfico e é contado');
-ok(timed[1].gapMin === 150 && timed[1].joinPrev && timed[2].gapMin === 570 && !timed[2].joinPrev && D.maxGapMin >= 570, 'dia: intervalos reais entre medições; mais de 6 h não liga os pontos (nada é interpolado)');
+ok(timed[1].gapMin === 150 && timed[1].joinPrev && timed[2].gapMin === 570 && timed[2].joinPrev && timed[2].longGap && !timed[1].longGap && !timed[0].joinPrev && D.maxGapMin >= 570, 'dia: intervalos reais entre medições; a linha liga toda a sequência e marca (tracejado) os intervalos de mais de 6 h, sem interpolar');
 ok(C.inDay([], iso(NOW)).n === 0 && C.inDay(day, '1999-01-01').n === 0 && C.inGap(75) === '1 h 15 min' && C.inGap(45) === '45 min', 'dia: vazio e formatação de intervalos');
 /* ---- atalhos ---- */
 const base = { records: many, exams: [], now: NOW, remWin: null, planN: 0, irN: 0 };

@@ -20,7 +20,7 @@ let fail = 0; const ok = (c, m) => { console.log((c ? 'ok    ' : 'FALHOU ') + m)
   let c = await cards(), names = c.map(x => x.n);
   ok(names.join('|') === 'Rápida Beta|Rápida Gama|Basal Alfa', 'cartões = tratamento cadastrado (ordem por horário; sem suspensa, sem "a confirmar", sem item de outro dia): ' + names.join(','));
   ok(!c.some(x => /Jejum|Antes do jantar/.test(x.txt)), 'sem cartões fixos de jejum/jantar');
-  ok(c.every(x => /Confirmar dose tomada/.test(x.txt)) , 'botão principal "Confirmar dose tomada"');
+  ok(c.every(x => /Confirmar dose aplicada/.test(x.txt)) , 'botão principal "Confirmar dose aplicada"');
   /* registrar a Rápida Beta com 6 UI (a Gama no mesmo horário continua pendente) */
   const id = await pg.evaluate(() => S.plan.insulin.find(x => x.name === 'Rápida Beta').id);
   await pg.evaluate(id => { const i = document.querySelector('input.tr-draft[data-it="' + id + '"]'); i.value = '6'; i.dispatchEvent(new Event('input', { bubbles: true })); }, id);

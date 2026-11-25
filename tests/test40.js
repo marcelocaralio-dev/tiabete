@@ -47,8 +47,8 @@ const st = pg => pg.evaluate(() => { const b = document.getElementById('acb'), p
   await pg.evaluate(() => { acCollapse(); }); await sleep(400);
   /* ---- 5 halo: apaga com tudo lido, acende com chegada, expandir/recolher não interfere ---- */
   s = await st(pg); ok(s.has && s.halo === 1, 'H1: recolhida com não lidos: halo aceso'); await pg.evaluate(() => acOpen(60000)); await sleep(400); s = await st(pg); ok(s.has && s.halo === 1, 'H2: expandida: halo continua aceso');
-  const hc = await pg.evaluate(() => { const b = document.getElementById('acb'); const pos = document.createElement('i'); pos.dataset.tone = 'pos'; document.body.appendChild(pos); const g = getComputedStyle(pos).getPropertyValue('--tone').trim(); pos.style.color = g; const gc = getComputedStyle(pos).color; pos.remove(); return { halo: getComputedStyle(b, '::after').borderTopColor, pos: gc }; });
-  ok(hc.halo === hc.pos, 'H3: o halo usa exatamente o verde dos cards positivos (' + hc.halo + ' = ' + hc.pos + ')');
+  const hc = await pg.evaluate(() => { const b = document.getElementById('acb'); const r = document.createElement('i'); r.style.color = 'var(--red)'; document.body.appendChild(r); const rc = getComputedStyle(r).color; r.remove(); return { halo: getComputedStyle(b, '::after').borderTopColor, red: rc }; });
+  ok(hc.halo === hc.red, 'H3: o halo usa exatamente o vermelho principal da identidade visual (--red) (' + hc.halo + ' = ' + hc.red + ')');
   /* ---- 7 painel com superfície e elevação próprias, nos dois temas ---- */
   for (const th of ['dark', 'light']) {
     await pg.evaluate(t => { document.documentElement.dataset.theme = t; }, th); await sleep(200);

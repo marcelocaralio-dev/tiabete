@@ -383,7 +383,7 @@ document.addEventListener('submit', async e => {
   if (name.length < 2) { $('#ie-err').textContent = 'Informe qual insulina foi.'; return; }
   if (!plTime(t)) { $('#ie-err').textContent = 'Informe o horário.'; return; }
   const ts = mkTs(isoDate(new Date()), t); if (ts > Date.now() + 60000) { $('#ie-err').textContent = 'Esse horário ainda não chegou hoje.'; return; }
-  if (typeof un !== 'number' || !(un > 0)) { $('#ie-err').textContent = 'Informe as unidades (Ui) tomadas, entre 0,5 e 300.'; return; }
+  if (typeof un !== 'number' || !(un > 0)) { $('#ie-err').textContent = 'Informe as unidades (Ui) aplicadas, entre 0,5 e 300.'; return; }
   const r = await logAdd('extra', ts, un); r.name = name; await logPut(r); closeSheet(); render(); toast('Registrado: ' + name + ' às ' + t + '.');
 });
 function extraInsCard() {

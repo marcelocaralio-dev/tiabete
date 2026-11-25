@@ -184,7 +184,7 @@ function inIndicator(k, m, extra) {
 }
 
 /* ---------- evolução do dia ---------- */
-/* Linha do tempo do dia. Só pontos registrados; `joinPrev` indica se dá para ligar ao ponto anterior no gráfico (até 6 h de intervalo). */
+/* Linha do tempo do dia. Só pontos registrados; `joinPrev` indica se há ponto anterior com horário para ligar no gráfico (a linha acompanha toda a sequência do dia); `longGap` marca intervalos acima de 6 h, desenhados tracejados para mostrar que nada foi medido entre os dois pontos. */
 function inDay(recs, iso, events, lowOf, highOf) {
   const day = (recs || []).filter(r => r && typeof r.glucose === 'number' && r.date === iso).slice().sort((a, b) => a.ts - b.ts);
   const lo = lowOf || INC.LIM.low, hiOf = highOf || (r => (r.context === 'jejum' ? INC.FAST.high : INC.LIM.high));
@@ -192,7 +192,7 @@ function inDay(recs, iso, events, lowOf, highOf) {
   const items = day.map((r, i) => {
     const p = i ? day[i - 1] : null, gap = pt && !r.noTime ? Math.round((r.ts - pt.ts) / 60000) : null; if (!r.noTime) pt = r;
     const out = r.glucose < lo ? 'low' : r.glucose > hiOf(r) ? 'high' : null;
-    return { r, gapMin: gap, joinPrev: gap != null && gap <= 360, out, band: INC.bandOf(r.glucose, r.context).k, delta: p ? r.glucose - p.glucose : null };
+    return { r, gapMin: gap, joinPrev: gap != null, longGap: gap != null && gap > 360, out, band: INC.bandOf(r.glucose, r.context).k, delta: p ? r.glucose - p.glucose : null };
   });
   const timed = items.filter(i => !i.r.noTime), gaps = items.map(i => i.gapMin).filter(g => g != null);
   const outN = items.filter(i => i.out).length;

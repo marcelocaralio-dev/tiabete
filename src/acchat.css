@@ -34,7 +34,8 @@
 .acp.fresh .acr { animation: acrIn .28s cubic-bezier(.2, .9, .3, 1.1) both; }
 .acp.fresh .acr:nth-child(2) { animation-delay: .04s; } .acp.fresh .acr:nth-child(3) { animation-delay: .08s; } .acp.fresh .acr:nth-child(n+4) { animation-delay: .12s; }
 @keyframes acrIn { from { opacity: 0; transform: translateY(8px) scale(.97); } }
-.acb.drag.flip { transition: left .2s ease; }
+.acb.drag.mag { transition: left .12s ease, top .12s ease; } /* imã suave ao entrar na área de exclusão */
+.acb.drag.over { border-color: var(--red); box-shadow: 0 0 0 3px rgba(var(--red-rgb), .35), 0 14px 34px var(--shadow); }
 .acb.snap { transition: left .28s cubic-bezier(.2, .9, .3, 1.1), top .28s ease, transform .18s ease; }
 @media (prefers-reduced-motion: reduce) { .acr, .acb.snap { transition: none; } .acp.fresh .acr { animation: none; } }
 .acr-c { align-self: center; }

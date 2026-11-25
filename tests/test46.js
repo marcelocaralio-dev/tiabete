@@ -62,7 +62,8 @@ let fail = 0; const ok = (c, m) => { console.log((c ? 'ok    ' : 'FALHOU ') + m)
     ok(g && g.lbl.startsWith(await pg.evaluate(k => TB_GREET.LBL[k], k)) && g.lbl.includes(String(v)), nm + ': rótulo e valor visíveis: ' + (g && g.lbl));
     const cs = await pg.evaluate(() => { const e = document.getElementById('gx-greet'), s = getComputedStyle(e), r = e.getBoundingClientRect(), ch = e.querySelector('.gx-chip').getBoundingClientRect(); const x = Math.round(innerWidth / 2), y = Math.round(innerHeight * 0.12); const top = document.elementFromPoint(x, y);
       return { bg: s.backgroundColor, bf: s.backdropFilter || 'none', fl: s.filter, op: s.opacity, pe: s.pointerEvents, pos: s.position, full: r.width >= innerWidth - 1 && r.height >= innerHeight - 1, centerX: Math.abs((ch.x + ch.width / 2) - innerWidth / 2) < 3, topInGreet: !!(top && top.closest('#gx-greet')), z: s.zIndex, kids: [...e.querySelectorAll('*')].every(c => getComputedStyle(c).pointerEvents === 'none') }; });
-    ok(cs.bg === 'rgba(0, 0, 0, 0)' && cs.bf === 'none' && cs.fl === 'none', nm + ': fundo 100% transparente, sem desfoque nem filtro (' + cs.bg + ')');
+    ok(cs.bg === 'rgba(0, 0, 0, 0)' && cs.bf === 'none' && cs.fl === 'none', nm + ': camada geral transparente, sem desfoque nem filtro (o vidro fica só no cartão .gx-glass) (' + cs.bg + ')');
+    ok(await pg.evaluate(() => { const c = document.querySelector('.gx-glass'), s = getComputedStyle(c); return /blur/.test(s.backdropFilter) && /gradient/.test(s.backgroundImage) && parseFloat(s.borderTopWidth) > 0; }), nm + ': cartão com fundo próprio em vidro fosco e borda');
     ok(cs.pe === 'none' && cs.kids && !cs.topInGreet, nm + ': não captura toques (pointer-events:none em tudo)');
     ok(cs.pos === 'fixed' && cs.centerX, nm + ': camada fixa e centralizada');
     ok(await pg.evaluate(() => !document.querySelector('.rw-bg, .sheet-bg') || true), nm + ': ok');
@@ -90,7 +91,7 @@ let fail = 0; const ok = (c, m) => { console.log((c ? 'ok    ' : 'FALHOU ') + m)
   /* 7) tema claro e movimento reduzido */
   await pg.evaluate(() => { document.documentElement.setAttribute('data-theme', 'light'); closeSheet(); render(); }); await sleep(300);
   await save(95); await sleep(700); const lg = await greet(); ok(lg && lg.cls.includes('gx-g-ok'), 'tema claro: saudação aparece');
-  const lcol = await pg.evaluate(() => getComputedStyle(document.querySelector('.gx-chip')).backgroundColor); ok(lcol === 'rgb(240, 250, 244)', 'tema claro: chip usa a paleta clara da faixa (' + lcol + ')');
+  const lcol = await pg.evaluate(() => { const g = document.querySelector('.gx-gr'), c = document.querySelector('.gx-glass'); return [getComputedStyle(g).getPropertyValue('--gx-bg').trim().toLowerCase(), getComputedStyle(c).backdropFilter]; }); ok(lcol[0] === '#f0faf4' && /blur/.test(lcol[1]), 'tema claro: cartão de vidro usa a paleta clara da faixa (' + lcol + ')');
   if (SHOTS) { await pg.screenshot({ path: path.join(SHOTS, 'saud-ok-light.png') }); }
   await sleep(2600);
   await pg.evaluate(() => { document.documentElement.removeAttribute('data-theme'); }); await pg.emulateMedia({ reducedMotion: 'reduce' });

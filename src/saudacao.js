@@ -48,9 +48,9 @@
   function build(k, text, glucose) {
     const root = document.createElement('div');
     root.id = 'gx-greet'; root.className = 'gx-gr gx-g-' + k; root.setAttribute('role', 'status'); root.setAttribute('aria-live', 'polite');
-    root.innerHTML = `<div class="gx-stage" aria-hidden="true"><div class="gx-fx"></div><span class="gx-halo"></span><span class="gx-ring"></span><span class="gx-ring r2"></span><span class="gx-rip"></span><span class="gx-rip r2"></span>
+    root.innerHTML = `<div class="gx-glass"><div class="gx-stage" aria-hidden="true"><div class="gx-fx"></div><span class="gx-halo"></span><span class="gx-ring"></span><span class="gx-ring r2"></span><span class="gx-rip"></span><span class="gx-rip r2"></span>
       <span class="gx-drop"><img class="gx-img" src="${GX_DROP}" alt="" width="66" height="86" draggable="false"><i class="gx-sh"></i></span><span class="gx-badge">${SYM[k]}</span></div>
-      <div class="gx-chip"><span class="gx-lbl">${LBL[k]} · <span class="gx-v num">${typeof fn === 'function' ? fn(glucose, 1) : glucose} mg/dL</span></span><b class="gx-t">${esc(text)}</b></div>`;
+      <div class="gx-chip"><span class="gx-lbl">${LBL[k]} · <span class="gx-v num">${typeof fn === 'function' ? fn(glucose, 1) : glucose} mg/dL</span></span><b class="gx-t">${esc(text)}</b></div></div>`;
     try { root.querySelector('.gx-drop').style.setProperty('--gx-mask', 'url("' + GX_DROP + '")'); } catch (e) { }
     fx(root.querySelector('.gx-fx'), k);
     return root;

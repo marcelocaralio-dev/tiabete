@@ -17,7 +17,7 @@ if (window.TB_PUBLIC && window.TB_DRV && window.TB_SECURE) {
   function paint() {
     if (!gate) { gate = document.createElement('div'); gate.id = 'tb-gate'; gate.setAttribute('role', 'dialog'); gate.setAttribute('aria-label', 'Entrar no GLUXO'); document.body.appendChild(gate); }
     const idField = (window.TB_GOOGLE_CLIENT_ID || '').trim() ? '' : `<div><label class="fl" for="gate-cid">ID do cliente Google (OAuth)</label><input class="in" id="gate-cid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxx.apps.googleusercontent.com" value="${esc(G.cid || '')}"></div>`;
-    gate.innerHTML = `<div>${drop}</div><h1 class="gt">Bem-vindo ao Tia<b>Bete</b></h1>
+    gate.innerHTML = `<div>${drop}</div><h1 class="gt">Bem-vindo ao Glu<b>xo</b></h1>
       <p>Você tem <b>14 dias de experiência Premium</b> com ou sem conta Google. Seus registros de glicemia ficam guardados <b>neste aparelho</b>; o GLUXO não vê seus dados de saúde.</p>${idField}
       <div class="gb"><button class="btn pri full" id="gate-in" ${G.busy ? 'disabled' : ''}>${G.busy ? 'Aguarde…' : 'Entrar com Google'}</button>
       <button class="btn full" id="gate-skip" ${G.busy ? 'disabled' : ''}>Continuar sem conta</button></div>

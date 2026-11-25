@@ -27,18 +27,24 @@
   background: var(--gx-ac); box-shadow: 0 4px 12px rgba(0,0,0,.35); z-index: 2; }
 .gx-rise { left: var(--x, 50%); top: 58%; border-radius: 50%; }
 
-.gx-chip { position: relative; z-index: 1; margin-top: -18px; width: min(320px, 100%); box-sizing: border-box; padding: 12px 20px 14px; text-align: center; border-radius: 22px; background: var(--gx-bg); color: var(--gx-ink);
-  border: 2px solid var(--gx-bd); box-shadow: 0 0 0 5px color-mix(in srgb, var(--gx-ac) 16%, transparent), 0 16px 44px var(--shadow, rgba(0,0,0,.4)); }
-.gx-g-low .gx-chip { border-style: dashed; }          /* além da cor: tracejado = abaixo, contorno forte = acima (mesmo critério da tela de medição) */
-.gx-g-high .gx-chip { border-width: 3px; }
+.gx-glass { position: relative; box-sizing: border-box; width: min(340px, 100%); padding: 14px 18px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; border-radius: 28px;
+  /* Glassmorphism: vidro fosco na cor da faixa; borda e brilho seguem --gx-bd / --gx-ac de cada classificação */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gx-bg) 80%, transparent), color-mix(in srgb, var(--gx-bg) 64%, transparent));
+  -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
+  border: 1.5px solid color-mix(in srgb, var(--gx-bd) 78%, transparent); transition: border-color .25s ease, background-color .25s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 0 0 4px color-mix(in srgb, var(--gx-ac) 12%, transparent), 0 18px 48px rgba(0,0,0,.32); }
+[data-theme="light"] .gx-glass { background: linear-gradient(160deg, color-mix(in srgb, var(--gx-bg) 94%, transparent), color-mix(in srgb, var(--gx-bg) 82%, transparent)); } /* tema claro: vidro mais denso para manter o contraste AA do texto */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .gx-glass { background: color-mix(in srgb, var(--gx-bg) 94%, transparent); } }
+.gx-chip { position: relative; z-index: 1; margin-top: -14px; width: 100%; box-sizing: border-box; padding: 0 4px; text-align: center; color: var(--gx-ink); }
+.gx-g-low .gx-glass { border-style: dashed; }          /* além da cor: tracejado = abaixo, contorno forte = acima (mesmo critério da tela de medição) */
+.gx-g-high .gx-glass { border-width: 2.5px; }
 .gx-lbl { display: block; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; opacity: .88; }
 .gx-v { text-transform: none; letter-spacing: 0; }
 .gx-t { display: block; margin-top: 4px; font-family: var(--f-display); font-weight: 600; font-size: 23px; line-height: 1.15; letter-spacing: -.02em; text-wrap: balance; color: var(--gx-ink); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .gx-gr { animation: rw-fade .3s ease-out both; }
-  .gx-gr.gx-out { animation: gx-out .52s ease-in forwards; }
-  .gx-chip { animation: rw-pop .55s cubic-bezier(.2, 1.4, .4, 1) .22s both; }
+  .gx-glass { animation: rw-pop .55s cubic-bezier(.2, 1.4, .4, 1) .05s both; }
+  .gx-gr.gx-out .gx-glass { animation: gx-out .52s ease-in forwards; }
   .gx-halo { animation: gx-breath 2.4s ease-in-out .4s infinite; }
   .gx-badge { animation: rw-crown .6s cubic-bezier(.2, 1.6, .4, 1) .7s both; }
   .gx-ring { animation: rw-ring 1.9s ease-out .3s infinite; } .gx-ring.r2 { animation-delay: 1.25s; }
@@ -58,8 +64,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .gx-ring, .gx-rip, .gx-rise { display: none; }
-  .gx-gr { animation: none; transition: opacity .25s ease; }
-  .gx-gr.gx-out { opacity: 0; }
+  .gx-glass { animation: none; transition: opacity .25s ease; }
+  .gx-gr.gx-out .gx-glass { opacity: 0; }
 }
 @keyframes gx-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-8px) scale(.97); } }
 @keyframes gx-breath { 0%, 100% { opacity: .65; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.06); } }
@@ -67,3 +73,4 @@
 @keyframes gx-rise { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 20% { opacity: .95; } 100% { transform: translate(var(--dx, 0), -92px) scale(1); opacity: 0; } }
 @keyframes gx-fall { 0% { transform: translateY(-96px) scale(.92, 1.1); opacity: 0; } 55% { transform: translateY(0) scale(1.1, .9); opacity: 1; } 75% { transform: translateY(-5px) scale(.97, 1.04); } 100% { transform: none; opacity: 1; } }
 @keyframes gx-rip { 0% { transform: scale(.35); opacity: .85; } 100% { transform: scale(1.55); opacity: 0; } }
+[data-theme="light"] .gx-lbl { opacity: 1; } /* sobre o vidro, o rótulo do tema claro precisa de contraste pleno (WCAG AA) */

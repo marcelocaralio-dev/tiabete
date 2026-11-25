@@ -184,10 +184,14 @@ const acK = b => { /* escala tela/estilo (o app usa zoom no html): medida numa s
   let q = document.getElementById('acbk'); if (!q && document.body) { document.body.insertAdjacentHTML('beforeend', `<i id="acbk" aria-hidden="true" style="position:fixed;left:-200px;top:0;width:${AC_SIZE}px;height:1px;visibility:hidden;pointer-events:none"></i>`); q = document.getElementById('acbk'); }
   const w = q ? q.getBoundingClientRect().width : 0; return w > 8 ? w / AC_SIZE : ((b && b._k) || 1); };
 function acBounds(k) { k = k || 1; const nav = document.getElementById('nav'), nh = nav ? nav.getBoundingClientRect().height : 0; return { M: 6 * k, TOP: 64 * k, BOT: (nh || 64 * k) + 10 * k }; }
-function acPlace(left, top, forceSide) {
-  const b = document.getElementById('acb'); if (!b) return; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, side = forceSide != null ? forceSide : (p.fx >= .5 ? 1 : 0);
+/* Posição da bolha. Repouso (free = false): encostada numa lateral, dentro da área útil (entre o topo e a barra de navegação).
+   Arrasto (free = true): sem margens de repouso; a bolha só fica contida na tela inteira, então chega a qualquer ponto, inclusive à área de exclusão no centro inferior.
+   Devolve { left, top } em pixels da tela, já com o limite aplicado (usado ao soltar para gravar a posição final). */
+function acPlace(left, top, forceSide, free) {
+  const b = document.getElementById('acb'); if (!b) return null; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, side = forceSide != null ? forceSide : (p.fx >= .5 ? 1 : 0);
   const L = left != null ? left : (side ? vw - sz - M : M), T = top != null ? top : TOP + p.fy * (vh - sz - TOP - BOT);
-  b.style.left = Math.min(vw - sz - M, Math.max(M, L)) / k + 'px'; b.style.top = Math.min(vh - sz - BOT, Math.max(TOP, T)) / k + 'px'; b.dataset.side = side ? 'r' : 'l';
+  const l = free ? Math.min(vw - sz, Math.max(0, L)) : Math.min(vw - sz - M, Math.max(M, L)), t = free ? Math.min(vh - sz, Math.max(0, T)) : Math.min(vh - sz - BOT, Math.max(TOP, T));
+  b.style.left = l / k + 'px'; b.style.top = t / k + 'px'; b.dataset.side = side ? 'r' : 'l'; return { left: l, top: t };
 }
 function acRefresh() {
   if (!document.body) return;
@@ -299,37 +303,42 @@ function acCollapse(now) {
   AC.open = false; AC.confirm = false; if (b) b.setAttribute('aria-expanded', 'false'); p.classList.remove('on');
   if (now) { p.hidden = true; return; } setTimeout(() => { if (!AC.open) p.hidden = true; }, 260);
 }
-/* ----- gestos: tocar abre o último alerta; arrastar muda só a ALTURA (a bolha nunca fica solta: está sempre numa das laterais);
-   passar o dedo para o outro lado da tela troca de margem; arrastar para a área de descarte dispensa a bolha ----- */
+/* ----- gestos: tocar abre o último alerta; arrastar move a bolha LIVREMENTE pela tela (qualquer direção, sem ficar presa às margens);
+   levá-la até a área de exclusão (centro inferior) e soltar dispensa a bolha; soltar em qualquer outro ponto encaixa a bolha na lateral mais próxima, numa posição válida ----- */
 function acBind(b) {
   let d = null; const z = () => document.getElementById('acz');
-  const zone = () => { const vw = innerWidth, vh = innerHeight; return { x: vw / 2, y: vh - 56 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0) }; };
-  const flip = () => { b.classList.add('flip'); clearTimeout(b._ft); b._ft = setTimeout(() => b.classList.remove('flip'), 230); };
-  b.addEventListener('pointerdown', e => { if (e.button > 0) return; try { b.setPointerCapture(e.pointerId); } catch (x) { } b._k = acK(b); const r = b.getBoundingClientRect(), p = S.ac.pos || { fx: 1 }; d = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, side: p.fx >= .5 ? 1 : 0, t: Date.now(), moved: false, hot: false }; });
+  /* Área de exclusão: centro e meia-dimensão, em pixels da tela, lidos do próprio elemento (respeita o zoom do app, a barra de gestos e a escala de animação). */
+  const zone = () => {
+    const k = b._k || acK(b), el = z(), r = el ? el.getBoundingClientRect() : null;
+    if (r && r.width > 8) return { x: r.left + r.width / 2, y: r.top + r.height / 2 - (el.classList.contains('on') ? 0 : 24 * k), hw: r.width / 2, hh: r.height / 2 };
+    return { x: innerWidth / 2, y: innerHeight - 49 * k, hw: 66 * k, hh: 31 * k };
+  };
+  /* Detecção: o CENTRO da bolha entra na área de exclusão (com folga para o dedo), nunca só a borda dela. */
+  const overZone = (cx, cy, k) => { const c = zone(); return Math.abs(cx - c.x) <= c.hw + 22 * k && Math.abs(cy - c.y) <= c.hh + 30 * k; };
+  b.addEventListener('pointerdown', e => { if (e.button > 0) return; try { b.setPointerCapture(e.pointerId); } catch (x) { } b._k = acK(b); const r = b.getBoundingClientRect(), p = S.ac.pos || { fx: 1 }; d = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, side: p.fx >= .5 ? 1 : 0, t: Date.now(), moved: false, hot: false, left: r.left, top: r.top }; });
   b.addEventListener('pointermove', e => {
-    if (!d) return; const dx = e.clientX - d.sx, dy = e.clientY - d.sy, vw = innerWidth;
+    if (!d) return; const dx = e.clientX - d.sx, dy = e.clientY - d.sy, k = b._k || 1, sz = AC_SIZE * k;
     if (!d.moved && Math.hypot(dx, dy) > 9) { d.moved = true; b.classList.add('drag'); document.body.classList.add('acb-drag'); acCollapse(true); const zz = z(); zz.hidden = false; requestAnimationFrame(() => zz.classList.add('on')); }
     if (!d.moved) return;
-    /* margem pelo dedo, com folga de 8% ao redor do meio da tela para não ficar trocando; a bolha nunca é desenhada no meio */
-    if (d.side === 1 && e.clientX < vw * .42) { d.side = 0; flip(); } else if (d.side === 0 && e.clientX > vw * .58) { d.side = 1; flip(); }
-    const c = zone(), k = b._k || 1; d.hot = Math.hypot(e.clientX - c.x, e.clientY - c.y) < 64 * k && dy > 90; z().classList.toggle('hot', d.hot);
-    if (d.hot) acPlace(c.x - AC_SIZE * k / 2, c.y - AC_SIZE * k / 2); /* só na área de descarte a bolha acompanha o dedo, para mostrar que será dispensada */
-    else acPlace(null, d.oy + dy, d.side);
+    /* posição livre, direto do dedo (o ponto tocado da bolha acompanha o dedo) */
+    const free = acPlace(d.ox + dx, d.oy + dy, null, true), cx = free.left + sz / 2, cy = free.top + sz / 2;
+    d.side = cx < innerWidth / 2 ? 0 : 1; d.left = free.left; d.top = free.top; b.dataset.side = d.side ? 'r' : 'l';
+    const hot = overZone(cx, cy, k);
+    if (hot !== d.hot) { d.hot = hot; z().classList.toggle('hot', hot); b.classList.toggle('over', hot); b.classList.toggle('mag', hot); if (hot) { try { navigator.vibrate && navigator.vibrate(12); } catch (x) { } } }
+    if (hot) { const c = zone(); acPlace(c.x - sz / 2, c.y - sz / 2, d.side, true); } /* sobre a área de exclusão a bolha se centraliza nela: sinal claro de que será dispensada */
   });
   const end = e => {
-    if (!d) return; const g = d; d = null; b.classList.remove('drag', 'flip'); document.body.classList.remove('acb-drag'); const zz = z(); zz.classList.remove('on', 'hot'); setTimeout(() => { zz.hidden = true; }, 200);
-    if (e.type === 'pointercancel' || e.type === 'lostpointercapture') { if (g.moved) acCommit(g.side); else acPlace(); return; }
-    if (!g.moved) { if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } return; }
-    const vh = innerHeight;
-    if (g.hot) { b.classList.add('gone'); setTimeout(() => { S.ac.hidden = true; b.classList.remove('gone'); acSave(true); acRefresh(); acPlace(); }, 220); return; }
-    const r = b.getBoundingClientRect();
-    if (r.top + r.height / 2 > vh * .72 && e.clientY - g.sy > 40) { b.classList.add('back'); acPlace(g.ox, g.oy, g.side); setTimeout(() => b.classList.remove('back'), 300); acCommit(g.side); return; } /* arrastou para baixo sem chegar à área de descarte: volta */
-    acCommit(g.side);
+    if (!d) return; const g = d; d = null; b.classList.remove('drag', 'flip', 'over', 'mag'); document.body.classList.remove('acb-drag'); const zz = z(); zz.classList.remove('on', 'hot'); setTimeout(() => { zz.hidden = true; }, 200);
+    const cancel = e.type === 'pointercancel' || e.type === 'lostpointercapture';
+    if (!g.moved) { if (cancel) { acPlace(); return; } if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } return; }
+    /* a exclusão só acontece ao SOLTAR dentro da área (gesto cancelado pelo sistema nunca exclui) */
+    if (g.hot && !cancel) { b.classList.add('gone'); setTimeout(() => { S.ac.hidden = true; b.classList.remove('gone'); acSave(true); acRefresh(); acPlace(); }, 220); return; }
+    acCommit(g.side, g.top); /* soltou fora da área: encaixa na lateral mais próxima, na altura onde foi solto (dentro dos limites válidos) */
   };
   /* grava margem (0 esquerda, 1 direita) e altura relativa, e encosta a bolha na lateral */
-  function acCommit(side) {
-    const r = b.getBoundingClientRect(), vh = innerHeight, k = b._k || acK(b), { TOP, BOT } = acBounds(k);
-    S.ac.pos = { fx: side, fy: Math.min(1, Math.max(0, (r.top - TOP) / (vh - AC_SIZE * k - TOP - BOT))) }; acSave(true); b.classList.add('snap'); acPlace(); setTimeout(() => b.classList.remove('snap'), 340);
+  function acCommit(side, top) {
+    const vh = innerHeight, k = b._k || acK(b), { TOP, BOT } = acBounds(k), span = vh - AC_SIZE * k - TOP - BOT;
+    S.ac.pos = { fx: side, fy: span > 0 ? Math.min(1, Math.max(0, (top - TOP) / span)) : 0 }; acSave(true); b.classList.add('snap'); acPlace(); setTimeout(() => b.classList.remove('snap'), 340);
   }
   b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', e => { if (d) end(e); });
   b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (AC.open) acCollapse(); else { const l = acList(); AC.id = l[0] ? l[0].id : null; AC.only = null; acOpen(12000); } } });

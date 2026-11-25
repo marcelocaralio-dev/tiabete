@@ -352,7 +352,7 @@ function histInsItems() {
     return true;
   });
 }
-function insLabel(x) { return x.kind === 'basal' ? 'Insulina basal tomada' : x.kind === 'extra' ? 'Outra insulina tomada · ' + (x.name || '') : 'Insulina rápida tomada · ' + { fast: 'jejum', lunch: 'pré-almoço', dinner: 'pré-jantar' }[x.kind]; }
+function insLabel(x) { return x.kind === 'basal' ? 'Insulina basal aplicada' : x.kind === 'extra' ? 'Outra insulina aplicada · ' + (x.name || '') : 'Insulina de ação rápida aplicada · ' + { fast: 'jejum', lunch: 'pré-almoço', dinner: 'pré-jantar' }[x.kind]; }
 function histItems() {
   const fr = filteredRecs(), eps = hypoEpisodes(fr), inEp = new Set(eps.flatMap(e => e.members.map(m => m.id)));
   const recs = fr.filter(r => !inEp.has(r.id)).map(r => ({ t: 'r', ts: r.ts, date: r.date, r })).concat(eps.map(e => ({ t: 'e', ts: e.ts, date: e.date, e }))), ins = histInsItems().map(x => ({ t: 'i', ts: x.ts, date: x.date, x }));
@@ -382,7 +382,7 @@ function histListHTML() {
       if (i.t === 'e') h += epiHTML(i.e);
       else if (i.t === 'm') h += mealLogHTML(i.m, 'hist');
       else if (i.t === 'r') { const r = i.r; h += `<button class="rec g-${bandOf(r.glucose, r.context).k}" data-key="r${r.id}" data-ts="${r.ts}" data-act="open" data-id="${r.id}"><span class="tm num${mealIcon(r) ? ' ic' : ''}">${mealIcon(r)}<b>${r.noTime ? '—:—' : r.time}</b></span><span class="info">${badge(r.glucose, r.context)}<span class="chips">${recChips(r)}</span></span><span class="gl num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`; }
-      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal tomada' : x.kind === 'extra' ? esc(x.name || 'Outra insulina') : 'Rápida tomada'}</span>${x.kind === 'basal' && x.src !== 'lembrete' ? '' : `<span class="chips">${x.kind === 'basal' ? '' : `<span class="tag">${x.kind === 'extra' ? 'Dose extra' : { fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span>`}${x.src === 'lembrete' ? `<span class="tag on">Aplicação confirmada${x.insulin ? ' · ' + esc(x.insulin) : ''}</span>` : ''}</span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
+      else { const x = i.x; h += `<button class="rec ins" data-key="i${x.id}" data-ts="${x.ts}" data-act="ins-log-edit" data-id="${x.id}"><span class="tm num${insIcon(x) ? ' ic' : ''}">${insIcon(x)}<b>${HM(x.ts)}</b></span><span class="info"><span class="badge ins-b">${x.kind === 'basal' ? 'Basal aplicada' : x.kind === 'extra' ? esc(x.name || 'Outra insulina') : 'Ação rápida aplicada'}</span>${x.kind === 'basal' && x.src !== 'lembrete' ? '' : `<span class="chips">${x.kind === 'basal' ? '' : `<span class="tag">${x.kind === 'extra' ? 'Dose extra' : { fast: 'Jejum', lunch: 'Pré-almoço', dinner: 'Pré-jantar' }[x.kind]}</span>`}${x.src === 'lembrete' ? `<span class="tag on">Aplicação confirmada${x.insulin ? ' · ' + esc(x.insulin) : ''}</span>` : ''}</span>`}</span><span class="gl num">${x.units != null ? fn(x.units, 1) + '<small>Ui</small>' : '<small>sem Ui</small>'}</span></button>`; }
     });
   }
   if (items.length > shown.length) h += `<button class="btn full" data-act="more">Mostrar mais (${items.length - shown.length})</button>`;
