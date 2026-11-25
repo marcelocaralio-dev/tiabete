@@ -61,8 +61,18 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
     if (r.status === 401 && !retry) { G.access = null; return api(url, o, true); }
     if (r.status === 401) throw reauth();
     if (r.status === 404) throw E('tool_error', 'Item não encontrado no Drive.');
-    if (r.status === 403) { const m = JSON.stringify(r.data || '').slice(0, 300); throw E('drv_forbidden', /rateLimit|quota/i.test(m) ? 'O Google limitou as consultas. Tente de novo em alguns minutos.' : /accessNotConfigured|has not been used|disabled/i.test(m) ? 'A API do Google Drive não está ativada no projeto do app (veja o guia de configuração).' : 'O Google negou o acesso. Reconecte a conta e aceite a permissão do Drive.'); }
-    if (r.status === 429 || r.status >= 500) throw E('upstream_error', 'O Drive não respondeu. Tente de novo em instantes.');
+    if (r.status === 403 || r.status === 429) {
+      /* motivo real devolvido pelo Google (ex.: rateLimitExceeded, accessNotConfigured, insufficientPermissions) */
+      const er = (r.data && r.data.error) || {}, why = String((er.errors && er.errors[0] && er.errors[0].reason) || er.status || (typeof er === 'string' ? er : '') || '').slice(0, 50), txt = String(er.message || '').slice(0, 90), all = JSON.stringify(r.data || '').slice(0, 600);
+      const rate = /ratelimit|quotaexceeded|dailylimitexceeded$|resource_exhausted|sharingratelimit/i.test(why) || r.status === 429 || (!why && /rate limit|quota/i.test(all));
+      if (rate && !o._rl) { await new Promise(ok => setTimeout(ok, 2500)); return api(url, Object.assign({}, o, { _rl: 1 }), retry); } /* uma nova tentativa com pausa */
+      const tag = ' (motivo do Google: ' + (why || r.status) + (txt ? ' · ' + txt : '') + ')';
+      if (rate) throw E('drv_rate', 'O Google limitou as consultas. Tente de novo em alguns minutos.' + tag);
+      if (/accessnotconfigured|service_disabled|has not been used|is disabled/i.test(why + ' ' + all)) throw E('drv_forbidden', 'A API do Google Drive não está ativada no projeto do app (veja o guia de configuração).' + tag);
+      if (/unreg|unauthenticated/i.test(why + ' ' + all)) throw E('drv_forbidden', 'O Google não reconheceu o acesso do app. Saia da conta e entre de novo.' + tag);
+      throw E('drv_forbidden', 'O Google negou o acesso. Reconecte a conta e aceite a permissão do Drive.' + tag);
+    }
+    if (r.status >= 500) throw E('upstream_error', 'O Drive não respondeu. Tente de novo em instantes.');
     if (r.status >= 300) throw E('tool_error', 'O Drive recusou o pedido (erro ' + r.status + ').');
     return r;
   }
