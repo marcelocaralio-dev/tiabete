@@ -29,6 +29,7 @@ const PTR_TRIGGER = 72, PTR_MAX = 96;
   }
   document.addEventListener('touchstart', e => {
     PTR.on = false; PTR.armed = false;
+    if (typeof gxPtrOk === 'function' && !gxPtrOk(S.route)) return;
     if (PTR.busy || e.touches.length !== 1 || !top() || DR.open || !document.getElementById('view')) return;
     if (document.querySelector('.sheet-bg, .rw-bg, #lk') || (document.activeElement && document.activeElement.matches && document.activeElement.matches('input, textarea, select'))) return;
     if (e.target.closest && (e.target.closest(SKIP) || scroller(e.target))) return;

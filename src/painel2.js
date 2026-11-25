@@ -78,7 +78,7 @@ function viewPainelCards() {
   if (!all.length) return viewPainelClassic(); // boas-vindas
   const M = inModel();
   const ed = inEditing();
-  let h = (ed ? inEditBar() : inTopBtn()) + banners() + labelBanner() + pfInvite() + prNotice('painel');
+  let h = (ed ? inEditBar() : inTopBtn() + (typeof gxNavBar === 'function' ? gxNavBar() : '')) + banners() + labelBanner() + pfInvite() + prNotice('painel');
   const C = {};
   C.hoje = inDayCard(d, inSzOf('hoje'));
   const e = est90();
