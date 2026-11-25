@@ -160,8 +160,8 @@ function acSync() {
 }
 /* A bolha só mostra o que está valendo agora (alerta ativo) e as confirmações recentes. Alerta já concluído, cancelado, desativado ou expirado fica só no histórico. */
 const acLiveItem = x => x.src === 'toast' || (x.active && !!x.html);
-const acList = () => S.ac.items.filter(x => !x.dismissed && acLiveItem(x)).sort((a, b) => (a.read - b.read) || (b.prio - a.prio) || (b.ts - a.ts));
-const acUnread = () => S.ac.items.filter(x => !x.dismissed && !x.read && x.active && x.html).length;
+const acList = () => S.ac.items.filter(x => !x.dismissed && acLiveItem(x) && gxAllowed(x)).sort((a, b) => (a.read - b.read) || (b.prio - a.prio) || (b.ts - a.ts));
+const acUnread = () => S.ac.items.filter(x => !x.dismissed && !x.read && x.active && x.html && gxAllowed(x)).length;
 function acSetState(id, patch) { const it = S.ac.items.find(x => x.id === id); if (!it) return; Object.assign(it, patch); acSave(true); acRefresh(); }
 /* ----- elementos da bolha ----- */
 /* gota OFICIAL do GLUXO (o mesmo arquivo PNG da marca, embutido no build; não é redesenhada) */
@@ -188,7 +188,7 @@ function acBounds(k) { k = k || 1; const nav = document.getElementById('nav'), n
    Arrasto (free = true): sem margens de repouso; a bolha só fica contida na tela inteira, então chega a qualquer ponto, inclusive à área de exclusão no centro inferior.
    Devolve { left, top } em pixels da tela, já com o limite aplicado (usado ao soltar para gravar a posição final). */
 function acPlace(left, top, forceSide, free) {
-  const b = document.getElementById('acb'); if (!b) return null; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, side = forceSide != null ? forceSide : (p.fx >= .5 ? 1 : 0);
+  const b = document.getElementById('acb'); if (!b) return null; const k = b._k = acK(b), sz = AC_SIZE * k, vw = innerWidth, vh = innerHeight, { M, TOP, BOT } = acBounds(k), p = S.ac.pos || { fx: 1, fy: .62 }, gs = gxGet('bubble', 'side'), side = gs !== 'free' ? (gs === 'right' ? 1 : 0) : forceSide != null ? forceSide : (p.fx >= .5 ? 1 : 0);
   const L = left != null ? left : (side ? vw - sz - M : M), T = top != null ? top : TOP + p.fy * (vh - sz - TOP - BOT);
   const l = free ? Math.min(vw - sz, Math.max(0, L)) : Math.min(vw - sz - M, Math.max(M, L)), t = free ? Math.min(vh - sz, Math.max(0, T)) : Math.min(vh - sz - BOT, Math.max(TOP, T));
   b.style.left = l / k + 'px'; b.style.top = t / k + 'px'; b.dataset.side = side ? 'r' : 'l'; return { left: l, top: t };
@@ -196,9 +196,10 @@ function acPlace(left, top, forceSide, free) {
 function acRefresh() {
   if (!document.body) return;
   const on = acBubbleOn(); if (on) acEnsure();
+  if (typeof gxApply === 'function') gxApply(acUnread());
   const b = document.getElementById('acb'); if (!b) return;
   const show = on && !S.ac.hidden; b.hidden = !show; if (!show) { acCollapse(true); return; }
-  const n = acUnread(); b.classList.toggle('has', n > 0); /* halo verde = único indicador de não lidos */
+  const n = acUnread(); /* halo e contador: ver gxApply (experience.js) */
   b.setAttribute('aria-label', n ? `Alertas: ${n} não lido${n > 1 ? 's' : ''}` : 'Alertas'); acPlace();
   if (AC.open) acPanel();
 }
@@ -244,16 +245,16 @@ function acMsg(it) {
 function acRow(it) {
   const d = new Date(it.ts), tm = pad(d.getHours()) + ':' + pad(d.getMinutes()), cat = AC_CATS[it.cat] || 'Alerta';
   return `<div class="acr${it.read ? ' read' : ''}${it.active && it.prio >= 3 ? ' crit' : ''}" data-ac-row="${it.id}" role="group" aria-label="${esc(cat)}${it.read ? ' (lida)' : ' (não lida)'}"><span class="acr-c" aria-hidden="true">${acSvg(AC_CIC[it.cat] || 'info', 15)}</span>
-    <div class="acr-w"><div class="acr-m" role="link" tabindex="0" data-ac="open" data-id="${it.id}" title="${esc(cat)} · ${tm}"><span class="acr-tm num">${tm}</span>${esc(acMsg(it))}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</div>
-    <div class="acr-a"><button type="button" class="acr-b" data-ac="read" data-id="${it.id}"${it.read ? ' disabled' : ''}>Marcar como lida</button><button type="button" class="acr-b" data-ac="go" data-id="${it.id}">Acessar</button><button type="button" class="acr-b" data-ac="dismiss" data-id="${it.id}">Remover da lista</button></div></div></div>`;
+    <div class="acr-w"><div class="acr-m" role="link" tabindex="0" data-ac="${gxOptsMode() ? 'opts' : 'open'}" data-id="${it.id}" title="${esc(cat)} · ${tm}"><span class="acr-tm num">${tm}</span>${esc(gxGet('list', 'preview') || gxSafe(it) ? acMsg(it) : cat)}${it.n > 1 ? ` <span class="acr-n">${it.n}×</span>` : ''}</div>
+    <div class="acr-a"${gxShowActs(it.id) ? '' : ' hidden'}>${gxGet('list', 'read') ? `<button type="button" class="acr-b" data-ac="read" data-id="${it.id}"${it.read ? ' disabled' : ''}>Marcar como lida</button>` : ''}${gxGet('list', 'go') ? `<button type="button" class="acr-b" data-ac="go" data-id="${it.id}">Acessar</button>` : ''}${gxGet('list', 'dismiss') ? `<button type="button" class="acr-b" data-ac="dismiss" data-id="${it.id}">Remover da lista</button>` : ''}${gxActs(it)}</div></div></div>`;
 }
 function acPanel() {
-  const p = document.getElementById('acp'); if (!p) return; const all = acList(); let list = all;
+  const p = document.getElementById('acp'); if (!p) return; const all = acList().filter(gxPops); let list = all;
   if (AC.only) { const o = all.filter(x => x.id === AC.only); if (o.length) list = o; else AC.only = null; }
   const ib = (a, ic, t) => `<button class="acp-i" data-ac="${a}" title="${t}" aria-label="${t}">${acSvg(ic, 17)}</button>`;
   const tb = (a, t) => `<button type="button" class="acp-tb" data-ac="${a}">${t}</button>`;
-  const head = AC.only ? '' : `<div class="acp-h2"><span class="acp-ti">${acSvg('bell', 16)}<b>Alertas</b>${all.length ? `<span class="num">${all.length}</span>` : ''}</span><span class="acp-ctl">${ib('hist', 'clock', 'Histórico de alertas')}</span></div>${all.length ? `<div class="acp-cmd">${tb('readall', 'Marcar todas como lidas')}${tb('dismissall', 'Remover todas')}</div>` : ''}`;
-  const body = list.length ? `<div class="acp-l">${list.slice(0, 40).map(acRow).join('')}</div>` : `<div class="acp-l"><div class="acr read"><span class="acr-c" aria-hidden="true">${acSvg('ok', 15)}</span><p class="acr-m">Nenhum alerta no momento.</p><span></span></div></div>`;
+  const head = AC.only ? '' : `<div class="acp-h2"><span class="acp-ti">${acSvg('bell', 16)}<b>Alertas</b>${all.length && gxB('panel') ? `<span class="num">${gxGet('badge', 'num') ? all.length : '•'}</span>` : ''}</span><span class="acp-ctl">${ib('hist', 'clock', 'Histórico de alertas')}</span></div>${all.length ? `<div class="acp-cmd">${tb('readall', 'Marcar todas como lidas')}${tb('dismissall', 'Remover todas')}</div>` : ''}`;
+  const body = list.length ? `<div class="acp-l">${gxRows(list.slice(0, 40))}</div>` : `<div class="acp-l"><div class="acr read"><span class="acr-c" aria-hidden="true">${acSvg('ok', 15)}</span><p class="acr-m">Nenhum alerta no momento.</p><span></span></div></div>`;
   const h = head + body; if (p._h !== h) { p.innerHTML = h; p._h = h; }
   acPanelPos();
 }
@@ -288,6 +289,7 @@ function acClickItem(id) {
   return acNavigate(d);
 }
 function acPop(it, ms) {
+  if (it && !gxMayPop(it)) { acRefresh(); return; }
   acEnsure(); const b = document.getElementById('acb'); if (!b) return;
   if (it && it.active) ocMove(it, 'exibido'); S.ac.hidden = false; AC.id = it ? it.id : null; AC.confirm = false; AC.only = it && it.src === 'toast' && it.prio === 0 ? it.id : null; acOpen((ms || (it && it.prio >= 3 ? 14000 : 8000)) + (it ? Math.min(9000, acMsg(it).length * 35) : 0)); /* mensagens longas ficam mais tempo abertas */
 }
@@ -351,6 +353,7 @@ document.addEventListener('click', e => {
     if (a === 'read') acSetState(id, { read: true });
     else if (a === 'dismiss') { acDismiss([id]); acTimer(12000); return; }
     else if (a === 'dismissall') { acDismiss(acList().map(x => x.id)); return; }
+    else if (a === 'opts') gxShown[id] = !gxShown[id];
     else if (a === 'open' || a === 'go') { acClickItem(id); return; }
     else if (a === 'readall') { S.ac.items.forEach(x => { if (!x.dismissed) x.read = true; }); acSave(true); acRefresh(); }
     else if (a === 'hist') { acCollapse(); go('alertashist'); return; }
@@ -366,7 +369,7 @@ function acModeCard() {
   return `<h2 class="sec">Modo de exibição dos alertas</h2><div class="card"><div role="radiogroup" aria-label="Modo de exibição dos alertas" class="stack" style="gap:8px">${opt('classic', 'Modo convencional', 'Faixas e avisos como sempre foram, dentro de cada página.')}${opt('bubble', 'Bolha flutuante', 'Uma gota sobre as páginas; o alerta se abre a partir dela e recolhe sozinho.')}</div>
   <p class="hint" style="margin:10px 0 0">A escolha vale na hora e fica salva. Os dois modos usam o mesmo histórico: trocar muda só a aparência, nunca os alertas. Tudo fica dentro do app, sem som, vibração nem notificação do Android.</p>
   ${on ? `<div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">${S.ac.hidden ? '<button class="btn" data-acm-do="show">Mostrar a bolha</button>' : ''}<button class="btn" data-acm-do="reset">Posição padrão</button></div>` : ''}
-  <button class="btn full" style="margin-top:10px" data-act="go" data-r="alertashist">Histórico de alertas (${n}${un ? ' · ' + un + ' não lido' + (un > 1 ? 's' : '') : ''})</button></div>`;
+  <button class="btn full" style="margin-top:10px" data-act="go" data-r="alertashist">Histórico de alertas${gxB('hist') ? (gxGet('badge', 'num') ? ` (${n}${un ? ' · ' + un + ' não lido' + (un > 1 ? 's' : '') : ''})` : un ? ' •' : '') : ''}</button></div>`;
 }
 let acFilter = 'all';
 function viewAlertasHist() {
@@ -374,13 +377,13 @@ function viewAlertasHist() {
   const shown = items.filter(x => acFilter === 'all' ? true : acFilter === 'unread' ? !x.read && !x.dismissed : x.cat === acFilter);
   let day = '', h = banners() + `<div class="card"><p class="hint" style="margin:0">Todos os alertas internos do app, na ordem em que apareceram. O histórico é o mesmo nos dois modos de exibição.</p><div class="ac-chips"><button class="ac-chip${acFilter === 'all' ? ' on' : ''}" data-acf="all">Todos (${items.length})</button><button class="ac-chip${acFilter === 'unread' ? ' on' : ''}" data-acf="unread">Não lidos (${un})</button>${cats.map(c => `<button class="ac-chip${acFilter === c ? ' on' : ''}" data-acf="${c}">${esc(AC_CATS[c] || c)}</button>`).join('')}</div>${un ? '<button class="btn full" style="margin-top:10px" data-acm-do="readall">Marcar todos como lidos</button>' : ''}</div>`;
   if (!shown.length) return h + '<div class="card"><div class="empty">Nenhum alerta aqui ainda.</div></div>';
-  for (const x of shown) {
+  const cards = list => { let day = '', h = ''; for (const x of list) {
     const d = new Date(x.ts), ds = isoDate(d); if (ds !== day) { day = ds; h += `<h2 class="sec">${ds === isoDate(new Date()) ? 'Hoje' : fmtDate(ds)}</h2>`; }
     h += `<div class="card ac-it${x.read || x.dismissed ? ' read' : ''}" data-tone="${x.prio >= 3 ? 'neg' : x.prio === 2 ? 'warn' : x.prio === 1 ? 'brand' : 'neu'}"><div class="row sp" style="gap:8px;align-items:flex-start"><div style="min-width:0"><span class="atag">${esc(AC_CATS[x.cat] || 'Alerta')}</span> <span class="atag">${AC_PRIO[x.prio] || ''}</span></div><span class="dim num" style="white-space:nowrap">${pad(d.getHours())}:${pad(d.getMinutes())}${x.n > 1 ? ' · ' + x.n + 'x' : ''}</span></div>
     <div class="ac-tt">${esc(x.title)}</div><div class="ac-tx">${esc(x.text)}</div>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${x.active && !x.dismissed ? '<span class="atag on">Ativo agora</span>' : ''}${!x.active && x.src !== 'toast' && OC_STATES[x.st] ? `<span class="atag">${OC_STATES[x.st]}</span>` : ''}${!x.read && !x.dismissed ? '<span class="atag">Não lido</span>' : ''}${x.dismissed ? '<span class="atag">Dispensado</span>' : ''}<span style="flex:1"></span>${!x.read && !x.dismissed ? `<button class="btn sm" data-acid="read" data-id="${x.id}">Marcar como lido</button>` : ''}${x.dismissed ? `<button class="btn sm" data-acid="restore" data-id="${x.id}">Restaurar</button>` : `<button class="btn sm" data-acid="dismiss" data-id="${x.id}">Dispensar</button>`}</div></div>`;
-  }
-  return h;
+  } return h; };
+  return h + gxHist(shown, cards);
 }
 document.addEventListener('click', e => {
   let el = e.target.closest('[data-acm]'); if (el) { acSetMode(el.dataset.acm); return; }

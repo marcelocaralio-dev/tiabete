@@ -1187,3 +1187,27 @@ table.t.wide-t { min-width: 540px; }
 table.t.md-t { min-width: 500px; }
 table.t.wide-t th:first-child, table.t.wide-t td:first-child, table.t.md-t th:first-child, table.t.md-t td:first-child { position: sticky; left: 0; z-index: 1; background: var(--s1); }
 .tbl-wrap.tw-hint:focus-visible { outline: 2px solid var(--brand-l); outline-offset: 2px; }
+/* GLUXO Experience */
+.gx-sec summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.gx-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; }
+.gx-row span { display: flex; flex-direction: column; } .gx-row input { width: 22px; height: 22px; flex: none; accent-color: var(--brand); }
+.gx-n, html.gx-badge #nav [data-r="mais"]::after { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 99px; background: var(--brand); color: #fff; font: 700 11px/18px var(--f-mono); text-align: center; }
+.gx-n { position: absolute; top: -4px; right: -4px; z-index: 2; } .gx-n[hidden] { display: none; }
+.gx-n.gx-new { animation: gx-pop .4s ease-out; } @keyframes gx-pop { 50% { transform: scale(1.35); } }
+html.gx-badge #nav [data-r="mais"] { position: relative; }
+html.gx-badge #nav [data-r="mais"]::after { content: var(--gx-n); position: absolute; top: 2px; left: calc(50% + 6px); }
+html.gx-badge-dot #nav [data-r="mais"]::after { min-width: 9px; width: 9px; height: 9px; padding: 0; }
+html.gx-still :is(#acb, #acp), html.gx-still :is(#acb, #acp) *, html.gx-still #acb::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .gx-n.gx-new { animation: none; } }
+.gx-row select { max-width: 48%; min-height: 36px; background: var(--s2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; }
+.gx-g summary { cursor: pointer; padding: 8px 4px; font-weight: 600; } .gx-hi { border-left: 3px solid var(--brand); }
+html.gx-strong .gx-n.gx-new { animation: gx-big .5s ease-out 2; } @keyframes gx-big { 50% { transform: scale(1.8); } }
+@media (prefers-reduced-motion: reduce) { html.gx-strong .gx-n.gx-new { animation: none; } }
+.gx-one { flex: none; width: 36px; height: 36px; border: 0; background: none; color: var(--mut); cursor: pointer; } .gx-row > span { flex: 1; }
+.gx-pv { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; }
+.gx-pn { min-width: 9px; height: 18px; border-radius: 99px; background: var(--brand); color: #fff; font: 700 11px/18px var(--f-mono); text-align: center; font-style: normal; }
+.gx-pb { width: 28px; height: 28px; border-radius: 50%; background: #fff; } .gx-pb.has { box-shadow: 0 0 0 3px var(--brand); }
+.gx-pb.soft { animation: gx-pop 1s 2; } .gx-pb.strong { animation: gx-big .6s 3; }
+html.gx-home #nav [data-r="painel"] { position: relative; } html.gx-home #nav [data-r="painel"]::after { content: var(--gx-h); position: absolute; top: 2px; left: calc(50% + 6px); color: var(--brand-l); font: 700 11px var(--f-mono); }
+@media (prefers-reduced-motion: reduce) { .gx-pb { animation: none !important; } }
+.acr-a[hidden] { display: none; }

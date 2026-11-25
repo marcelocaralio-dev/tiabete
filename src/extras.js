@@ -588,9 +588,9 @@ function hypoAudioUnlock() { try { const AC = window.AudioContext || window.webk
 function hypoBeep() {
   try {
     hypoAudioUnlock(); const c = hypoAudio;
-    if (c) [0, .45, .9].forEach(d => { const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + d; o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.5, t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + .35); o.start(t); o.stop(t + .4); });
+    if (c && (typeof gxGet !== 'function' || gxGet('sound', 'beep'))) [0, .45, .9].forEach(d => { const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + d; o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.5, t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + .35); o.start(t); o.stop(t + .4); });
   } catch (e) { }
-  try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) { }
+  try { if (navigator.vibrate && (typeof gxGet !== 'function' || gxGet('sound', 'vib'))) navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) { }
 }
 const hypoAlertGet = () => { try { return localStorage.getItem('tb-hypo-alert') || ''; } catch (e) { return ''; } };
 /* Um único alerta por contagem (chave = id da última medição). Se o app estava fechado, o alerta aparece ao voltar. */
@@ -789,6 +789,7 @@ async function applyBackupState(st, replace) {
   try { if (st.alertCenter && typeof st.alertCenter === 'object' && (replace || !S.ac.items.length)) { const have = new Set(S.ac.items.map(x => x.id)); const inc = (Array.isArray(st.alertCenter.items) ? st.alertCenter.items : []).filter(x => x && x.id && x.key && !have.has(x.id)); S.ac.items = replace ? inc : S.ac.items.concat(inc); S.ac.items = S.ac.items.slice(0, AC_MAX); acSave(); } } catch (e) { }
   try { if (st.customAlerts && typeof st.customAlerts === 'object' && (replace || !S.ca.rules.length)) { caLoad(st.customAlerts); S.ca.seeded = true; await caSave(); caSync(); } } catch (e) { }
   try { if (st.alerts && (replace || JSON.stringify(alCfg()) === JSON.stringify(AL_DEF))) { S.alerts = { ...AL_DEF, ...st.alerts }; await alSave(); } } catch (e) { }
+  try { if (st.gx && typeof st.gx === 'object') { const { sound, ...g } = st.gx; gxSave(g); } } catch (e) { }
   try { if (typeof st.swipeNav === 'boolean' && replace) { S.swipeNav = st.swipeNav; await Store.put('meta', { id: 'swipe-nav', value: S.swipeNav }); } } catch (e) { }
   try { if (st.bolus && typeof st.bolus === 'object') { S._blRes = null; if (replace) blLoad(st.bolus); else S._blRes = blMerge(st.bolus); await Store.put('meta', { id: 'bolus', value: S.bl }); } } catch (e) { console.error(e); }
   try {
@@ -903,7 +904,7 @@ document.addEventListener('change', async e => {
 });
 function viewLembretes() {
   const sv = S.icsPref || {};
-  return banners() + (typeof acModeCard === 'function' ? acModeCard() : '') + alertsPanel() + (typeof irSummaryCard === 'function' ? irSummaryCard() : '') + (typeof plRemindersCard === 'function' ? plRemindersCard() : '') + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário e abra no celular: ele cria alarmes diários. Escolha os horários.</p>
+  return banners() + (typeof acModeCard === 'function' ? acModeCard() : '') + (typeof gxCard === 'function' ? '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' : '') + alertsPanel() + (typeof irSummaryCard === 'function' ? irSummaryCard() : '') + (typeof plRemindersCard === 'function' ? plRemindersCard() : '') + `<p class="hint" style="margin:0 0 12px">Os avisos dentro do app só aparecem com ele aberto. Para ser lembrado com o app fechado, gere um arquivo de calendário e abra no celular: ele cria alarmes diários. Escolha os horários.</p>
   <div class="card"><div class="stack" style="gap:12px">${ICS_ITEMS.map(x => { const p = sv[x.k] || {}, on = p.on !== undefined ? p.on : x.k !== 'deitar'; return `<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><label style="display:flex;flex-direction:row-reverse;justify-content:space-between;gap:10px;align-items:center;flex:1;min-width:0"><input type="checkbox" class="ics-on swt" role="switch" data-k="${x.k}" ${on ? 'checked' : ''}><span>${x.t}</span></label><input class="in ics-t" type="time" id="ics-${x.k}" value="${p.t || icsDefault(x.k)}" style="width:140px;flex:none"></div>`; }).join('')}</div>
   <div class="field" style="margin-top:14px"><label class="fl" for="ics-adv">Avisar com antecedência</label><select class="in" id="ics-adv"><option value="0">Na hora</option><option value="5">5 minutos antes</option><option value="10">10 minutos antes</option><option value="15">15 minutos antes</option></select></div></div>
   <button class="btn pri full" style="margin-top:12px" data-act="ics-make">Gerar arquivo de calendário</button>
@@ -1400,7 +1401,7 @@ document.addEventListener('click', async e => {
 /* ================= Configurações (tudo que o usuário pode ajustar) ================= */
 function viewConfig() {
   const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + themeCard() + scaleCard() + swipeCard() + `
+  return banners() + '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
