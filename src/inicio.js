@@ -242,7 +242,7 @@ function inXRows(pm, d, M) {
 const IN_ROW = 4;
 let inFitSig = '', inFitRaf = 0, inFitGrid = null, inFitRO = null;
 function inFitDo(grid) {
-  const kids = [...grid.children], gap = grid.classList.contains('editing') ? 18 : 10;
+  const kids = [...grid.children], gap = grid.classList.contains('editing') ? 28 : 10;
   const sig = grid.offsetWidth + '|' + kids.map(c => c.offsetHeight + (c.dataset.sz || '')).join(',');
   if (sig === inFitSig && grid.classList.contains('in-fit')) return;
   kids.forEach(c => { if (c.classList.contains('dragging')) return; c.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((c.offsetHeight + gap) / IN_ROW)); });
@@ -285,7 +285,7 @@ function inEditBar(msg) {
     <p class="in-sr" id="in-live" role="status" aria-live="polite"></p></div>`;
 }
 const inFixRow = pos => `<div class="in-fixrow" aria-hidden="true">${pnIc('lock')}<span>${pos === 'top' ? 'Resumo glicêmico · fixo no topo' : 'Central de Métricas · fixa no final'}</span></div>`;
-/* Em edição cada cartão ganha uma moldura (alça de arraste + botão de ocultar) sem mudar o cartão nem a sua altura: os controles ficam sobre a borda. */
+/* Em edição cada cartão ganha uma moldura sem mudar o cartão: alça de arraste e botão de ocultar sobre a borda superior; tamanho em faixa própria abaixo dele. */
 const IN_SZ_IC = { c: '<rect x="8" y="10" width="8" height="4" rx="1.5"/>', n: '<rect x="6" y="8" width="12" height="8" rx="2"/>', x: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/>' };
 function inSizeCtl(k, t, sz) {
   return `<div class="in-sz" role="group" aria-label="Tamanho de ${t}">${['c', 'n', 'x'].map(s => `<button type="button" data-act="in-size" data-k="${k}" data-s="${s}" aria-pressed="${sz === s}" aria-label="${IN_SZ_LAB[s][0].toUpperCase() + IN_SZ_LAB[s].slice(1)}: ${t}" title="${IN_SZ_LAB[s][0].toUpperCase() + IN_SZ_LAB[s].slice(1)}"><svg viewBox="0 0 24 24" aria-hidden="true">${IN_SZ_IC[s]}</svg></button>`).join('')}</div>`;

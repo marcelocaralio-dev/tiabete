@@ -185,8 +185,8 @@
 .in-fixrow { display: flex; align-items: center; gap: 6px; margin: 2px 4px 6px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .04em; color: var(--mut); }
 .in-fixrow .pn-ic { width: 13px; height: 13px; stroke: var(--mut); }
 .pn-grid { position: relative; }
-.pn-grid.editing { row-gap: 18px; padding-top: 12px; }
-.pn-ed { position: relative; grid-column: span 6; min-width: 0; display: flex; border-radius: 20px; }
+.pn-grid.editing { row-gap: 28px; padding-top: 12px; }
+.pn-ed { position: relative; grid-column: span 6; min-width: 0; display: flex; flex-direction: column; padding-bottom: 6px; border-radius: 20px; }
 .pn-ed.wide { grid-column: 1 / -1; } .pn-ed.mini { grid-column: span 4; }
 .pn-ed-in { flex: 1 1 auto; min-width: 0; display: flex; } .pn-ed-in > * { flex: 1 1 auto; min-width: 0; }
 .pn-ed::after { content: ""; position: absolute; inset: 0; border-radius: 20px; border: 1px dashed color-mix(in srgb, var(--brand-l) 45%, transparent); pointer-events: none; }
@@ -256,8 +256,10 @@ button.in-grip:not(:disabled):not(.acb):not(.sc-thumb) { touch-action: none; }
 [data-sz="x"].in-ind { gap: 4px; }
 .pn-ed[data-sz="x"] .in-xr { margin-top: 6px; }
 
-/* controle de tamanho (só na edição): três ícones crescentes na borda inferior do card */
-.in-sz { position: absolute; z-index: 3; bottom: -15px; left: 50%; transform: translateX(-50%); display: flex; padding: 2px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--brand) 55%, var(--line)); background: var(--s2); }
+/* controle de tamanho (só na edição): três ícones crescentes em faixa própria na base da moldura, abaixo do card.
+   Fica no fluxo (não sobre a borda) para não cobrir o conteúdo nem ficar sob a alça do card seguinte; o row-gap da edição
+   (aqui e em inFitDo) mantém as áreas de toque separadas. */
+.in-sz { position: relative; z-index: 3; flex: none; align-self: center; margin-top: 6px; display: flex; padding: 2px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--brand) 55%, var(--line)); background: var(--s2); }
 .in-sz button { position: relative; width: 30px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 99px; background: none; color: var(--mut); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .18s ease, color .18s ease; }
 .in-sz button::before { content: ""; position: absolute; inset: -7px -1px; }
 .in-sz button[aria-pressed="true"] { background: var(--brand); color: #fff; }
