@@ -23,11 +23,18 @@ if (window.TB_PUBLIC && window.TB_SECURE && window.TB_HTTP) {
   /* evento "tb-auth": detail.type = 'restored' (conta lida do aparelho na abertura), 'connected' (login concluído), 'disconnected' ou 'changed' */
   const notify = type => { try { window.dispatchEvent(new CustomEvent('tb-auth', { detail: { type: type || 'changed' } })); } catch (e) { try { window.dispatchEvent(new Event('tb-auth')); } catch (x) { } } };
   /* Toda chamada ao Google tem limite de tempo e erro de rede/tempo vira mensagem do Drive (não a da IA). Nunca fica pendurada. */
+  /* Se a chamada nativa (CapacitorHttp) não responde ou falha, repete UMA vez pelo fetch do WebView (o Google libera CORS nessas APIs) e, se isso
+     funcionar, passa a usar o fetch nas próximas. A mensagem de erro diz em qual etapa travou. */
   async function gcall(url, o, ms) {
-    try { return await http(url, Object.assign({}, o, { timeout: ms || 30000 })); }
+    ms = ms || 30000; const step = url.startsWith(TOK) ? 'login no Google' : url.startsWith(UP) ? 'envio do arquivo' : 'consulta ao Drive';
+    const tryOnce = (noNative, t) => http(url, Object.assign({}, o, { timeout: t, noNative }));
+    let first = !!G.preferFetch;
+    try { return await tryOnce(first, first ? ms : Math.min(ms, url.startsWith(UP) ? 30000 : 15000)); }
     catch (e) {
-      if (e && e.code === 'ai_timeout') throw E('drv_timeout', 'O Google demorou demais para responder. Verifique a internet e tente de novo.');
-      if (e && (e.net || e.code === 'ai_network')) throw E('drv_network', 'Sem conexão com o Google. Verifique a internet e tente de novo.');
+      if (!(e && (e.code === 'ai_timeout' || e.net || e.code === 'ai_network'))) throw e;
+      if (!first) { try { const r = await tryOnce(true, ms); G.preferFetch = true; return r; } catch (e2) { e = e2; } }
+      if (e && e.code === 'ai_timeout') throw E('drv_timeout', 'O Google não respondeu a tempo (etapa: ' + step + '). Tente de novo.');
+      if (e && (e.net || e.code === 'ai_network')) throw E('drv_network', 'Não foi possível falar com o Google (etapa: ' + step + (e.aiMsg && /\(([^)]+)\)\s*$/.test(e.aiMsg) ? ', ' + e.aiMsg.match(/\(([^)]+)\)\s*$/)[1] : '') + ').');
       throw e;
     }
   }

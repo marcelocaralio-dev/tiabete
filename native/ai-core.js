@@ -55,7 +55,7 @@
     /* limite de tempo opcional (o.timeout, em ms): sem ele a chamada pode ficar pendurada para sempre */
     let tmoId = null, ac = null; const tmo = o.timeout ? new Promise((_, no) => { tmoId = setTimeout(() => { try { ac && ac.abort(); } catch (e) { } no({ code: 'ai_timeout', timeout: true }); }, o.timeout); }) : null;
     const run = (async () => {
-      if (CH && CH.request) {
+      if (CH && CH.request && !o.noNative) {
         const r = await CH.request({ url, method, headers, data: o.body, responseType: o.text ? 'text' : 'json', connectTimeout: Math.min(30000, o.timeout || 30000), readTimeout: o.timeout || 180000 });
         let d = r.data;
         if (!o.text && typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { } }

@@ -85,7 +85,7 @@ function boot(rt, extra) {
   const up0 = GF.uploads; GF.mode = 'ok'; c2.run('drvAuto()'); await sleep(100); ok(GF.uploads === up0, 'C9 após falha espera antes de tentar sozinha (sem martelar o Google)');
   c2.run('S.drv.failAt = 0'); c2.run('drvAuto()'); await sleep(150); ok(GF.uploads === up0 + 1 && c2.run('S.drv.lastStatus') === 'ok', 'C10 depois do prazo tenta de novo e conclui');
   /* D) falhas: nunca fica preso, sempre dá para tentar de novo */
-  for (const [mode, re, name] of [['offline', /Sem conexão/, 'sem internet'], ['503', /não respondeu/, 'API indisponível'], ['403api', /não está ativada/, 'API desativada'], ['403', /negou o acesso/, 'sem permissão']]) {
+  for (const [mode, re, name] of [['offline', /falar com o Google/, 'sem internet'], ['503', /não respondeu/, 'API indisponível'], ['403api', /não está ativada/, 'API desativada'], ['403', /negou o acesso/, 'sem permissão']]) {
     GF.mode = mode; c = boot(true); await c.run('TB_DRV.ready()');
     await c.run('drvList()'); ok(c.run('S.drv.listState') === 'error' && re.test(c.run('S.drv.msg')) && !c.run('S.drv.busy') && re.test(c.run('driveCardBody("x")')), 'D ver cópias, ' + name + ': mensagem clara e sem carregamento preso');
     await c.run('drvBackup(true)'); ok(c.run('S.drv.lastStatus') === 'fail' && re.test(c.run('S.drv.lastMsg')) && !c.run('S.drv.busy'), 'D backup, ' + name + ': falha registrada e sem carregamento preso');
@@ -97,7 +97,7 @@ function boot(rt, extra) {
   GF.tokenMode = 'ok';
   /* E) Requisição que nunca responde: o limite de tempo encerra e libera */
   GF.hang = true; c = boot(true); await c.run('TB_DRV.ready()'); const t0 = Date.now(); await c.run('drvList()');
-  ok(c.run('S.drv.listState') === 'error' && /demorou demais/.test(c.run('S.drv.msg')) && !c.run('S.drv.busy') && Date.now() - t0 < 3000, 'E1 chamada pendurada no Google vira erro de tempo e libera a tela');
+  ok(c.run('S.drv.listState') === 'error' && /não respondeu a tempo \(etapa/.test(c.run('S.drv.msg')) && !c.run('S.drv.busy') && Date.now() - t0 < 3000, 'E1 chamada pendurada no Google vira erro de tempo e libera a tela');
   c = boot(true); await c.run('TB_DRV.ready()'); 
   ok(await c.run('(async()=>{ const p = drvDeadline(new Promise(()=>{}), 200).catch(e => e.code); return p; })()') === 'drv_timeout', 'E2 prazo geral do app também encerra operação que não termina');
   c.run('S.drv.busy = true; S.drv.busyAt = Date.now() - 200000'); ok(c.run('drvIsBusy()') === false && c.run('drvBegin("x")') > 0, 'E3 operação esquecida como "ocupada" é descartada e não bloqueia mais');
