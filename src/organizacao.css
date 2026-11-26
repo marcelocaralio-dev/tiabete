@@ -1,0 +1,69 @@
+/* ================= GLUXO Experience 04 · Organização e personalização =================
+   Só tokens existentes. Alvos de toque >= 40px. Densidade e formato dependem de classes em <html> (gxo-*). */
+.gxo-h { display: inline-flex; gap: 6px; vertical-align: middle; margin-left: 8px; }
+.gxo-sr { display: flex; gap: 8px; margin: 10px 0; }
+.gxo-b { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 40px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--s2); color: var(--mut); font: 600 13px/1 var(--f-body); cursor: pointer; }
+.gxo-b svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.gxo-b.on { color: var(--brand); border-color: var(--brand); }
+.gxo-b.on svg { fill: currentColor; }
+.gxo-b.lb { flex: 1; }
+h1.pg .gxo-b { min-width: 40px; }
+
+.gxo-sec { padding: 14px; margin-bottom: 12px; }
+.gxo-sec .row.sp { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.gxo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gxo-chips .gxo-it { flex: 0 1 auto; max-width: 100%; }
+.gxo-list, .gxo-grp { display: grid; gap: 8px; }
+.gxo-it, .gxo-row { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 4px 4px 12px; background: var(--s2); border: 1px solid var(--line); border-radius: 12px; }
+.gxo-row[hidden] { display: none; }
+.gxo-open { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; min-height: 40px; align-content: center; padding: 4px 0; background: none; border: 0; color: var(--fg); font: inherit; cursor: pointer; }
+span.gxo-open { cursor: default; }
+.gxo-open b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gxo-open small { color: var(--mut); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gxo-x { flex: none; display: grid; place-items: center; min-width: 40px; min-height: 40px; border: 0; border-radius: 10px; background: none; color: var(--mut); font: 700 16px/1 var(--f-body); cursor: pointer; }
+.gxo-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.gxo-x.on { color: var(--brand); } .gxo-x.on svg { fill: currentColor; }
+.gxo-x:disabled { opacity: .3; cursor: default; }
+.gxo-more { min-height: 40px; padding: 0 8px; background: none; border: 0; color: var(--brand); font: 600 13px/1 var(--f-body); cursor: pointer; }
+.gxo-cn { margin: 8px 0 0; }
+.gxo-pins.ex .gxo-it { padding-top: 8px; padding-bottom: 8px; }
+.gxo-tools { display: grid; gap: 8px; margin-bottom: 12px; }
+.gxo-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gxo-sel select, .gxo-tools input { min-height: 40px; }
+.gxo-gh { display: flex; gap: 8px; align-items: baseline; margin: 16px 0 8px; }
+.gxo-act { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.gxo-act .btn, .gxo-save .btn, .gxo-row .btn { min-height: 40px; }
+.gxo-save { display: flex; gap: 8px; margin-top: 10px; }
+.gxo-save input { flex: 1; min-width: 0; min-height: 40px; }
+.gxo-empty { text-align: center; padding: 24px 12px; }
+.gxo-pl { display: grid; gap: 6px; margin: 10px 0; max-height: 52vh; overflow: auto; }
+.gxo-pl h3 { margin: 10px 0 2px; font-size: 13px; color: var(--mut); }
+.gxo-pk { display: flex; align-items: center; gap: 8px; min-height: 44px; text-align: left; }
+.gxo-pk b { flex: 1; min-width: 0; font-weight: 600; } .gxo-pk small { color: var(--mut); }
+.gxo-pk[hidden] { display: none; }
+.gxo-ck { flex: none; width: 28px; text-align: center; color: var(--mut); font-weight: 700; }
+.gxo-pk.on .gxo-ck { color: var(--brand); }
+
+/* marcador discreto de favorito/fixado em registros do histórico */
+.rec[data-gxo-m] { position: relative; }
+.rec[data-gxo-m]::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); opacity: .85; }
+.rec[data-gxo-m*="p"]::after { border-radius: 2px; }
+
+/* histórico: cards e resumido */
+#h-list.gxo-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#h-list.gxo-cards > .rec { margin-bottom: 0; grid-template-columns: 1fr; }
+#h-list.gxo-cards > :not(.rec) { grid-column: 1 / -1; }
+#h-list.gxo-sum > .rec :is(.n, .meta, small, .tags) { display: none; }
+@media (max-width: 340px) { #h-list.gxo-cards { grid-template-columns: 1fr; } }
+
+/* densidade (listas e cards; tipografia e cores não mudam) */
+html.gxo-d-compact .card { padding: 10px 12px; }
+html.gxo-d-compact .rec { padding-top: 8px; padding-bottom: 8px; }
+html.gxo-d-compact #h-list > .rec, html.gxo-d-compact .pn-grid { margin-bottom: 4px; gap: 8px; }
+html.gxo-d-expanded .card { padding: 20px; }
+html.gxo-d-expanded .rec { padding-top: 16px; padding-bottom: 16px; }
+html.gxo-d-expanded #h-list > .rec { margin-bottom: 12px; }
+html.gxo-d-expanded .pn-grid { gap: 16px; }
+/* Início em lista: uma coluna. O Resumo glicêmico e a Central de Métricas ficam fora da grade e não mudam. */
+html.gxo-home-list .pn-grid > * { grid-column: 1 / -1 !important; }
+#view .gxo-tools :is(.btn, select, input), #view .gxo-act .btn, #view .gxo-row .btn { min-height: 40px; }

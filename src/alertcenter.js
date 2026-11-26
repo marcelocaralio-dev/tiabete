@@ -148,7 +148,7 @@ function acToast(msg, cat) {
   else { it = { id: uid(), key: 't|' + text + '|' + now, src: 'toast', cat: c, prio, title: AC_CATS[c], text, ts: now, read: prio === 0, dismissed: false, active: false, rev: 0 }; if (r && !AC_TOAST_SKIP[r] && typeof VIEWS === 'object' && VIEWS[r]) it.dest = { v: AC_DEST_V, r, p: {} }; S.ac.items.unshift(it); if (S.ac.items.length > AC_MAX) S.ac.items.length = AC_MAX; }
   acSave();
   if (!acBubbleOn()) { acRefresh(); return false; }
-  S.ac.hidden = false; acPop(it, prio === 0 ? 3500 : 9000); return true;
+  S.ac.hidden = false; acPop(it, typeof gxvDur === 'function' ? gxvDur(prio === 0 ? 3500 : 9000, prio > 0) : (prio === 0 ? 3500 : 9000)); return true;
 }
 function acSync() {
   if (!S.irReady) return; /* antes de as configurações serem lidas do banco tudo pareceria desativado/cancelado: não resolve nada */

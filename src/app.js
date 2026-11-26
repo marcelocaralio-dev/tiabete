@@ -606,7 +606,7 @@ const COL_LABEL = { date: 'data', time: 'hora', tags: 'etiquetas', glucose: 'gli
 function viewImportar() {
   let h = banners();
   const imp = S.imp;
-  if (imp && imp.loading) return h + `<div class="card"><div class="eyebrow">Lendo o arquivo</div><p style="margin:10px 0 0">${esc(imp.name)}. Nada é gravado nesta etapa.</p></div>`;
+  if (imp && imp.loading) return h + `<div class="card"><div class="eyebrow">Lendo o arquivo</div><p style="margin:10px 0 0">${esc(imp.name)}. Nada é gravado nesta etapa.</p>${typeof gxvSk === 'function' ? gxvSk('lines', { n: 3, ttl: 90000 }) : ''}</div>`;
   if (imp && imp.done) {
     const r = imp.result;
     return h + `<div class="card red"><div class="eyebrow">Importação concluída</div><div class="grid3" style="margin:14px 0 4px"><div class="tile"><div class="lb">Importados</div><div class="v num">${r.added}</div></div><div class="tile"><div class="lb">Duplicados</div><div class="v num">${r.dup}</div></div><div class="tile"><div class="lb">Ignorados</div><div class="v num">${r.ignored}</div></div></div>
@@ -917,7 +917,7 @@ function navHTML() {
   const cur = navGroup(S.route), b = (r, i, l) => `<button data-act="go" data-r="${r}" ${cur === r ? 'aria-current="page"' : ''}>${ic(i)}${l}</button>`;
   return `<div class="nav-in">${b('painel', 'home', 'Início')}${b('historico', 'list', 'Histórico')}<button class="fab" data-act="new" aria-label="Nova medição">${ic('plus')}</button>${b('analise', 'chart', 'Análise')}${b('mais', 'menu', 'Mais')}</div>`;
 }
-function backOf(r) { return r === 'metrica' ? 'metricas' : r === 'metricas' ? 'painel' : r === 'alertashist' ? 'lembretes' : r === 'insrem' ? 'lembretes' : r === 'esquemas' ? 'perfil' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
+function backOf(r) { return r === 'gxvis' || r === 'gxorg' ? 'gxexp' : r === 'metrica' ? 'metricas' : r === 'metricas' ? 'painel' : r === 'alertashist' ? 'lembretes' : r === 'insrem' ? 'lembretes' : r === 'esquemas' ? 'perfil' : r === 'exame' || r === 'comparar' ? 'exames' : r === 'insulinas' && S.prevRoute === 'painel' ? 'painel' : 'mais'; }
 function go(r) { if (r === 'mais' && S.route !== 'mais' && hubOf(S.route)) S.maisOpen = hubOf(S.route); if (r !== S.route) S.prevRoute = S.route; S.route = r; if (location.hash !== '#' + r) { try { location.hash = r; } catch (e) { } } render(); window.scrollTo(0, 0); }
 function routeFromHash() { const h = location.hash.replace('#', ''); return h === 'exame' ? (S.exams.some(x => x.id === S.ex.id) ? 'exame' : 'exames') : VIEWS[h] ? h : 'painel'; }
 

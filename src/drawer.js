@@ -92,7 +92,7 @@ document.addEventListener('keydown', e => {
   const W = () => Math.min(320, window.innerWidth * .86); let g = null;
   const EDGE = 40;
   /* Vale sobre qualquer superfície, menos campos, controles deslizantes e áreas que rolam na horizontal */
-  const SKIP = '.gx-bar, .in-grip, input, textarea, select, [contenteditable], [role=slider]';
+  const SKIP = 'nav.gx-bar, .in-grip, input, textarea, select, [contenteditable], [role=slider]';
   const hScroll = el => { for (let n = el; n && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 2) return true; } return false; };
   const blocked = el => !el || !el.closest || !!el.closest(SKIP) || hScroll(el) || !!el.closest('#acb, #acp, #acz') || !!document.querySelector('.sheet-bg, .rw-bg, #lk');
   document.addEventListener('touchstart', e => {

@@ -129,7 +129,7 @@ function inReorder(p, visKeys) {
 function inHide(p, k) { const q = inCleanPrefs(p); if (!IN_CARDS.some(c => c.k === k) || q.hidden.includes(k)) return q; q.hidden = [...q.hidden, k]; return q; }
 /* Readiciona um cartão oculto: vai para o fim da lista personalizável (sempre acima da Central de Métricas). */
 function inShow(p, k) { const q = inCleanPrefs(p); if (!q.hidden.includes(k)) return q; q.hidden = q.hidden.filter(x => x !== k); q.order = q.order.filter(x => x !== k).concat(k); return q; }
-const inVisible = p => { const q = inCleanPrefs(p); return q.order.filter(k => !q.hidden.includes(k)); };
+let inVisible = p => { const q = inCleanPrefs(p); return q.order.filter(k => !q.hidden.includes(k)); };
 
 /* ---------- utilitários ---------- */
 const inReal = recs => (recs || []).filter(r => r && r.source !== 'exemplo' && r.example !== true && typeof r.glucose === 'number' && isFinite(r.glucose) && r.glucose > 0 && typeof r.ts === 'number');

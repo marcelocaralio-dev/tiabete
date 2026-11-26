@@ -173,7 +173,7 @@ async function handleExamFiles(files) {
 const QST = { fila: '…', lendo: '…', analisando: '…', ok: '✓', dup: '=', erro: '!' };
 function queueHTML() {
   if (!S.ex.queue.length) return '';
-  return `<div class="stack" style="margin-top:12px" aria-live="polite">${S.ex.queue.map(q => `<div class="card soft" style="padding:12px 14px"><div class="row sp" style="gap:10px"><span style="min-width:0;overflow-wrap:anywhere"><b>${QST[q.st] || ''} ${esc(q.name)}</b><br><span class="dim" style="font-size:14px">${esc(q.msg || '')}${q.warn ? ' ' + esc(q.warn) : ''}</span></span>${q.exId ? `<button class="btn sm" data-act="ex-open" data-id="${q.exId}">Abrir</button>` : ''}</div></div>`).join('')}</div>`;
+  return `<div class="stack" style="margin-top:12px" aria-live="polite">${S.ex.queue.map(q => `<div class="card soft" style="padding:12px 14px"><div class="row sp" style="gap:10px"><span style="min-width:0;overflow-wrap:anywhere"><b>${QST[q.st] || ''} ${esc(q.name)}</b><br><span class="dim" style="font-size:14px">${esc(q.msg || '')}${q.warn ? ' ' + esc(q.warn) : ''}</span>${(q.st === 'lendo' || q.st === 'analisando') && typeof gxvSk === 'function' ? gxvSk('lines', { n: 2, ttl: 240000, label: 'Analisando o exame' }) : ''}</span>${q.exId ? `<button class="btn sm" data-act="ex-open" data-id="${q.exId}">Abrir</button>` : ''}</div></div>`).join('')}</div>`;
 }
 function examTone(k) { return k === 'a' || k === 'b' ? 'pos' : k === 'c' ? 'warn' : k === 'd' ? 'neg' : 'neu'; }
 /* Modelo C (categorizado, barra pela faixa da nota) + anel E + distribuição dentro/fora/sem faixa */
