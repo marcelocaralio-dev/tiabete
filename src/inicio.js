@@ -162,8 +162,13 @@ function inDayChart(D, isToday) {
   [0, 6, 12, 18, 24].forEach(h => { const x = L + h / 24 * pw; g += `<line class="in-gx" x1="${x}" x2="${x}" y1="${T}" y2="${T + ph}"/><text class="in-gt" x="${x}" y="${H - 4}" text-anchor="${h === 0 ? 'start' : h === 24 ? 'end' : 'middle'}">${String(h).padStart(2, '0')}h</text>`; });
   [LIM.low, LIM.high].forEach(v => { g += `<text class="in-gt" x="${L - 3}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end">${v}</text>`; });
   if (isToday) { const x = X(Date.now()).toFixed(1); g += `<line class="in-now" x1="${x}" x2="${x}" y1="${T}" y2="${T + ph}"/>`; }
-  pts.forEach((it, i) => { const p = pts[i - 1]; if (p && it.joinPrev) g += `<line class="in-ln${it.longGap ? ' gap' : ''}" x1="${X(p.r.ts).toFixed(1)}" y1="${Y(p.r.glucose).toFixed(1)}" x2="${X(it.r.ts).toFixed(1)}" y2="${Y(it.r.glucose).toFixed(1)}"/>`; });
-  pts.forEach(it => { g += `<circle class="in-pt p-${inBand(it.band)}" cx="${X(it.r.ts).toFixed(1)}" cy="${Y(it.r.glucose).toFixed(1)}" r="4.2"/>`; });
+  /* Linha: UM traçado contínuo por trecho (junções arredondadas), na ordem das medições. Trecho com intervalo > 6 h vira outro traçado, tracejado.
+     Os traçados vêm ANTES dos pontos e são mais finos que eles, mas com os pontos menores a linha aparece também entre medições muito próximas. */
+  const XY = it => X(it.r.ts).toFixed(1) + ' ' + Y(it.r.glucose).toFixed(1); let run = [], runGap = false;
+  const flush = () => { if (run.length > 1) g += `<path class="in-ln${runGap ? ' gap' : ''}" d="M${run.join(' L')}"/>`; run = []; };
+  pts.forEach((it, i) => { const p = pts[i - 1]; if (!p || !it.joinPrev) { flush(); run = [XY(it)]; runGap = false; return; } if (!!it.longGap !== runGap) { const last = run[run.length - 1]; flush(); run = [last]; runGap = !!it.longGap; } run.push(XY(it)); });
+  flush();
+  pts.forEach(it => { g += `<circle class="in-pt p-${inBand(it.band)}" cx="${X(it.r.ts).toFixed(1)}" cy="${Y(it.r.glucose).toFixed(1)}" r="3.3"/>`; });
   return `<svg class="in-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Medições do dia ${D.iso}: ${D.n}, entre ${f0(D.min)} e ${f0(D.max)} mg/dL.">${g}</svg>`;
 }
 function inTlItem(it) {
