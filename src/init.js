@@ -44,6 +44,7 @@
     }
     try { await Store.put('meta', { id: 'seeded', at: Date.now() }); } catch (e) { }
   }
+  try { await heBoot(); } catch (e) { console.error(e); }
   S.route = routeFromHash();
   render();
   try { if (window.GxSplash) GxSplash.done('app'); } catch (e) { }

@@ -84,6 +84,7 @@ async function loadAll() {
   S.events = await Store.all('events');
   S.inslog = (await Store.all('inslog')).sort((a, b) => a.ts - b.ts);
   if (typeof insSync === 'function') insSync();
+  try { if (typeof heAfterLoad === 'function') heAfterLoad(); } catch (e) { }
   if (typeof syncExamA1c === 'function' && await syncExamA1c()) S.hba = (await Store.all('hba1c')).sort((a, b) => a.date.localeCompare(b.date));
 }
 async function removeExamples() {
@@ -364,7 +365,7 @@ function epiHTML(e) {
   const n = e.members.length, dur = n > 1 ? ` → ${HM(e.end)} · ${gapFmt((e.end - e.start) / 60000)}` : '';
   return `<div class="rec epi" data-key="e${e.id}" data-ts="${e.ts}"><div class="epi-h"><svg class="epi-x" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M12 6.5v11M6.5 12h11"/></svg><div><div class="epi-t">Episódio de hipoglicemia</div><div class="epi-s num">${HM(e.start)}${dur}</div></div><div class="epi-min num">${f0(e.min)}<small>menor</small></div></div>
     <div class="epi-ms">${e.members.map(r => `<button class="epi-m" data-act="open" data-id="${r.id}"><span class="num">${r.time}</span>${badge(r.glucose, r.context)}<span class="epi-g num">${fn(r.glucose, 1)}<small>mg/dL</small></span></button>`).join('')}</div>
-    <div class="epi-f ${e.rec ? 'ok' : 'no'}">${e.rec ? `✓ Voltou a ${f0(e.rec.glucose)} mg/dL às ${HM(e.rec.ts)}` : 'Sem medição de 70 mg/dL ou mais registrada depois'}</div></div>`;
+    <div class="epi-f ${e.rec ? 'ok' : 'no'}">${e.rec ? `✓ Voltou a ${f0(e.rec.glucose)} mg/dL às ${HM(e.rec.ts)}` : 'Sem medição de 70 mg/dL ou mais registrada depois'}</div>${typeof heEpiLink === 'function' ? heEpiLink(e) : ''}</div>`;
 }
 function histListHTML() {
   const items = histItems();
@@ -467,7 +468,7 @@ async function saveRecord(form) {
   let note = '';
   if (hasExamples() && !old) { await removeExamples(); note = ' Dados de exemplo removidos.'; }
   await Store.put('records', rec); await loadAll(); closeSheet(); render(); toast('Medição salva.' + note);
-  hypoAfterSave(rec);
+  await hypoAfterSave(rec);
   if (!old) { try { gxGreet(rec); } catch (e) { } } /* saudação visual (saudacao.js): só medição nova, só depois de salvar */
 }
 function openRecord(id) {
@@ -769,6 +770,7 @@ function wipeSheet(w) {
   openSheet(`<h2>${all ? 'Apagar tudo?' : 'Apagar todas as medições?'}</h2><p style="margin:0 0 10px">Serão apagados: <b>${what}</b>. Isso não pode ser desfeito.</p><button class="btn full" data-act="bk-json" style="margin-bottom:12px">Fazer cópia antes</button><label class="fl" for="wipe-t">Digite APAGAR para confirmar</label><input class="in" id="wipe-t" autocomplete="off" autocapitalize="characters" placeholder="APAGAR"><div class="row" style="margin-top:12px"><button class="btn danger grow" id="wipe-go" data-act="wipe-do" data-w="${w}" disabled>Apagar definitivamente</button><button class="btn" data-act="close">Cancelar</button></div>`);
 }
 async function wipeData(w) {
+  try { if (typeof heWipe === 'function') await heWipe(); } catch (e) { }
   await Store.delMany('records', S.records.map(r => r.id));
   if (w === 'all') { await Store.delMany('hba1c', S.hba.map(r => r.id)); await Store.delMany('schemes', S.schemes.map(r => r.id)); await Store.delMany('exams', S.exams.map(r => r.id)); await Store.delMany('events', S.events.map(r => r.id)); await Store.delMany('inslog', S.inslog.map(r => r.id)); S.inslog = []; S.ins = { basalTs: null, day: isoDate(new Date()), fast: null, lunch: null, dinner: null, dinnerMin: S.ins.dinnerMin }; await Store.put('meta', { id: 'insulin', ...S.ins }); }
   S.imp = null; S.rest = null; S.day = null; if (S.ex) { S.ex.sel = null; S.ex.narr = {}; S.ex.queue = []; if (w === 'all') S.ex.id = null; }
@@ -817,7 +819,7 @@ function menuGroups() {
     'g-trat': { t: 'Tratamento e insulina', d: 'Medicamentos, horários e doses de insulina', items: [['esquemas', 'Meu tratamento', 'Diabetes, insulinas, medicamentos e histórico'], ['insrem', 'Lembretes de insulina', 'Avisos de basal e rápida, com confirmação da aplicação'], ['insulinas', 'Histórico de insulinas', 'Horários, média e variação das insulinas']] },
     'g-bolus': { t: 'Cálculo de bolus', d: 'Razão insulina/carboidratos, alimentos e refeições', items: [['bolus', 'Cálculo de bolus', 'Razão insulina/carboidratos, alimentos e refeições']] },
     'g-hist': { t: 'Histórico e registros', d: 'Classificar medições, eventos e importação de outros aplicativos', items: [['classificar', 'Classificar medições', 'Jejum, antes e depois da refeição'], ['eventos', 'Eventos', 'Marcar doença, viagem ou rotina nos gráficos'], ['importar', 'Importar de outros aplicativos', 'mySugr, Glooko, Libre, Dexcom, Diabetes:M e outros (CSV, XLSX, JSON), com prévia']] },
-    'g-relat': { t: 'Relatórios e estatísticas', d: 'Relatórios para o médico, padrões e conquistas', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['padroes', 'Padrões', 'Observações automáticas dos seus registros'], ['ctxres', 'Insights e resumos', 'Observações e resumos por período dos seus registros'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses']] },
+    'g-relat': { t: 'Relatórios e estatísticas', d: 'Relatórios para o médico, padrões e conquistas', items: [['relatorios', 'Relatórios', 'PDF e Excel por período'], ['padroes', 'Padrões', 'Observações automáticas dos seus registros'], ['conquistas', 'Conquistas', 'Marcos de 7, 14, 30 dias e 3 meses']] },
     'g-ia': { t: 'Inteligência artificial', d: 'Pergunte sobre seus registros e configure a IA', items: [HAS_CLAUDE ? ['perguntas', 'Perguntar ao Claude', 'Pergunte sobre seus registros'] : null, VIEWS.ia ? ['ia', 'Provedor e chave', 'Escolha o provedor, o modelo e a chave'] : null] },
     'g-dados': { t: 'Cópia de segurança', d: 'Exportar, restaurar, Google Drive e CSV', items: [['backup', 'Cópia de segurança', 'Exportar, restaurar, Google Drive e CSV']] },
     'g-seg': { t: 'Segurança e privacidade', d: 'Bloqueio por PIN, biometria, cópia protegida e privacidade', items: [['seguranca', 'Bloqueio e proteção', 'PIN, biometria, cópia protegida por senha e Drive cifrado'], ['privacidade', 'Privacidade e armazenamento', 'Onde ficam seus dados, armazenamento persistente e apagar perfil']] },

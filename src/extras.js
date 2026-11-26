@@ -378,7 +378,7 @@ function insLogForm(r) {
   return `<h2>${r ? 'Editar · ' + esc(insName(r)) : 'Registrar dose passada'}</h2><p class="hint" style="margin:0 0 12px">Horário e unidades são registros seus. O app não calcula nem sugere dose.</p><form id="ins-log-form" data-id="${r ? r.id : ''}" novalidate><div class="form-grid">
     ${r && r.kind === 'extra' ? `<div class="field full"><label class="fl" for="il-n">Insulina</label><input class="in" id="il-n" maxlength="80" value="${esc(r.name || '')}"></div>` : ''}${r ? '' : `<div class="field full"><p class="eyebrow il-bt">1 · Qual insulina?</p><select class="in" id="il-k" aria-label="Qual insulina?">${ilOptions()}</select></div>`}
     <p class="eyebrow il-bt" style="grid-column:1/-1;margin:6px 0 0">${r ? 'Quando aconteceu?' : '2 · Quando aconteceu?'}</p><div class="field"><label class="fl" for="il-d">Data</label><input class="in" type="date" id="il-d" value="${d}" max="${isoDate(now)}"></div>
-    <div class="field"><label class="fl" for="il-t">Horário</label><input class="in" id="il-t" value="${t}" data-ck="time" inputmode="numeric" placeholder="21:30" autocomplete="off"></div><p class="eyebrow il-bt" style="grid-column:1/-1;margin:6px 0 0">${r ? 'Quantas unidades foram aplicadas?' : '3 · Quantas unidades foram aplicadas?'}</p>${unitsField('il-u', r ? r.units : null)}</div><div class="il-rev" id="il-rev" aria-live="polite"></div>
+    <div class="field"><label class="fl" for="il-t">Horário</label><input class="in" id="il-t" value="${t}" inputmode="numeric" placeholder="21:30" autocomplete="off"></div><p class="eyebrow il-bt" style="grid-column:1/-1;margin:6px 0 0">${r ? 'Quantas unidades foram aplicadas?' : '3 · Quantas unidades foram aplicadas?'}</p>${unitsField('il-u', r ? r.units : null)}</div><div class="il-rev" id="il-rev" aria-live="polite"></div>
     <div class="err" id="il-err" role="alert" style="color:var(--red-l);min-height:18px;margin-top:6px"></div>
     <div class="stack" style="margin-top:10px"><button class="btn pri full" type="submit">Salvar</button>${r ? `<button class="btn full" type="button" data-act="ins-log-del-ask" data-id="${r.id}">Excluir registro</button>` : ''}</div></form>`;
 }
@@ -530,7 +530,7 @@ document.addEventListener('change', e => { if (e.target.id !== 'ia-m') return; c
 const HYPO_STEP = 15 * 60e3; // intervalo entre reavaliações
 S.hypoOff = {};
 try { S.hypoOff = JSON.parse(localStorage.getItem('tb-hypo-off') || '{}') || {}; } catch (e) { }
-function hypoState() { const st = hypoEpisode(S.records, Date.now()); return st && st.protocol ? st : null; } // episódio com reavaliação ativa (glicemia <= 60)
+function hypoState() { return typeof heHypoState === 'function' ? heHypoState() : null; } // episódio com reavaliação ativa (glicemia <= 60)
 function hypoLow() { const st = hypoEpisode(S.records, Date.now()); return st && !st.protocol ? st : null; } // 61 a 69: só registro, sem reavaliação
 /* Cronômetro: o tempo restante vem sempre da data/hora real da última medição (ts), nunca de um contador em memória.
    Por isso continua certo ao minimizar, bloquear a tela, fechar e reabrir o app. */
@@ -545,7 +545,7 @@ function hypoBanner() {
   if (lo && !S.hypoOff[lo.id]) return `<div class="banner hypo" role="alert"><div><b>Glicemia baixa:</b> <b class="num">${f0(lo.last.glucose)}</b> mg/dL às ${lo.last.time}, registrada como hipoglicemia.<div style="margin-top:2px;opacity:.95">Siga o plano combinado com seu médico.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm" data-act="hypo-off">Dispensar</button></div></div>`;
   const st = hypoState(); if (!st || S.hypoOff[st.id]) return '';
   const g = st.last.glucose;
-  return `<div class="banner hypo" role="alert"><div><b>⚠ Hipoglicemia:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
+  return `<div class="banner hypo" role="alert"><div><b>${g >= LIM.low ? '⚠ Acompanhamento de hipoglicemia' : '⚠ Hipoglicemia'}:</b> <b class="num">${f0(g)}</b> mg/dL às ${st.last.time}${g < LIM.vlow ? ' · muito baixa' : ''}.<div style="margin-top:4px" data-hy-next>${hypoNextTxt(st)}</div><div style="margin-top:2px;opacity:.95">Meça a cada 15 min até voltar a 70 ou mais.</div></div><div class="hy-btns"><button class="btn sm" data-act="hypo-open">Abrir protocolo</button><button class="btn sm ghost" data-act="hypo-off">Dispensar</button></div></div>`;
 }
 function hypoSheet(conf) {
   const st = hypoState(), due = !!st && hypoDue(st);
@@ -559,12 +559,12 @@ function hypoSheet(conf) {
   const ok = conf ? `<div class="hy-ok" role="status">✓ Registrado às <b class="num">${conf.time}</b>: <b class="num">${f0(conf.g)}</b> mg/dL (medição ${conf.n}).${conf.low ? ' O cronômetro de 15 minutos recomeçou.' : ''}</div>` : '';
   return `<h2>${st ? '⚠ Hipoglicemia' : 'Protocolo de hipoglicemia'}</h2>${top}
   <form id="hypo-form" class="hy-reg${due ? ' hy-due' : ''}" novalidate>
-    <div class="hy-line"><input class="in hy-in" id="hy-g" inputmode="decimal" autocomplete="off" placeholder="mg/dL" aria-label="Resultado da glicemia em mg/dL"><button class="btn pri hy-go" type="submit">Registrar agora</button></div>
+    <div class="hy-line"><input class="in hy-in" id="hy-g" inputmode="decimal" autocomplete="off" placeholder="mg/dL" value="${esc(st && st.episode ? st.episode.progress.draft : '')}" aria-label="Resultado da glicemia em mg/dL"><button class="btn pri hy-go" type="submit">Registrar agora</button></div>
     <p class="err" id="hy-err" role="alert" style="min-height:18px;margin:6px 0 0"></p>${ok}
   </form>
   <div class="hy-warn"><b>Emergência:</b> com confusão intensa, convulsão, desmaio ou dificuldade para engolir, peça ajuda agora (SAMU 192), sem esperar o cronômetro. O cronômetro é só um apoio: não substitui a orientação do seu médico nem deve atrasar o tratamento.</div>
   <p class="hint" style="margin:10px 0 0">Meça de novo a cada 15 minutos até voltar a 70 mg/dL ou mais. Siga o plano de hipoglicemia combinado com seu médico.</p>
-  ${list}<button class="btn full" type="button" data-act="close" style="margin-top:14px">Fechar</button>`;
+  ${list}${st ? '<button class="btn danger full" type="button" data-he="discard" style="margin-top:14px">Encerrar episódio manualmente</button>' : ''}<button class="btn full" type="button" data-act="close" style="margin-top:${st ? 8 : 14}px">Fechar</button>`;
 }
 /* Atualiza o card aberto sem fechá-lo (o card continua na tela depois de cada medição). */
 function hypoRefresh(conf) {
@@ -576,7 +576,7 @@ function hypoRefresh(conf) {
 /* Com o formulário de medição aberto, o protocolo abre por cima dele (glucoform.js) para não perder o preenchimento. */
 function hypoOpen() { if (document.getElementById('rec-form')) glHypoOver(); else openSheet(hypoSheet()); }
 function hypoClose() { const o = document.getElementById('gl-over'); if (o) o.remove(); else closeSheet(); }
-function hypoAfterSave(rec) { const st = hypoState(); if (rec && st && !rec.noTime && Date.now() - rec.ts < 4 * 3600e3 && st.ep.some(r => r.id === rec.id)) setTimeout(hypoOpen, 150); }
+async function hypoAfterSave(rec) { if (!rec || typeof heOnSaved !== 'function') return; const k = await heOnSaved(rec); if (k === 'start' || k === 'attach') setTimeout(hypoOpen, 150); else if (k === 'recovery') heAskRecovery(rec); }
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act^="hypo-"]'); if (!el) return; const act = el.dataset.act;
   if (act === 'hypo-open') hypoOpen();
@@ -631,9 +631,11 @@ document.addEventListener('submit', async e => {
     if (hasExamples()) await removeExamples();
     await Store.put('records', rec); await loadAll();
     if (st0 && S.hypoOff[st0.id]) { delete S.hypoOff[st0.id]; try { localStorage.setItem('tb-hypo-off', JSON.stringify(S.hypoOff)); } catch (x) { } } // nova medição: o aviso volta à tela inicial
+    const kind = await heOnSaved(rec);
     render(); try { gxGreet(rec); } catch (e) { } /* saudação visual (saudacao.js) */
-    if (hypoState()) { if (!hypoRefresh({ g, time: rec.time, n, low: true })) hypoOpen(); toast('Medição registrada. Meça de novo em 15 min.'); }
-    else { hypoClose(); toast('Glicemia de volta a 70 mg/dL ou mais. Protocolo encerrado.'); }
+    if (kind === 'recovery') { if (!hypoRefresh({ g, time: rec.time, n, low: false })) hypoOpen(); heAskRecovery(rec); } /* >= 70: pede confirmação, não encerra sozinho */
+    else if (hypoState()) { if (!hypoRefresh({ g, time: rec.time, n, low: true })) hypoOpen(); toast('Medição registrada. Meça de novo em 15 min.'); }
+    else { hypoClose(); toast('Medição registrada.'); }
   } catch (x) { console.error(x); err('Não foi possível salvar: ' + (x && x.message || x)); if (btn) btn.disabled = false; }
   finally { setTimeout(() => { hypoBusy = false; }, 700); }
 });
@@ -1401,7 +1403,7 @@ document.addEventListener('click', async e => {
 /* ================= Configurações (tudo que o usuário pode ajustar) ================= */
 function viewConfig() {
   const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' + (typeof viewGxCtx === 'function' ? '<button class="btn full" data-act="go" data-r="gxctx" style="margin-top:8px">Inteligência contextual</button>' : '') + themeCard() + scaleCard() + swipeCard() + `
+  return banners() + '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>

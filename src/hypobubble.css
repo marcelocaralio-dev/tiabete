@@ -1,0 +1,29 @@
+/* Bolha contextual de hipoglicemia (vermelho oficial GLUXO = --brand) e menu. Independente da bolha de alertas (.acb). */
+.hyb { position: fixed; z-index: 35; width: 46px; height: 46px; padding: 0; border-radius: 50%; border: 1.5px solid var(--brand-lo, #B00104); background: var(--brand, #D70207); color: #fff; display: grid; place-items: center; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; box-shadow: 0 6px 18px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, .28); transition: transform .18s ease, opacity .18s ease; }
+button.hyb { touch-action: none !important; }
+.hyb[hidden], .hyp[hidden] { display: none; }
+.hyb svg { pointer-events: none; display: block; }
+.hyb::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; border: 2px solid rgba(var(--brand-rgb, 215, 2, 7), .45); animation: hybPulse 2.8s ease-out infinite; }
+@keyframes hybPulse { 0% { transform: scale(.9); opacity: .9; } 70%, 100% { transform: scale(1.22); opacity: 0; } }
+.hyb:focus-visible { outline: 3px solid var(--red-l); outline-offset: 3px; }
+.hyb.hyb-drag { cursor: grabbing; transform: scale(1.1); transition: none; z-index: 38; box-shadow: 0 14px 34px var(--shadow); }
+.hyb.snap { transition: left .28s cubic-bezier(.2, .9, .3, 1.1), top .28s ease, transform .18s ease; }
+body.acb-typing .hyb:not(.hyb-drag), .dr-lock .hyb { opacity: 0; pointer-events: none; }
+body.hyb-dragging { overscroll-behavior: none; }
+.hyp { position: fixed; z-index: 36; box-sizing: border-box; padding: 6px; background: var(--acp-bg); border: 1px solid var(--acp-bd); border-radius: 18px; box-shadow: var(--acp-sh), var(--acp-hl); opacity: 0; transform: scale(.35); transition: transform .24s cubic-bezier(.2, .9, .3, 1.1), opacity .2s ease; }
+.hyp.on { opacity: 1; transform: none; }
+.hyp-t { padding: 6px 10px 4px; font: 700 12px var(--f-body); color: var(--brand-l); }
+.hyp-i { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--fg); font: 600 14px/1.25 var(--f-body); text-align: left; cursor: pointer; }
+.hyp-i:is(:hover, :active) { background: var(--acp-row); }
+.hyp-i:focus-visible { outline: 2px solid var(--brand-l); outline-offset: -2px; }
+.hyp-c { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--acp-row); color: var(--brand-l); }
+.hyp-c.main { background: var(--brand, #D70207); color: #fff; }
+.he-st { display: inline-block; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--low-bd); color: var(--red-l); font: 700 12.5px var(--f-body); }
+.he-st.end { border-color: var(--line); color: var(--mut); }
+.he-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 12px 0; font-size: 14.5px; }
+.he-kv dt { color: var(--mut); } .he-kv dd { margin: 0; text-align: right; }
+.he-ev { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.he-ev li { display: flex; gap: 10px; font-size: 14px; } .he-ev time { color: var(--mut); min-width: 44px; }
+.he-lk { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.he-dlg p { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .hyb, .hyb.snap, .hyp { transition: none; } .hyb::after { animation: none; } }
