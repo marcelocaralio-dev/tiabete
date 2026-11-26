@@ -1,0 +1,33 @@
+/* GLUXO Experience 05 · Inteligência contextual: só variáveis de cor já existentes (a paleta do app não muda) */
+.cx-box { padding: 10px 12px; margin: 0 0 12px; border-color: var(--line); }
+.cx-n + .cx-n { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cx-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cx-h b { font-size: 14px; }
+.cx-tag { font-size: 11px; color: var(--mut2); white-space: nowrap; }
+.cx-p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--fg); }
+.cx-m, .cx-w { margin: 4px 0 0; font-size: 12px; }
+.cx-d { margin-top: 6px; font-size: 12.5px; }
+.cx-d summary { cursor: pointer; color: var(--mut); min-height: 24px; }
+.cx-d dl { margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+.cx-d dt { color: var(--mut2); }
+.cx-d dd { margin: 0; overflow-wrap: anywhere; }
+.cx-a, .cx-f { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cx-f { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.cx-b { font: inherit; font-size: 12.5px; min-height: 34px; padding: 6px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--s2); color: var(--fg); cursor: pointer; }
+.cx-b.pri { border-color: var(--red); }
+.cx-lk { font: inherit; background: none; border: 0; padding: 4px 0; color: var(--fg); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.cx-ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
+.cx-ul .row { list-style: none; margin-left: -18px; }
+.cx-seg { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.cx-h3 { font-size: 13px; margin: 14px 0 4px; color: var(--mut); font-weight: 700; }
+.cx-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+.cx-st { display: flex; flex-direction: column; gap: 1px; }
+.cx-st b { font-size: 17px; }
+.cx-bar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--s2); margin: 6px 0; }
+.cx-leg { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12.5px; display: grid; gap: 2px; }
+.cx-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.cx-tb { display: grid; gap: 2px; font-size: 13px; }
+.cx-tr { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.cx-tr.hd { color: var(--mut2); font-size: 12px; }
+.cx-sum, .cx-n .cx-p { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .cx-box * { transition: none !important; animation: none !important; } }

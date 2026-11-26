@@ -1401,7 +1401,7 @@ document.addEventListener('click', async e => {
 /* ================= Configurações (tudo que o usuário pode ajustar) ================= */
 function viewConfig() {
   const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' + themeCard() + scaleCard() + swipeCard() + `
+  return banners() + '<button class="btn full" data-act="go" data-r="gxexp">Personalização · GLUXO Experience</button>' + (typeof viewGxCtx === 'function' ? '<button class="btn full" data-act="go" data-r="gxctx" style="margin-top:8px">Inteligência contextual</button>' : '') + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>
