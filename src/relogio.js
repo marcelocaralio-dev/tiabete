@@ -4,6 +4,7 @@
    Cancelar não altera nada. A digitação continua disponível (campo "Digitar" do seletor e teclado direto no campo).
    Configuração por atributos do input: data-ck="off" (não usa o relógio), data-ck-title="Título", min/max (validados na confirmação). */
 const CK_R = 100, CK_C = 120;
+const CK_SEL = 'input[type="time"], input[data-ck="time"]';   /* campos nativos de horário e campos de texto marcados com data-ck="time" */
 let ckSt = null;
 const ckEl = id => document.getElementById(id);
 function ckSvg() {
@@ -11,7 +12,7 @@ function ckSvg() {
   return `<svg class="ck-svg" viewBox="0 0 240 240" role="presentation"><circle class="ck-face" cx="120" cy="120" r="116"/><g id="ck-hand" class="ck-hand"><line x1="120" y1="120" x2="120" y2="${CK_C - 88 + 19}"/><circle class="ck-tip" cx="120" cy="32" r="19"/></g><circle class="ck-dot" cx="120" cy="120" r="4"/><g id="ck-nums"></g><g id="ck-rest"><circle id="ck-mdot" r="4" class="ck-mdot" cx="120" cy="32" style="display:none"/></g></svg>`;
 }
 function ckOpen(inp) {
-  if (ckSt) return; const cur = ckParse(inp.value), d = new Date(), base = cur || { h: d.getHours(), m: d.getMinutes() };
+  if (ckSt) return; const cur = ckParse(inp.value) || ckTyped(inp.value), d = new Date(), base = cur || { h: d.getHours(), m: d.getMinutes() };
   const title = inp.dataset.ckTitle || (inp.id && document.querySelector(`label[for="${inp.id}"]`) ? document.querySelector(`label[for="${inp.id}"]`).textContent.trim() : inp.getAttribute('aria-label') || 'Horário');
   ckSt = { inp, h12: ckTo12(base.h), pm: base.h >= 12, m: base.m, mode: 'h', rot: null, orig: inp.value, prevFocus: document.activeElement };
   const bg = document.createElement('div'); bg.className = 'ck-bg'; bg.id = 'ck-bg';
@@ -62,9 +63,9 @@ document.addEventListener('click', e => {
   if (ckSt && b && ckEl('ck-bg') && ckEl('ck-bg').contains(b)) { const a = b.dataset.ck;
     if (a === 'cancel') ckClose(true); else if (a === 'ok') ckConfirm(); else if (a === 'h' || a === 'm') { ckSt.mode = a; ckDraw(); } else if (a === 'am' || a === 'pm') { ckSt.pm = a === 'pm'; ckDraw(); } return; }
   if (ckSt && t.id === 'ck-bg') { ckClose(true); return; }
-  const inp = t.closest('input[type="time"]'); if (inp && !inp.disabled && !inp.readOnly && inp.dataset.ck !== 'off' && !ckSt) { e.preventDefault(); inp.blur(); ckOpen(inp); }
+  const inp = t.closest(CK_SEL); if (inp && !inp.disabled && !inp.readOnly && inp.dataset.ck !== 'off' && !ckSt) { e.preventDefault(); inp.blur(); ckOpen(inp); }
 }, true);
-document.addEventListener('mousedown', e => { const i = e.target.closest && e.target.closest('input[type="time"]'); if (i && !i.disabled && !i.readOnly && i.dataset.ck !== 'off') e.preventDefault(); }, true);
+document.addEventListener('mousedown', e => { const i = e.target.closest && e.target.closest(CK_SEL); if (i && !i.disabled && !i.readOnly && i.dataset.ck !== 'off') e.preventDefault(); }, true);
 document.addEventListener('keydown', e => {
   if (ckSt) {
     const inp = ckEl('ck-in'), typing = document.activeElement === inp;
@@ -74,6 +75,6 @@ document.addEventListener('keydown', e => {
     if (document.activeElement === ckEl('ck-dial')) { const k = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 5, PageDown: -5 }[e.key]; if (k != null) { e.preventDefault(); if (ckSt.mode === 'h') ckSt.h12 = ckStep('h', ckSt.h12, k); else ckSt.m = ckStep('m', ckSt.m, k); ckDraw(); } else if (e.key === ' ') { e.preventDefault(); ckSt.mode = ckSt.mode === 'h' ? 'm' : 'h'; ckDraw(); } }
     return;
   }
-  const i = e.target; if (i && i.matches && i.matches('input[type="time"]') && i.dataset.ck !== 'off' && !i.readOnly && (e.key === ' ' || (e.altKey && e.key === 'ArrowDown'))) { e.preventDefault(); ckOpen(i); }
+  const i = e.target; if (i && i.matches && i.matches(CK_SEL) && i.dataset.ck !== 'off' && !i.readOnly && (e.key === ' ' || (e.altKey && e.key === 'ArrowDown'))) { e.preventDefault(); ckOpen(i); }
 });
 document.addEventListener('input', e => { if (!ckSt || e.target.id !== 'ck-in') return; const p = ckTyped(e.target.value); if (p) { ckSt.h12 = ckTo12(p.h); ckSt.pm = p.h >= 12; ckSt.m = p.m; const f = e.target; ckDraw(); f.value = e.target.value; } });
