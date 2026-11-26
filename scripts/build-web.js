@@ -24,6 +24,8 @@ const APK_TEXT = [
 let js = order.map(f => rd(f)).join('\n');
 /* Logotipo oficial GLUXO (assets/brand/web-logo-completo.png) embutido como data URI, uma única vez. */
 js = js.replace('%%GX_LOGO_FULL%%', 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets', 'brand', 'web-logo-completo.png')).toString('base64')).replace('%%GX_DROP%%', 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets', 'brand', 'web-gota.png')).toString('base64'));
+/* Fotografia de fundo da tela de entrada */
+js = js.replace('%%GX_LOGIN_BG%%', fs.readFileSync(path.join(root, 'assets', 'brand', 'login-fundo.jpg')).toString('base64'));
 for (const [a, b] of APK_TEXT) js = js.replace(a, b);
 /* Data/hora da compilação (horário de Brasília) para a tela Sobre */
 const BR = new Date(Date.now() - 3 * 3600e3), p2 = n => String(n).padStart(2, '0');
