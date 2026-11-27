@@ -26,7 +26,7 @@ function gxRows(list) {
 document.addEventListener('toggle', e => { const g = e.target.dataset && e.target.dataset.gxg; if (g) gxOpen[g] = e.target.open; }, true);
 document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-ac^="dismiss"], [data-acid="dismiss"]'); if (el && gxGet('list', 'confirm') && !window.confirm('Remover da lista?')) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 function gxAll() { try { return JSON.parse(localStorage.getItem(GX_LS)) || {}; } catch (e) { return {}; } }
-function gxGet(f, k) { const v = (gxAll()[f] || {})[k]; const [d, , , c] = GX_F[f].o[k]; return (c ? c.some(x => x[0] === v) : typeof v === 'boolean') ? v : d; }
+function gxGet(f, k) { const lk = typeof gxhLocked === 'function' && gxhLocked(f), [d, , , c] = GX_F[f].o[k]; if (lk && !c && typeof d === 'boolean' && typeof mdForcedOff === 'function' && mdForcedOff(f, k)) return false; const v = lk ? undefined : (gxAll()[f] || {})[k]; return (c ? c.some(x => x[0] === v) : typeof v === 'boolean') ? v : d; }
 function gxSave(p) { try { if (Object.keys(p).length) localStorage.setItem(GX_LS, JSON.stringify(p)); else localStorage.removeItem(GX_LS); } catch (e) { } }
 let gxLast = null;
 function gxApply(n) {

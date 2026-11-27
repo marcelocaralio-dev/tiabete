@@ -1,0 +1,20 @@
+/* Modos de interface · seletor em Aparência. Só usa tokens e componentes existentes (card, gxh-badge, hint, btn); sem cores novas. */
+.md-opts { display: grid; gap: 10px; }
+.md-opt { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; text-align: left; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--s2); color: var(--fg); font: inherit; cursor: pointer; min-height: 48px; }
+.md-opt.on { border-color: rgba(var(--brand-rgb), .6); background: rgba(var(--brand-rgb), .10); }
+.md-opt:focus-visible { outline: 2px solid var(--brand-l); outline-offset: 2px; }
+.md-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.md-h b { font-weight: 700; font-size: 16px; }
+.md-d { color: var(--mut); font-size: 14px; line-height: 1.4; }
+.md-s { align-self: flex-start; font: 600 12px/1 var(--f-mono); color: var(--mut); }
+.md-s.on { color: var(--good); }
+.md-s.md-lock { color: var(--fg); }
+.md-hint { margin: 10px 0 0; }
+.md-more { margin-top: 10px; }
+.md-more > summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--brand-l); min-height: 36px; display: flex; align-items: center; }
+.md-list p { margin: 8px 0 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.md-list b { font-weight: 600; }
+.md-list span { color: var(--mut); line-height: 1.4; }
+.md-gate b { display: block; }
+.md-gate .hint { margin: 6px 0 10px; }
+.md-note { margin: 10px 0 0; }

@@ -16,7 +16,7 @@ GX_F.org_view = { t: 'Organização · Preferências de visualização', o: { de
 const GXO_FG = ['org_home', 'org_view'];   /* grupos de preferências que fazem parte de um layout */
 const gxo = (f, k) => gxGet(f, k);
 const gxoIc = n => ({ star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></svg>', pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2h-4v6l-1 1-1-1v-6H7v-2l3-3z"/></svg>' }[n]);
-const gxoCan = (kind, t) => gxo(kind === 'fav' ? 'org_fav' : 'org_pin', 'on') && gxo(kind === 'fav' ? 'org_fav' : 'org_pin', t) !== false;
+const gxoCan = (kind, t) => !gxhLocked(kind === 'fav' ? 'org_fav' : 'org_pin') && gxo(kind === 'fav' ? 'org_fav' : 'org_pin', 'on') && gxo(kind === 'fav' ? 'org_fav' : 'org_pin', t) !== false;
 const gxoP = () => gxAll();
 const gxoFoodIds = () => ((S.bl && S.bl.foods) || []).filter(f => f && f.fav).map(f => f.id);
 const gxoFavs = () => orgFavItems(gxoP(), gxoFoodIds());
@@ -91,6 +91,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 const gxoItem = (it, rm, extra) => { const r = gxoRes(it); return r ? `<div class="gxo-it"><button type="button" class="gxo-open" data-gxo="open" data-t="${it.t}" data-k="${esc(it.k)}"><b>${esc(r.label)}</b><small>${esc(extra || r.sub)}</small></button>${rm ? `<button type="button" class="gxo-x" data-gxo="${rm}" data-t="${it.t}" data-k="${esc(it.k)}" aria-label="${rm === 'pin' ? 'Desafixar' : 'Remover dos favoritos'}: ${esc(r.label)}" title="${rm === 'pin' ? 'Desafixar' : 'Remover dos favoritos'}">✕</button>` : ''}</div>` : ''; };
 function gxoGoalSub(k) { try { const e = rwEval()[k], s = e ? e.streak : 0, N = RW_STEPS.find(n => n > s) || RW_STEPS[RW_STEPS.length - 1]; return s > 0 ? `${Math.min(s, N)} de ${N} dias` : 'Meta ou conquista'; } catch (e) { return 'Meta ou conquista'; } }
 function gxoHomeHTML() {
+  if (gxhLocked('org_pin')) return '';
   gxoSweep();
   const out = {};
   if (gxo('org_pin', 'on')) {
@@ -116,7 +117,7 @@ VIEWS.painel = viewPainel;
 const gxoIV0 = inVisible;
 inVisible = function (p) {
   const v = gxoIV0(p); if (typeof inEditing === 'function' && inEditing()) return v;
-  if (!gxo('org_pin', 'on') || !gxo('org_pin', 'card')) return v;
+  if (gxhLocked('org_pin') || !gxo('org_pin', 'on') || !gxo('org_pin', 'card')) return v;
   const pc = orgPins(gxoP()).filter(i => i.t === 'card' && v.includes(i.k)).map(i => i.k); return pc.length ? pc.concat(v.filter(k => !pc.includes(k))) : v;
 };
 
@@ -145,12 +146,13 @@ function gxoFavRows(items, sortMode, full) {
   }).join('');
 }
 function viewFav() {
-  if (!gxo('org_fav', 'on')) return `<div class="card"><b>Favoritos desligados</b><p class="hint">Ative em Mais → GLUXO Experience → Organização → Favoritos.</p><button type="button" class="btn full" data-gxo="goOrg">Abrir Organização</button></div>`;
+  if (gxhLocked('org_fav')) return mdGateHTML('Favoritos');
+  if (!gxo('org_fav', 'on')) return `<div class="card"><b>Favoritos desligados</b><p class="hint">Ative em Mais → GLUXO Experience → Personalização das informações → Favoritos.</p><button type="button" class="btn full" data-gxo="goOrg">Abrir Personalização das informações</button></div>`;
   gxoSweep();
   const sortMode = gxo('org_fav', 'sort'), all = gxoFavs(), vis = all.filter(i => gxoCan('fav', i.t) && gxoRes(i));
   const sel = (f, k, c) => `<select class="in" data-gx="${f}.${k}" aria-label="${GX_F[f].o[k][1]}">${c.map(([v, l]) => `<option value="${v}"${gxo(f, k) === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   const head = `<div class="gxo-tools"><input class="in" id="gxo-q" type="search" placeholder="Localizar nos favoritos" aria-label="Localizar nos favoritos"><div class="gxo-sel">${sel('org_fav', 'group', GX_F.org_fav.o.group[3])}${sel('org_fav', 'sort', GX_F.org_fav.o.sort[3])}</div><button type="button" class="btn sm" data-gxo="picker" data-mode="fav">Adicionar favorito</button></div>`;
-  if (!vis.length) return head + `<div class="empty gxo-empty"><b>${all.length ? 'Nenhum favorito nas categorias ativas' : 'Nenhum favorito ainda'}</b><p>${all.length ? 'Reative categorias em Organização → Favoritos.' : 'Toque na estrela de um registro, tela, card, meta ou observação para guardá-lo aqui. Alimentos usam a estrela da lista do cálculo de bolus.'}</p></div>`;
+  if (!vis.length) return head + `<div class="empty gxo-empty"><b>${all.length ? 'Nenhum favorito nas categorias ativas' : 'Nenhum favorito ainda'}</b><p>${all.length ? 'Reative categorias em Personalização das informações → Favoritos.' : 'Toque na estrela de um registro, tela, card, meta ou observação para guardá-lo aqui. Alimentos usam a estrela da lista do cálculo de bolus.'}</p></div>`;
   const fullKeys = all.map(orgKey), lbl = i => gxoRes(i).label, ts = i => gxoRes(i).ts;
   const sorted = sortMode === 'manual' ? vis : orgSort(vis, sortMode, lbl, ts);
   let body;
@@ -221,7 +223,7 @@ function gxoPicker(mode) {
   if (gxoCan(kind, 'event') && kind === 'fav') sections.push(['event', (S.events || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 15).map(e => [String(e.id), String(e.text || 'Observação').slice(0, 60), fmtDate(e.date)])]);
   if (gxoCan(kind, 'rec')) sections.push(['rec', S.records.filter(r => !isEx(r)).slice().sort((a, b) => b.ts - a.ts).slice(0, 15).map(r => [String(r.id), `${r.glucose} mg/dL`, `${fmtDate(r.date)}${r.noTime ? '' : ' ' + r.time}`])]);
   const body = sections.map(([t, l]) => l.length ? `<h3>${cats[t]}</h3>` + l.map(([k, n, s]) => `<button type="button" class="menu-item gxo-pk${on(t, k) ? ' on' : ''}" data-gxo="${kind}" data-t="${t}" data-k="${esc(k)}" data-pick="1" aria-pressed="${on(t, k)}"><b>${esc(n)}</b>${s ? `<small>${esc(s)}</small>` : ''}<span class="gxo-ck" aria-hidden="true">${on(t, k) ? '✓' : '+'}</span></button>`).join('') : '').join('');
-  openSheet(`<h2>${kind === 'pin' ? 'Fixar conteúdo' : 'Adicionar favorito'}</h2><input class="in" id="gxo-pq" type="search" placeholder="Localizar" aria-label="Localizar" autocomplete="off"><div id="gxo-pl" class="gxo-pl">${body || '<p class="hint">Nenhuma categoria ativa. Ative em Organização.</p>'}</div><button type="button" class="btn full" data-act="close">Concluir</button>`);
+  openSheet(`<h2>${kind === 'pin' ? 'Fixar conteúdo' : 'Adicionar favorito'}</h2><input class="in" id="gxo-pq" type="search" placeholder="Localizar" aria-label="Localizar" autocomplete="off"><div id="gxo-pl" class="gxo-pl">${body || '<p class="hint">Nenhuma categoria ativa. Ative em Personalização das informações.</p>'}</div><button type="button" class="btn full" data-act="close">Concluir</button>`);
 }
 document.addEventListener('input', e => {
   const t = e.target; if (t.id === 'gxo-q') { const q = t.value.trim().toLowerCase(); let n = 0; document.querySelectorAll('.gxo-row[data-txt]').forEach(r => { const h = !!q && !r.dataset.txt.includes(q); r.hidden = h; if (!h) n++; }); const m = document.querySelector('.gxo-nomatch'); if (m) m.hidden = n > 0; }

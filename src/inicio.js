@@ -8,11 +8,13 @@
    4. Central de Métricas (estrutural, fixa no final; bloco existente, adicionado por viewPainel) */
 const IN_LS = 'tb-inicio';
 let inPrefsRaw, inPrefsCache = null, inMemo = { key: '', m: null };
-function inPrefs() {
+/* Preferências GUARDADAS (nunca apagadas por mudança de plano). inPrefs() é o layout EFETIVO: sem autorização Premium vale a base universal. */
+function inPrefsStored() {
   let raw = null; try { raw = localStorage.getItem(IN_LS); } catch (e) { }
   if (inPrefsCache === null || raw !== inPrefsRaw) { inPrefsRaw = raw; inPrefsCache = inParsePrefs(raw); }
   return inPrefsCache;
 }
+const inPrefs = () => hbLayout(inPrefsStored(), gxhAuth(), typeof mdActive === 'function' ? mdActive() : 'experience');
 function inPrefsSave(p) {
   p = inCleanPrefs(p);
   try { if (inIsDefault(p)) localStorage.removeItem(IN_LS); else localStorage.setItem(IN_LS, JSON.stringify(p)); } catch (e) { }
@@ -270,12 +272,13 @@ window.addEventListener('resize', () => { try { const g = document.querySelector
 /* ---------- 6. Personalização direto no Início ----------
    Estado de edição só em memória (S.inEdit); ordem e ocultos vão para 'tb-inicio' (mesmo mecanismo de antes, com cópia durável em persist.js).
    Resumo glicêmico e Central de Métricas são estruturais (IN_FIXED): nunca entram na lista, nunca têm alça nem ocultação. */
-const inEditing = () => !!S.inEdit && S.route === 'painel' && typeof pnlMode !== 'undefined' && pnlMode !== 'classic';
+const inEditing = () => !!S.inEdit && gxhPers() && S.route === 'painel' && typeof pnlMode !== 'undefined' && pnlMode !== 'classic';
 const inSpan = html => /class="[^"]*\b(wide|in-card)\b/.test(html) ? 'wide' : /class="[^"]*\bmini\b/.test(html) ? 'mini' : /class="[^"]*\bin-ind\b/.test(html) ? 'ind' : '';
 const inCardT = k => (IN_CARDS.find(c => c.k === k) || {}).t || k;
 /* Botão discreto "Personalizar", na linha do título "Início". */
 function inTopBtn() {
-  return `<div class="in-top"><button type="button" class="in-pbtn" data-act="in-cust" aria-label="Personalizar a tela inicial">${pnIc('sliders')}<span>Personalizar</span></button></div>`;
+  if (!gxhPers()) return gxhLockNote();   /* Modo Padrão: sem botão de personalizar (o Experience é escolhido em Aparência) */
+  return `<div class="in-top"><button type="button" class="in-pbtn" data-act="in-cust" aria-label="Personalizar a tela inicial">${pnIc('sliders')}<span>Personalizar</span></button></div>${gxhLockNote()}`;
 }
 /* Barra do modo de edição (fixa ao rolar) + painel recolhível "Cards disponíveis" (inclui os indicadores do painel ocultos). */
 function inEditBar(msg) {
@@ -327,6 +330,7 @@ function inRedraw(msg, keepFlip) {
 }
 function inApply(p, msg, live) { inPrefsSave(p); inRedraw(live, true); }
 function inEditOn(on) {
+  if (on && !gxhPers()) { S.inEdit = false; gxhLockSheet(); return; }
   S.inEdit = !!on; inRedraw(null, false);
   if (on) { const t = document.querySelector('.top'); document.documentElement.style.setProperty('--in-top', (t ? t.offsetHeight : 56) + 'px'); const b = document.querySelector('.in-ed-ok'); if (b) b.focus({ preventScroll: true }); }
   else { const b = document.querySelector('.in-pbtn'); if (b) b.focus({ preventScroll: true }); window.scrollTo(0, 0); }

@@ -7,6 +7,7 @@
   /* As configurações salvas precisam ser LIDAS antes de qualquer gravação. Se a leitura falhar, nada em "meta" é gravado por cima (Store.metaOk). */
   if (Store.persistent) { let ok = false; for (let i = 0; i < 3 && !ok; i++) { try { await Store.all('meta'); ok = true; } catch (e) { await new Promise(r => setTimeout(r, 500 * (i + 1))); } } Store.metaOk = ok; if (!ok) { try { toast('Não consegui ler suas configurações salvas. Feche e abra o app de novo; nada foi apagado.'); } catch (e) { } } }
   try { await psRestore(); } catch (e) { }
+  try { mdBoot(); } catch (e) { }   /* modo de interface: escolha inicial e perda de Premium, antes de a primeira tela ser desenhada */
   await loadAll();
   let seeded = false;
   try { const ms = await Store.all('meta'); const lb = ms.find(x => x.id === 'last-backup'), sn = ms.find(x => x.id === 'bk-snooze'); const si = ms.find(x => x.id === 'insulin'); if (si) { const { id, ...rest } = si; Object.assign(S.ins, rest); } if (lb) S.lastBackup = lb.ts; if (sn) S.bkSnooze = sn.ts; } catch (e) { }

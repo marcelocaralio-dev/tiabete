@@ -5,7 +5,7 @@
    de a gravação assíncrona terminar. As medições continuam na loja "records"; o episódio guarda um instantâneo (id, data, hora, valor).
    A bolha é independente da bolha de alertas (#acb): não altera o código nem o comportamento dela. */
 const HE = { st: heEmpty(), ready: false, open: false, timer: null };
-const HE_ID = 'hypo-episodes', HE_MIR = 'tb-he', HB_SIZE = 46;
+const HE_ID = 'hypo-episodes', HE_MIR = 'tb-he', HB_SIZE = 76;   /* bolha de alertas = 56: a de hipoglicemia é bem maior e tem rótulo de texto (reforço de acessibilidade) */
 const heId = () => 'he' + uid();
 const heTm = ts => { const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
 const heDt = ts => fmtDM(ts) + ' ' + heTm(ts);
@@ -128,11 +128,13 @@ const hbK = b => typeof acK === 'function' ? acK(b) : 1;
 function hbBlocked() { return (typeof SEC !== 'undefined' && SEC.locked) || !!(document.getElementById('lk') || document.getElementById('tb-gate') || document.getElementById('tb-splash')); }
 function hbEnsure() {
   if (hbEl() || !document.body) return;
-  document.body.insertAdjacentHTML('beforeend', `<button id="hyb" class="hyb" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="hyp" aria-label="Episódio de hipoglicemia ativo. Abrir opções" hidden>${heSvg(HE_IC.shield, 24)}</button>
-  <div id="hyp" class="hyp" role="menu" aria-label="Episódio de hipoglicemia" hidden><div class="hyp-t">Episódio de hipoglicemia</div>
-    <button class="hyp-i" type="button" role="menuitem" data-he="open"><span class="hyp-c main">${heSvg(HE_IC.aid, 18)}</span><span>Abrir protocolo de hipoglicemia</span></button>
-    <button class="hyp-i" type="button" role="menuitem" data-he="new"><span class="hyp-c">${heSvg(HE_IC.plus, 18)}</span><span>Registrar nova glicemia</span></button>
-    <button class="hyp-i" type="button" role="menuitem" data-he="view-act"><span class="hyp-c">${heSvg(HE_IC.list, 18)}</span><span>Consultar episódio</span></button></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<button id="hyb" class="hyb" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="hyp" aria-label="Episódio de hipoglicemia ativo. Abrir opções" hidden>${heSvg(HE_IC.shield, 34)}<span class="hyb-t">HIPO</span></button>
+  <div id="hyps" class="hyp-scrim" hidden></div>
+  <div id="hyp" class="hyp" role="menu" aria-label="Episódio de hipoglicemia" hidden><div class="hyp-t">Hipoglicemia</div>
+    <button class="hyp-i main" type="button" role="menuitem" data-he="open"><span class="hyp-c main">${heSvg(HE_IC.aid, 30)}</span><span>Abrir protocolo</span></button>
+    <button class="hyp-i" type="button" role="menuitem" data-he="new"><span class="hyp-c">${heSvg(HE_IC.plus, 30)}</span><span>Registrar glicemia</span></button>
+    <button class="hyp-i" type="button" role="menuitem" data-he="view-act"><span class="hyp-c">${heSvg(HE_IC.list, 30)}</span><span>Ver episódio</span></button>
+    <button class="hyp-i hyp-x" type="button" role="menuitem" data-he="close"><span>Fechar</span></button></div>`);
   hbBind(hbEl());
   document.addEventListener('pointerdown', e => { if (HE.open && !e.target.closest('#hyp, #hyb')) hbCollapse(); }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && HE.open) { hbCollapse(); const b = hbEl(); if (b) b.focus(); } });
@@ -158,22 +160,22 @@ function hbPlace(left, top, free) {
   }
   b.style.left = l / k + 'px'; b.style.top = t / k + 'px'; b.dataset.side = side ? 'r' : 'l'; return { left: l, top: t };
 }
+/* Painel centralizado e destacado: largura generosa, centrado na tela e contido na área visível (rola por dentro se a tela for muito baixa; nenhum botão fica cortado). */
 function hbMenuPos() {
   const b = hbEl(), p = hpEl(); if (!b || !p) return;
-  const k = b._k || hbK(b), r = b.getBoundingClientRect(), vw = innerWidth, vh = innerHeight, W = Math.min(272 * k, vw - 24 * k); p.style.width = W / k + 'px';
-  const right = r.left + r.width / 2 > vw / 2, left = Math.min(vw - W - 12 * k, Math.max(12 * k, right ? r.right - W : r.left)), above = r.top + r.height / 2 > vh / 2;
-  p.style.left = left / k + 'px'; p.classList.toggle('below', !above);
-  if (above) { p.style.bottom = (vh - r.top + 8 * k) / k + 'px'; p.style.top = 'auto'; } else { p.style.top = (r.bottom + 8 * k) / k + 'px'; p.style.bottom = 'auto'; }
-  p.style.transformOrigin = ((r.left + r.width / 2 - left) / k) + 'px ' + (above ? '100%' : '0%');
+  const k = b._k || hbK(b), vw = innerWidth, vh = innerHeight, W = Math.min(420 * k, vw - 24 * k);
+  p.style.width = W / k + 'px'; p.style.maxHeight = (vh - 24 * k) / k + 'px'; p.style.bottom = 'auto'; p.style.left = Math.max(12 * k, (vw - W) / 2) / k + 'px';
+  const h = p.offsetHeight * k; p.style.top = Math.max(12 * k, (vh - h) / 2) / k + 'px'; p.style.transformOrigin = '50% 50%';
 }
+const hbScrim = on => { const o = document.getElementById('hyps'); if (o) o.hidden = !on; };
 function hbOpen() {
   const b = hbEl(), p = hpEl(); if (!b || !p || b.hidden) return;
-  HE.open = true; b.setAttribute('aria-expanded', 'true'); p.hidden = false; hbMenuPos(); requestAnimationFrame(() => requestAnimationFrame(() => p.classList.add('on')));
-  clearTimeout(HE.timer); HE.timer = setTimeout(() => hbCollapse(), 12000);
+  HE.open = true; b.setAttribute('aria-expanded', 'true'); hbScrim(true); p.hidden = false; hbMenuPos(); requestAnimationFrame(() => requestAnimationFrame(() => p.classList.add('on')));
+  clearTimeout(HE.timer); HE.timer = setTimeout(() => hbCollapse(), 30000);   /* mais tempo para decidir com calma durante o episódio */
 }
 function hbCollapse(now) {
   clearTimeout(HE.timer); const p = hpEl(), b = hbEl(); if (!p) return;
-  HE.open = false; if (b) b.setAttribute('aria-expanded', 'false'); p.classList.remove('on');
+  HE.open = false; if (b) b.setAttribute('aria-expanded', 'false'); p.classList.remove('on'); hbScrim(false);
   if (now) { p.hidden = true; return; } setTimeout(() => { if (!HE.open) p.hidden = true; }, 260);
 }
 /* Toque abre/fecha o menu; arrastar move a bolha e, ao soltar, ela encosta na lateral mais próxima (posição gravada com o episódio). Não existe "soltar para dispensar":
