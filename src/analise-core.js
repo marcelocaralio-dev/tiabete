@@ -108,6 +108,7 @@ function anCompare(a, b, ra, rb) {
   const perTen = (e, s) => s.spanDays ? e / s.spanDays * 10 : null;
   const rows = [
     { k: 'mean', t: 'Média', u: 'mg/dL', a: A.mean, b: B.mean, dir: 0, dec: 1 },
+    ...[['median', 'Mediana', v => (v[(v.length - 1) >> 1] + v[v.length >> 1]) / 2], ['min', 'Menor valor', v => v[0]], ['max', 'Maior valor', v => v[v.length - 1]]].map(([k, t, f]) => { const [x, y] = [a, b].map(rs => rs.length ? f(rs.map(r => r.glucose).sort((m, n) => m - n)) : null); return { k, t, u: 'mg/dL', a: x, b: y, dir: 0, dec: 0 }; }),
     { k: 'sd', t: 'Desvio-padrão', u: 'mg/dL', a: A.sd, b: B.sd, dir: -1, dec: 1 },
     { k: 'cv', t: 'Coef. de variação', u: '%', a: A.cv, b: B.cv, dir: -1, dec: 1 },
     { k: 'n', t: 'Medições', u: '', a: A.n, b: B.n, dir: 0, dec: 0 },

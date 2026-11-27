@@ -160,3 +160,20 @@ i.an-b-ok, i.an-b-high, i.an-b-vhigh, i.an-b-low, i.an-b-vlow { stroke: none; }
 @media (max-width: 360px) { .an-ov-r { grid-template-columns: 1fr; justify-items: center; } .an-kpis, .an-slots { grid-template-columns: 1fr; } .an-hr, .an-bn, .an-dvr { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .an-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .an-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); } .an-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .an-h-chev { transition: none; } }
+
+/* recorrências: cor e barra lateral por categoria */
+#rc-root { display: grid; gap: 10px; }
+.an-card.rc-gli { --t: var(--ds-neg); } .an-card.rc-tempo { --t: #8b7cf6; } .an-card.rc-ali { --t: var(--ds-warn); } .an-card.rc-trat { --t: #2aa7d6; } .an-card.rc-comp { --t: var(--ds-pos); }
+.rc-cat { font-size: 12px; font-weight: 700; color: var(--t); }
+.rc-hist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.rc-hist button { display: grid; gap: 2px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--s2); color: inherit; font: inherit; font-size: 12px; }
+.rc-hist button[aria-pressed="true"] { border-color: currentColor; } .rc-hist b { font-size: 18px; }
+.rc-det { font-size: 13px; overflow-wrap: anywhere; }
+
+/* comparação entre períodos: cores identificam o período, não melhora ou piora */
+.cp-pair { display: grid; gap: 3px; margin: 8px 0; font-size: 12px; }
+.cp-pair > div { display: grid; grid-template-columns: 14px 1fr 48px; gap: 6px; align-items: center; }
+.cp-bar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; } .cp-bar i { display: block; height: 100%; }
+.cp-bar i.a { background: #3b82f6; } .cp-bar i.b { background: #f08c28; }
+.cp-svg { width: 100%; height: auto; } .cp-svg text { font-size: 9px; fill: currentColor; }
+.cp-svg polyline { fill: none; stroke-width: 1.8; } .cp-svg .a { stroke: #3b82f6; } .cp-svg .b { stroke: #f08c28; stroke-dasharray: 4 3; } .cp-svg circle { fill: currentColor; }

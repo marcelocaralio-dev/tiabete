@@ -98,7 +98,7 @@ const AN_SECS = [
   { id: 'ref', t: 'Análise por refeição', n: 'Refeições', c: 8, sum: M => { const d = mealDeltas(M.cur).filter(x => x.n >= MIN_BUCKET); return d.length ? `<span class="an-sc-i"><b class="num">${d.length}</b> refeição${d.length > 1 ? 'ões' : ''} com variação medida</span>` : '<span class="an-sc-i dim">Sem pares antes/depois suficientes</span>'; }, body: anBodyRef },
   { id: 'rfe', t: 'Refeições e glicemia', n: 'Refeição×glicemia', c: 14, sum: M => rfeSum(M), body: M => anBodyRfe(M) },
   { id: 'comp', t: 'Comparação entre períodos', n: 'Comparar', c: 9, sum: M => { const c = anCmpPick(M); return c && c.enough ? `<span class="an-sc-i"><b class="num">${c.good}</b> melhoraram</span><span class="an-sc-i"><b class="num">${c.bad}</b> pioraram</span>` : '<span class="an-sc-i dim">Escolha dois períodos</span>'; }, body: anBodyComp },
-  { id: 'pad', t: 'Padrões recorrentes', n: 'Padrões', c: 10, sum: M => { const r = M.rec(); return r.length ? `<span class="an-sc-i"><b class="num">${r.length}</b> padrão${r.length > 1 ? 'ões' : ''} identificado${r.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Nenhum padrão claro</span>'; }, body: anBodyPad },
+  { id: 'pad', t: 'Padrões recorrentes', n: 'Padrões', c: 10, sum: M => { const r = rcData(M).list; return r.length ? `<span class="an-sc-i"><b class="num">${r.length}</b> ${r.length > 1 ? 'padrões' : 'padrão'} identificado${r.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Nenhum padrão claro</span>'; }, body: rcBody },
   { id: 'ass', t: 'Associações entre variáveis', n: 'Associações', c: 11, sum: M => { const a = M.assoc(); return a.length ? `<span class="an-sc-i"><b class="num">${a.length}</b> relação${a.length > 1 ? 'ões' : ''} observada${a.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Dados insuficientes</span>'; }, body: anBodyAss },
   { id: 'evo', t: 'Evolução histórica', n: 'Histórico', c: 12, sum: M => { const h = M.hist(); return h ? `<span class="an-sc-i"><b class="num">${h.n}</b> medições desde ${anDay(h.first)}</span>` : ''; }, body: anBodyEvo }
 ];
@@ -130,7 +130,8 @@ function anBodyVisao(M) {
 function anBodyDesc(M) {
   const d = M.disc();
   if (!d.list.length) return anEmpty('Nenhuma descoberta por enquanto', esc(d.why));
-  return `<div class="an-cards">${d.list.map(x => `<article class="an-card t-${x.tone}"><h3>${esc(x.title)}</h3><p class="an-card-t">${esc(x.text)}</p><p class="an-meta"><span>Período: ${esc(x.period)}</span><span>${x.n} registros</span></p><details class="an-ev"><summary>Evidências usadas</summary><ul>${x.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></details>${anRelated(anRecs(x.recIds), x.hist)}</article>`).join('')}</div>${anNote('Descobertas descrevem números dos seus registros neste período. Não indicam causa nem orientam tratamento.')}`;
+  /* as recorrências não são repetidas aqui: a Central só aponta para a seção delas */
+  return `<button type="button" class="btn" data-act="an-go" data-k="pad">Ver recorrências com evidências</button><div class="an-cards">${d.list.map(x => `<article class="an-card t-${x.tone}"><h3>${esc(x.title)}</h3><p class="an-card-t">${esc(x.text)}</p><p class="an-meta"><span>Período: ${esc(x.period)}</span><span>${x.n} registros</span></p><details class="an-ev"><summary>Evidências usadas</summary><ul>${x.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></details>${anRelated(anRecs(x.recIds), x.hist)}</article>`).join('')}</div>${anNote('Descobertas descrevem números dos seus registros neste período. Não indicam causa nem orientam tratamento.')}`;
 }
 /* 3. Controle glicêmico */
 function anBodyCtrl(M) {
@@ -329,7 +330,7 @@ function anCmpPick(M) {
 }
 function compareCardHTML() {
   const { A, B } = S.ana, M = anModel(), c = anCmpPick(M);
-  const pre = [['prev', 'Atual × anterior', M.range !== 'all'], ['w30', '30 × 30 dias', true], ['mon', 'Este mês × anterior', true]];
+  const pre = [['prev', 'Atual × anterior', M.range !== 'all']].concat(CP_PRESETS.map(x => [...x, true]));
   let h = `<div class="an-pre" role="group" aria-label="Comparações prontas">${pre.map(([k, l, on]) => `<button type="button" class="an-pill" data-act="an-preset" data-v="${k}" ${on ? '' : 'disabled'}>${l}</button>`).join('')}</div>
     <div class="form-grid"><div class="field"><label class="fl" for="a-from">Período A · de</label><input class="in" type="date" id="a-from" value="${A.from}"></div><div class="field"><label class="fl" for="a-to">até</label><input class="in" type="date" id="a-to" value="${A.to}"></div>
     <div class="field"><label class="fl" for="b-from">Período B · de</label><input class="in" type="date" id="b-from" value="${B.from}"></div><div class="field"><label class="fl" for="b-to">até</label><input class="in" type="date" id="b-to" value="${B.to}"></div></div>`;
@@ -338,7 +339,7 @@ function compareCardHTML() {
   h += `<p class="an-note" style="margin-top:12px">${c.manual ? 'Comparando os períodos informados.' : `Comparando o intervalo atual (${esc(M.rl)}) com o período anterior de mesmo tamanho.`}</p>
     <div class="an-ab"><div class="an-abc a"><b>A</b><span class="num">${rg(c.ra)}</span><span>${c.A.n} medições · ${c.A.days} dias</span></div><div class="an-abc b"><b>B</b><span class="num">${rg(c.rb)}</span><span>${c.B.n} medições · ${c.B.days} dias</span></div></div>`;
   if (!c.enough) return h + `<p class="an-warn">Um dos períodos tem menos de ${MIN_BUCKET} medições. Não há como comparar.</p>`;
-  if (c.warn.length) h += `<ul class="an-wl" role="note">${c.warn.map(w => `<li>${w}</li>`).join('')}</ul>`;
+  const lim = cpData(c).limits; if (lim.length) h += `<ul class="an-wl" role="note">${lim.map(w => `<li>${w}</li>`).join('')}</ul>`;
   h += `<div class="an-bal"><span class="an-pill on">${c.good} melhor${c.good === 1 ? 'ou' : 'aram'} em A</span><span class="an-pill">${c.bad} pior${c.bad === 1 ? 'ou' : 'aram'} em A</span></div><div class="an-cmp">${c.rows.map(r => {
     const v = x => x == null ? '—' : fn(x, r.dec), mx = r.k === 'mean' ? 300 : r.k === 'sd' ? Math.max(r.a || 0, r.b || 0, 1) * 1.3 : r.k === 'cv' ? 60 : r.k === 'ep' ? Math.max(r.a || 0, r.b || 0, 1) * 1.3 : r.pp ? 100 : Math.max(r.a || 0, r.b || 0, 1) * 1.3;
     const cls = r.better === 'a' ? 'good' : r.better === 'b' ? 'bad' : 'neu';
@@ -349,15 +350,10 @@ function compareCardHTML() {
   const ra = c.ra, rb = c.rb, sa = stats(inRange(anBase(S.records), ra[0], ra[1])), sb = stats(inRange(anBase(S.records), rb[0], rb[1])), cc = compareStats(sa, sb);
   const row = (lb, a, b, d) => `<tr><td>${lb}</td><td>${a}</td><td>${b}</td><td>${d}</td></tr>`;
   h += `<details class="an-ev"><summary>Ver tabela completa</summary><div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>Período A</th><th>Período B</th><th>A − B</th></tr></thead><tbody>${row('Média', fm(sa.mean), fm(sb.mean), fsign(cc.diff))}${row('Variação (%)', '', '', cc.pct == null ? '—' : fsign(cc.pct) + '%')}${row('Desvio-padrão', fm(sa.sd), fm(sb.sd), sa.sd != null && sb.sd != null ? fsign(sa.sd - sb.sd) : '—')}${row('Menor–maior', sa.n ? f0(sa.min) + '–' + f0(sa.max) : '—', sb.n ? f0(sb.min) + '–' + f0(sb.max) : '—', '')}${row('Nº de medições', sa.n, sb.n, fsign(sa.n - sb.n, 0))}${row('Abaixo de 70', `${sa.hypo}<small>${sa.n ? (sa.hypo / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hypo}<small>${sb.n ? (sb.hypo / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hypo - sb.hypo, 0))}${row('Acima da faixa', `${sa.hyper}<small>${sa.n ? (sa.hyper / sa.n * 100).toFixed(0) + '%' : '—'}</small>`, `${sb.hyper}<small>${sb.n ? (sb.hyper / sb.n * 100).toFixed(0) + '%' : '—'}</small>`, fsign(sa.hyper - sb.hyper, 0))}</tbody></table></div><p class="an-note"><b>A − B:</b> diferença entre A e B; sinal + significa que A ficou maior. Valores em mg/dL.</p></details>`;
-  return h;
+  return h + cpHTML(c);
 }
 function anBodyComp(M) { return `<div id="cmp">${compareCardHTML()}</div>`; }
 /* 10. Padrões */
-function anBodyPad(M) {
-  const r = M.rec();
-  if (!r.length) return anEmpty('Nenhum padrão claro', `Padrões só aparecem com amostra suficiente (3 ou mais ocorrências, e 5 ou mais dias ou medições em cada grupo comparado). Há ${M.sum.n} medições neste intervalo.`) + anNote('Os padrões do aplicativo também podem ser vistos em Mais → Padrões.');
-  return `<div class="an-cards">${r.map(x => `<article class="an-card t-${x.tone}"><h3>${esc(x.title)}</h3><div class="an-cnt"><b class="num">${x.count}</b><span>ocorrências em ${x.universe} ${x.k === 'atividade' || x.k.startsWith('marca-') ? 'dias' : 'medições'}</span><span class="an-bar" aria-hidden="true"><i style="width:${Math.min(100, Math.max(3, x.count / x.universe * 100)).toFixed(0)}%"></i></span></div><p class="an-card-t">${esc(x.text)}</p>${anRelated(anRecs(x.recIds).slice(-30), x.hist)}</article>`).join('')}</div>${anNote('Estes padrões são <b>coincidências nos números</b> dos seus registros, não causas. Muitos fatores mudam de um dia para o outro. Converse com sua equipe de saúde antes de mudar qualquer conduta.')}`;
-}
 /* 11. Associações */
 function anBodyAss(M) {
   const a = M.assoc();
@@ -420,10 +416,9 @@ document.addEventListener('click', e => {
     if (M.curR) { S.hist.from = isoDate(new Date(M.curR[0])); S.hist.to = isoDate(new Date(M.curR[1])); } go('historico');
   } else if (a === 'an-preset') {
     const v = el.dataset.v, now = Date.now(), iso = ms => isoDate(new Date(ms)); let A, B;
-    if (v === 'prev') { const M = anModel(); if (!M.curR) return; A = [M.curR[0], M.curR[1]]; B = [M.prevR[0], M.prevR[1]]; }
-    else if (v === 'w30') { A = [startOfDay(addDays(now, -29)), now]; B = [startOfDay(addDays(now, -59)), startOfDay(addDays(now, -30))]; }
-    else { const d = new Date(now), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), p0 = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime(); A = [m0, now]; B = [p0, m0 - DAY]; }
-    S.ana.A = { from: iso(A[0]), to: iso(A[1]) }; S.ana.B = { from: iso(B[0]), to: iso(B[1]) }; anMemo = { key: '', M: null }; const c = document.getElementById('cmp'); if (c) c.innerHTML = compareCardHTML();
+    if (v === 'prev') { const M = anModel(); if (!M.curR) return; A = [M.curR[0], M.curR[1]]; B = [M.prevR[0], M.prevR[1]]; S.ana.A = { from: iso(A[0]), to: iso(A[1]) }; S.ana.B = { from: iso(B[0]), to: iso(B[1]) }; }
+    else Object.assign(S.ana, cpPreset(v, now));
+    anMemo = { key: '', M: null }; const c = document.getElementById('cmp'); if (c) c.innerHTML = compareCardHTML();
   }
 });
 
