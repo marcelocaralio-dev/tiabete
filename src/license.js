@@ -73,20 +73,15 @@ async function licSave(r) {
   LK.seen = srv ? Math.max(srv, Math.min(LK.seen, srv + LIC_SKEW_MS)) : Math.max(LK.seen, loc); LK.seenL = loc;
   LK.awaiting = false; LK.seenSaved = LK.seen; await S_.setCfg('lic-seen', { t: LK.seen, l: LK.seenL });
 }
-/* Falha ao ler o cofre (ainda não pronto, erro momentâneo) NÃO é "sem licença": marca readErr e relê algumas vezes. Só sinaliza; não muda nenhuma regra de assinatura. */
-let licLoadTry = 0;
-function licLoadRetry() { if (++licLoadTry <= 5 && typeof setTimeout === 'function') setTimeout(() => { licLoad().then(() => { if (!LK.readErr) licRefresh(false); }).catch(() => { }); }, 1500 * licLoadTry); }
 async function licLoad() {
-  if (!LK.cfg) { LK.loaded = true; return; }
-  if (!licSec()) { LK.readErr = true; LK.loaded = true; licLoadRetry(); return; }
+  if (!LK.cfg || !licSec()) { LK.loaded = true; return; }
   try {
     const sv = await licSec().getCfg('lic-seen'); if (sv && typeof sv === 'object') { LK.seen = +sv.t || 0; LK.seenL = +sv.l || 0; } else LK.seen = +sv || 0;
     LK.seenSaved = LK.seen; try { if (await licSec().getCfg('lic-prov')) await licSec().setCfg('lic-prov', null); } catch (e) { }   /* resto do teste provisório da 0.33.0: removido, não vale mais */
     LK.ack = await licSec().getCfg('lic-ack') || null;
     const t = await licSec().get('lic-token'); LK.payload = t ? await licVerify(t, LK.pub) : null;
     const i = await licSec().getCfg('lic-info'); if (i) { LK.info = i; LK.devices = i.devices || []; }
-    LK.readErr = false;
-  } catch (e) { LK.readErr = true; licLoadRetry(); }
+  } catch (e) { }
   LK.loaded = true; try { render(); } catch (e) { }
 }
 /* ---- rede: falhas NUNCA bloqueiam nada gratuito; só deixam o último token valer até o fim da tolerância ---- */
