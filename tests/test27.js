@@ -103,7 +103,7 @@ ok(!C.inShortcuts({ ...base, records: [rec(0, '23:00', 130, { source: 'exemplo' 
 const sc2 = C.inScale([55, 300], 70, 180); ok(sc2.pos(55) === (55 - 40) / (sc2.max - sc2.min) * 100 && sc2.pos(300) <= 100 && sc2.pos(0) === 0, 'escala: posições dentro de 0–100');
 /* ---- integração com o app (sem navegador): build e ordem ---- */
 const ROOT = path.join(__dirname, '..'), bw = fs.readFileSync(ROOT + '/scripts/build-web.js', 'utf8'), ps = fs.readFileSync(ROOT + '/src/persist.js', 'utf8');
-ok(/'src\/painel2\.js', 'src\/inicio-core\.js', 'src\/inicio\.js'/.test(bw) && /inicio\.css/.test(bw), 'build: núcleo, interface e CSS do Início entram no pacote, depois do painel');
+ok(/'src\/inicio-core\.js'/.test(bw) && bw.indexOf("'src/painel2.js'") > -1 && bw.indexOf("'src/painel2.js'") < bw.indexOf("'src/inicio.js'") && /inicio\.css/.test(bw), 'build: núcleo, interface e CSS do Início entram no pacote, depois do painel');
 ok(/'tb-inicio'/.test(ps), 'persistência: preferências do Início têm cópia durável no banco');
 const ui = fs.readFileSync(ROOT + '/src/inicio.js', 'utf8'), core = fs.readFileSync(ROOT + '/src/inicio-core.js', 'utf8');
 ok(!/innerHTML\s*=\s*[^;]*\$\{(?:e|x)\.(?:text|title)\}/.test(ui) && /esc\(e\.title\)/.test(ui) && /esc\(e\.text\)/.test(ui), 'segurança: textos dos acontecimentos passam por esc()');
