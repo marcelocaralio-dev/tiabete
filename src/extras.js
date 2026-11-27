@@ -679,42 +679,76 @@ const RW_GREENS = ['#22c55e', '#4ade80', '#86efac', '#16a34a', '#bbf7d0', '#34d3
 const rwSvg = (p, s = 28) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const RW_TROPHY = '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 13v4M8.5 20h7M10 17h4v3h-4z"/>';
 function rwState() { S.rw = S.rw || {}; S.rw.got = S.rw.got || {}; return S.rw; }
-const rwSave = async () => { try { await Store.put('meta', { id: 'rewards', value: S.rw }); } catch (e) { } };
+/* Devolve true só se a gravação foi concluída (uma comemoração nunca é exibida sem o registro dela estar salvo). */
+const rwSave = async () => { try { await Store.put('meta', { id: 'rewards', value: S.rw }); return true; } catch (e) { return false; } };
 const rwEval = () => rewardEval(S.records, isoDate(new Date()), rwSkips());
-let rwTimer = null, rwBusy = false, rwDay = isoDate(new Date());
+/* Registro de apresentação das comemorações (S.rw, meta 'rewards'; vai no backup junto com o restante):
+     got[chave]   = dia em que a conquista foi desbloqueada (já existia)
+     pend[chave]  = 1 enquanto o desbloqueio foi gravado mas a comemoração ainda NÃO foi exibida
+     shown[chave] = dia em que a comemoração foi exibida (gravado ANTES de a animação aparecer)
+   A fila só recebe o que está em pend e ainda não está em shown; reabrir/reiniciar o app nunca repete uma comemoração já exibida.
+   rwReady: o estado salvo já foi lido do banco (init.js); antes disso nada é avaliado, para um estado vazio não parecer "tudo novo".
+   rwSess: chaves já enfileiradas ou exibidas nesta sessão (barreira extra contra animações duplicadas). */
+let rwTimer = null, rwBusy = false, rwDay = isoDate(new Date()), rwReady = false, rwRunning = false, rwAgain = false;
+const rwSess = new Set();
 function rwTick() { const d = isoDate(new Date()); if (d !== rwDay) { rwDay = d; if (S.route === 'conquistas' && !$('#sheet-bg')) render(); } rewardSoon(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rwTick(); });
 setInterval(rwTick, 5 * 60000);
 function rewardSoon() { clearTimeout(rwTimer); rwTimer = setTimeout(rewardCheck, 500); }
 async function rewardCheck() {
-  if (typeof insLoaded === 'undefined' || !insLoaded || !S.records.length) return;
-  const st = rwState(), ev = rwEval(), q = []; let dirty = false;
-  // quebra: selo que não vale mais no ciclo atual sai de "got" (fica bloqueado) e vai para o histórico
+  if (!rwReady || typeof insLoaded === 'undefined' || !insLoaded || !S.records.length) return;
+  if (rwRunning) { rwAgain = true; return; }   /* uma verificação por vez; o pedido que chegou durante ela roda logo depois */
+  rwRunning = true;
+  try { await rwCheckRun(); } catch (e) { console.error(e); } finally { rwRunning = false; if (rwAgain) { rwAgain = false; rewardSoon(); } }
+}
+async function rwCheckRun() {
+  const st = rwState(), ev = rwEval(), q = [], today = isoDate(new Date()); let dirty = false;
   st.hist = st.hist || [];
-  for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (rwOn(k) && st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: isoDate(new Date()) }); delete st.got[key]; dirty = true; } }
-  if (cwCheck(st, q, isoDate(new Date()), false)) dirty = true; /* personalizadas perdidas (só remove selo) */
+  if (!st.shown || typeof st.shown !== 'object') { st.shown = {}; dirty = true; }
+  if (!st.pend || typeof st.pend !== 'object') { st.pend = {}; dirty = true; }
+  /* migração/consistência: toda conquista já desbloqueada sem registro de pendência conta como já apresentada; registro sem desbloqueio é descartado */
+  for (const k of Object.keys(st.got)) if (!st.shown[k] && !st.pend[k]) { st.shown[k] = st.got[k]; dirty = true; }
+  for (const k of Object.keys(st.shown)) if (!st.got[k]) { delete st.shown[k]; dirty = true; }
+  for (const k of Object.keys(st.pend)) if (!st.got[k] || st.shown[k]) { delete st.pend[k]; dirty = true; }
+  // quebra: selo que não vale mais no ciclo atual sai de "got" (fica bloqueado) e vai para o histórico; um novo desbloqueio depois disso é genuinamente novo
+  for (const k of Object.keys(RW_INFO)) for (const N of RW_STEPS) { const key = k + '-' + N; if (rwOn(k) && st.got[key] && !ev[k].ach[N]) { st.hist.push({ k, N, date: st.got[key], brokeAt: today }); delete st.got[key]; delete st.shown[key]; delete st.pend[key]; rwSess.delete(key); dirty = true; } }
+  if (cwCheck(st, q, today, false)) dirty = true; /* personalizadas perdidas (só remove selo) */
   try { if (typeof rwRecSync === 'function' && rwRecSync(st, ev)) dirty = true; } catch (e) { console.error(e); } /* recorde pessoal: só sobe, independe de avisos */
   if (dirty) await rwSave();
   if (rwBusy) return;
   if (!alCfg().rewards) return;
+  if (Store.persistent && !Store.metaOk) return; /* sem poder gravar o registro, não anima (evitaria repetir a cada abertura) */
   if ($('#sheet-bg') || $('.rw-bg')) return;
   dirty = false;
-  if (cwCheck(st, q, isoDate(new Date()), true)) dirty = true;
+  if (cwCheck(st, q, today, true)) dirty = true;
   for (const k of Object.keys(RW_INFO)) {
     if (!rwOn(k)) continue;
-    const fresh = RW_STEPS.filter(N => ev[k].ach[N] && !st.got[k + '-' + N]);
-    fresh.forEach(N => { st.got[k + '-' + N] = isoDate(new Date()); dirty = true; });
-    if (fresh.length) q.push({ k, N: Math.max(...fresh) });
+    RW_STEPS.filter(N => ev[k].ach[N] && !st.got[k + '-' + N]).forEach(N => { st.got[k + '-' + N] = today; st.pend[k + '-' + N] = 1; dirty = true; });
   }
   st.init = true;
-  if (q.length) { st.last = { ...q[q.length - 1], ts: Date.now() }; dirty = true; }
-  if (dirty) await rwSave();
+  /* fila: só o que foi desbloqueado, ainda não foi apresentado e não está na fila/exibido nesta sessão (personalizadas primeiro, como antes) */
+  const waiting = key => st.got[key] && st.pend[key] && !st.shown[key] && !rwSess.has(key);
+  for (const x of cwEvalAll()) if (x.on && waiting(x.key)) q.push({ k: x.key, N: x.c.goal, keys: [x.key] });
+  for (const k of Object.keys(RW_INFO)) {
+    if (!rwOn(k)) continue;
+    const ps = RW_STEPS.filter(N => waiting(k + '-' + N)); if (ps.length) q.push({ k, N: Math.max(...ps), keys: ps.map(N => k + '-' + N) });
+  }
+  q.forEach(x => x.keys.forEach(key => rwSess.add(key)));
+  if (q.length) { st.last = { k: q[q.length - 1].k, N: q[q.length - 1].N, ts: Date.now() }; dirty = true; }
+  if (dirty && !(await rwSave())) { q.forEach(x => x.keys.forEach(key => rwSess.delete(key))); return; }
   if (q.length) { rwBusy = true; rwShowQueue(q); }
 }
-function rwShowQueue(q) {
+/* Registra a apresentação ANTES de a animação aparecer: fechar o app no meio dela também conta como apresentada. */
+async function rwShowQueue(q) {
   const x = q.shift(); if (!x) { rwBusy = false; return; }
-  rwCelebrate(x.k, x.N, () => rwShowQueue(q));
+  const st = rwState(), today = isoDate(new Date());
+  st.shown = st.shown || {}; st.pend = st.pend || {};
+  x.keys.forEach(key => { st.shown[key] = today; delete st.pend[key]; });
+  if (!(await rwSave())) { rwBusy = false; return; }
+  rwCelebrate(x.k, x.N, () => rwShowQueue(q), true);
 }
+/* Fechou a comemoração que acabou de ser apresentada: o aviso "Nova conquista" dessa mesma conquista não precisa reaparecer a cada abertura. */
+function rwSeen(k) { const st = rwState(), l = st.last; if (l && l.k === k && st.seen !== l.ts) { st.seen = l.ts; rwSave(); } }
 function rwFx(box, kind, count) {
   const rnd = (a, b) => a + Math.random() * (b - a), mk = (cls, st) => { const i = document.createElement('i'); i.className = cls; i.style.cssText = st; box.appendChild(i); };
   const col = () => RW_GREENS[Math.floor(Math.random() * RW_GREENS.length)];
@@ -726,7 +760,7 @@ function rwFx(box, kind, count) {
     for (let i = 0; i < count; i++) mk('rw-p rw-rain', `left:${rnd(0, 100)}%;--c:${col()};--dl:${rnd(0, 2.4).toFixed(2)}s;--du:${rnd(2.4, 4).toFixed(2)}s;--dx:${rnd(-50, 50).toFixed(0)}px;--s:${rnd(7, 13).toFixed(0)}px`);
   }
 }
-function rwCelebrate(k, N, done) {
+function rwCelebrate(k, N, done, auto) {
   closeRw(true);
   const cu = cwMeta(k); if (!cu && !RW_INFO[k]) { if (done) done(); return; }
   const c = cu ? { t: esc(cu.name), ic: cu.icp } : RW_INFO[k], m = cu ? { ...CW_MS, m: cu.c.desc ? esc(cu.c.desc) : 'Você chegou lá. Continue assim!' } : RW_MS[N], big = !cu && N >= 90;
@@ -741,7 +775,7 @@ function rwCelebrate(k, N, done) {
     <button class="btn full" id="rw-see" style="margin-top:8px">Ver minhas conquistas</button></div>`;
   document.body.appendChild(bg); document.body.style.overflow = 'hidden';
   rwFx(bg.querySelector('.rw-fx'), m.fx, m.c);
-  bg._done = done;
+  bg._done = done; bg._auto = !!auto; bg._k = k;
   const fin = go2 => { closeRw(); if (go2) go('conquistas'); };
   bg.querySelector('#rw-ok').onclick = () => fin(false);
   bg.querySelector('#rw-see').onclick = () => fin(true);
@@ -749,6 +783,7 @@ function rwCelebrate(k, N, done) {
 }
 function closeRw(silent) {
   const b = $('#rw-bg'); if (!b) return; const d = b._done; b.remove();
+  if (b._auto && !silent) { try { rwSeen(b._k); } catch (e) { } }
   if (!$('#sheet-bg')) document.body.style.overflow = '';
   if (d && !silent) d();
 }

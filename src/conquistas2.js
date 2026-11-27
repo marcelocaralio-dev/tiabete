@@ -135,11 +135,11 @@ function cwMeta(k) { if (typeof k !== 'string' || !k.startsWith('c:')) return nu
 
 /* verificação contínua: chamada por rewardCheck() (extras.js) */
 function cwCheck(st, q, today, canNotify) {
-  let dirty = false;
+  let dirty = false; st.shown = st.shown || {}; st.pend = st.pend || {};
   for (const x of cwEvalAll()) {
     if (!x.on) continue; const got = st.got[x.key];
-    if (got && !x.e.done) { st.hist.push({ k: x.key, N: x.c.goal, date: got, brokeAt: today }); delete st.got[x.key]; dirty = true; }
-    else if (!got && x.e.done && canNotify) { st.got[x.key] = today; dirty = true; q.push({ k: x.key, N: x.c.goal }); }
+    if (got && !x.e.done) { st.hist.push({ k: x.key, N: x.c.goal, date: got, brokeAt: today }); delete st.got[x.key]; delete st.shown[x.key]; delete st.pend[x.key]; if (typeof rwSess !== 'undefined') rwSess.delete(x.key); dirty = true; }
+    else if (!got && x.e.done && canNotify) { st.got[x.key] = today; st.pend[x.key] = 1; dirty = true; } /* a fila de comemorações é montada por rewardCheck a partir de pend */
   }
   return dirty;
 }
@@ -246,7 +246,7 @@ document.addEventListener('click', async e => {
   }
   else if (act === 'cw-del') {
     if (el.dataset.armed !== '1') { el.dataset.armed = '1'; el.textContent = 'Toque de novo para excluir'; setTimeout(() => { if (el.isConnected) { el.dataset.armed = ''; el.textContent = 'Excluir'; } }, 4000); return; }
-    const s = rwState(), key = rwKeyOf(id); s.cust = cwList().filter(c => c.id !== id); delete s.got[key]; if (s.rec) delete s.rec[key]; if (s.off) delete s.off[key]; if (s.pause) delete s.pause[key]; if (s.hist) s.hist = s.hist.filter(h => h.k !== key); if (s.last && s.last.k === key) delete s.last;
+    const s = rwState(), key = rwKeyOf(id); s.cust = cwList().filter(c => c.id !== id); delete s.got[key]; if (s.shown) delete s.shown[key]; if (s.pend) delete s.pend[key]; if (s.rec) delete s.rec[key]; if (s.off) delete s.off[key]; if (s.pause) delete s.pause[key]; if (s.hist) s.hist = s.hist.filter(h => h.k !== key); if (s.last && s.last.k === key) delete s.last;
     await cwDone('Conquista excluída.');
   }
   else if (act === 'cw-tgl') { const k = el.dataset.k; rwSetOn(k, !rwOn(k)); await rwSave(); render(); rewardSoon(); }

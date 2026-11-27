@@ -22,7 +22,7 @@
   try { const us = (await Store.all('meta')).find(x => x.id === 'ui-scale'); if (us && SCALES.some(x => x[0] === us.value)) { S.scale = us.value; applyScale(); } } catch (e) { }
   try { const th = (await Store.all('meta')).find(x => x.id === 'theme'); if (th && ['light', 'dark', 'auto'].includes(th.value)) { S.theme = th.value; try { localStorage.setItem('tb-theme', th.value); } catch (e) { } } applyTheme(); } catch (e) { }
   try { const ac = (await Store.all('meta')).find(x => x.id === 'acc'); if (ac && ac.value && typeof ac.value === 'object') { S.acc = ac.value; try { localStorage.setItem('tb-acc', JSON.stringify(S.acc)); } catch (e) { } } } catch (e) { }
-  try { const rw = (await Store.all('meta')).find(x => x.id === 'rewards'); if (rw && rw.value) S.rw = { got: {}, act: {}, init: false, ...rw.value }; } catch (e) { }
+  try { const rw = (await Store.all('meta')).find(x => x.id === 'rewards'); if (rw && rw.value) S.rw = { got: {}, act: {}, init: false, ...rw.value }; rwReady = true; /* só agora as conquistas podem ser avaliadas: o estado salvo já foi lido */ } catch (e) { }
   try { const am = (await Store.all('meta')).find(x => x.id === 'alerts'); if (am && am.value) S.alerts = { ...AL_DEF, ...am.value }; } catch (e) { }
   try { const pm = (await Store.all('meta')).find(x => x.id === 'profile'); if (pm && pm.value) S.profile = pfClean(pm.value); } catch (e) { }
   try { const pi = (await Store.all('meta')).find(x => x.id === 'profile-invite'); if (pi && pi.value > 0) S.pfSnooze = pi.value; } catch (e) { }
