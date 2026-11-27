@@ -51,7 +51,7 @@ ok(J(M.mdExclusive(cats, { vis_skel: 'Skeleton', bubble: 'Bolha' })) === J([{ c:
 function dummy() { const f = function () { return dummy(); }; return new Proxy(f, { get: (t, k) => k === Symbol.toPrimitive ? () => '' : k === 'then' ? undefined : dummy(), apply: () => dummy(), construct: () => dummy(), has: () => true }); }
 const LS = {}, store = { console, Date, Math, JSON, Object, Array, String, Number, Set, Map, Promise, RegExp, parseFloat, parseInt, isNaN, Error, Symbol, setInterval: () => 0,
   localStorage: { getItem: k => LS[k] ?? null, setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; } }, GX_F: {}, esc: String, sheets: [], openSheet: h => store.sheets.push(h), TITLES: {}, VIEWS: { licenca: () => '' },
-  LK: { cfg: true, loaded: true, dev: false }, premium: true, licPremiumNow: () => store.premium, licStatus: () => store.status, status: 'trial_active' };
+  LK: { cfg: true, loaded: true, dev: false, payload: { st: 'x' } }, premium: true, licPremiumNow: () => store.premium, licStatus: () => store.status, status: 'trial_active' };
 const g = new Proxy(store, { has: () => true, get: (t, k) => k in t ? t[k] : (k === 'window' || k === 'globalThis' ? g : dummy()), set: (t, k, v) => (t[k] = v, true) });
 vm.createContext(g);
 for (const f of ['src/modos-core.js', 'src/homebase-core.js', 'src/homebase.js']) vm.runInContext(rd(f).replace(/^const HBC = .*$/m, 'const HBC = { IN_DEF: () => ({ v: 2, order: ["a"], hidden: [] }), inCleanPrefs: x => x, inIsDefault: x => JSON.stringify(x) === JSON.stringify({ v: 2, order: ["a"], hidden: [] }) };'), g);
@@ -101,7 +101,52 @@ LS['tb-gx'] = GX; LS['tb-inicio'] = J({ v: 2, order: ['hoje'], hidden: [] });
 /* licença carregando: não conclui perda */
 store.LK = { cfg: true, loaded: false }; LS['tb-modo'] = J(E); reset();
 ok(ev('mdCheck()') === false && ev('mdChosen()') === 'experience', 'licença carregando não derruba o Experience escolhido');
-store.LK = { cfg: true, loaded: true, dev: false };
+store.LK = { cfg: true, loaded: true, dev: false, payload: { st: 'x' } };
+
+/* 5b. estabilidade do Experience: nada que seja carregamento, falha ou demora conta como desativação */
+const MC = M, pay = { st: 'trial_active' };
+ok(MC.mdLossConfirmed('trial_expired', pay, true, false) && MC.mdLossConfirmed('refunded', pay, true, false) && MC.mdLossConfirmed('revoked', pay, true, false), 'perda confirmada: teste terminado, reembolso, revogação');
+ok(!MC.mdLossConfirmed('trial_expired', null, true, false) && !MC.mdLossConfirmed('trial_expired', pay, false, false) && !MC.mdLossConfirmed('trial_expired', pay, true, true), 'sem token assinado, carregando ou leitura falha: não é perda');
+ok(!MC.mdLossConfirmed('lifetime_active', pay, true, false) && !MC.mdLossConfirmed('trial_active', pay, true, false) && !MC.mdLossConfirmed('pending_trial', null, true, false), 'tolerância offline vencida, relógio fora do lugar ou sem resposta: não é perda');
+const st0 = MC.mdStamp({ mode: 'experience' }, 1000);
+ok(MC.mdProvisional(st0, 2000) && !MC.mdProvisional(st0, 1000 + 8 * 86400e3) && !MC.mdProvisional({ mode: 'experience' }, 2000) && !MC.mdProvisional(MC.mdStamp({ mode: 'standard' }, 1000), 2000), 'continuidade provisória: só quem escolheu o Experience e já teve o Premium confirmado, por tempo limitado');
+const setLK = o => { store.LK = Object.assign({ cfg: true, loaded: true, dev: false, payload: { st: 'x' } }, o); reset(); };
+const keepE = () => { LS['tb-modo'] = J({ v: 1, mode: 'experience', ok: Date.now() }); };
+/* carregando */
+keepE(); setLK({ loaded: false, payload: null }); store.premium = false; store.status = 'pending_trial';
+ok(ev('mdCheck()') === false && ev('mdChosen()') === 'experience' && ev('gxhPers()') === true, 'licença carregando: Experience continua (não desativa prematuramente)');
+/* leitura do cofre falhou */
+keepE(); setLK({ readErr: true, payload: null });
+ok(ev('mdCheck()') === false && ev('mdChosen()') === 'experience' && ev('gxhPers()') === true && ev('gxhLockNote()') === '', 'falha de leitura do cofre: sem desativação e sem mensagem');
+/* tolerância offline vencida (token assinado antigo): Premium não vale agora, mas não é perda */
+keepE(); setLK({}); store.premium = false; store.status = 'lifetime_active';
+ok(ev('mdCheck()') === false && ev('mdChosen()') === 'experience' && ev('gxhLockNote()') === '', 'token antigo/sem resposta: escolha mantida, sem aviso');
+/* sem nenhum Premium confirmado antes: não há continuidade provisória */
+LS['tb-modo'] = J({ v: 1, mode: 'experience' }); setLK({ readErr: true, payload: null });
+ok(ev('gxhPers()') === false, 'sem confirmação anterior: nada é liberado durante a falha');
+/* Premium confirmado carimba a escolha; voltando ao normal tudo segue */
+LS['tb-modo'] = J({ v: 1, mode: 'experience' }); setLK({}); store.premium = true; store.status = 'trial_active';
+ev('mdCheck()'); ok(JSON.parse(LS['tb-modo']).ok > 0 && ev('mdChosen()') === 'experience', 'Premium confirmado: escolha carimbada e mantida');
+/* perda realmente confirmada */
+store.premium = false; store.status = 'trial_expired'; reset();
+ok(ev('mdCheck()') === true && ev('mdChosen()') === 'standard' && /terminou/.test(ev('gxhLockNote()')), 'perda confirmada com token assinado: Padrão uma vez, com aviso');
+/* consulta em andamento não decide */
+keepE(); setLK({ busy: true }); store.premium = false; store.status = 'trial_expired';
+ok(ev('mdCheck()') === false && ev('mdChosen()') === 'experience', 'consulta de licença em andamento: espera o resultado');
+/* desativar manualmente restaura o Padrão e preserva preferências */
+keepE(); setLK({}); store.premium = true; store.status = 'trial_active'; LS['tb-gx'] = GX;
+ev("mdSave(mdSelect(mdStored(), 'standard', gxhAuth()).stored)"); reset();
+ok(ev('mdChosen()') === 'standard' && ev('gxhPers()') === false && LS['tb-gx'] === GX && ev('mdCheck()') === false, 'desativar manualmente: Padrão, sem reativar sozinho, preferências intactas');
+/* leitura do armazenamento falhando na abertura não vira escolha nem sobrescreve */
+keepE(); const gi = store.localStorage.getItem; const saved = LS['tb-modo'];
+store.localStorage.getItem = k => { if (k === 'tb-modo') throw new Error('x'); return LS[k] ?? null; };
+ev('mdMemo = { raw: undefined, st: null }'); ev('mdBoot()'); ok(LS['tb-modo'] === saved && ev('mdCheck()') === false, 'falha ao ler tb-modo: nada é regravado nem tratado como desativação');
+store.localStorage.getItem = gi; ev('mdMemo = { raw: undefined, st: null }');
+LS['tb-modo'] = '{quebrado'; ev('mdBoot()'); ok(LS['tb-modo'] === '{quebrado', 'valor ilegível não é sobrescrito pela inicialização');
+/* recarregar (reabrir): mesma escolha lida de novo */
+keepE(); ev('mdMemo = { raw: undefined, st: null }'); setLK({}); store.premium = true; ev('mdBoot()');
+ok(ev('mdChosen()') === 'experience' && ev('gxhPers()') === true, 'recarregar/reabrir: Experience permanece');
+store.premium = true; store.status = 'trial_active'; setLK({}); LS['tb-gx'] = GX;
 
 /* 6. ligação nos módulos (sem sistema paralelo, sem escrever preferências) */
 const mo = rd('src/modos.js'), hbS = rd('src/homebase.js'), bw = rd('scripts/build-web.js'), ord = bw.match(/const order = \[(.*?)\];/s)[1], pos = f => ord.indexOf(`'src/${f}'`);
@@ -112,7 +157,7 @@ ok(bw.includes("rd('src/modos.css')"), 'estilos incluídos no build');
 ok(/'tb-modo'\]/.test(rd('src/persist.js')), 'escolha do modo entra na cópia durável (sobrevive ao reinício)');
 const ini = rd('src/init.js'); ok(ini.indexOf('psRestore()') < ini.indexOf('mdBoot()') && ini.indexOf('mdBoot()') < ini.indexOf('render();'), 'mdBoot roda depois da restauração e antes da primeira tela');
 ok(/typeof mdCard === 'function' \? mdCard\(\)/.test(rd('src/app.js')), 'Aparência mostra o seletor de modo');
-ok(!/data-r="gxexp">Personalização · GLUXO Experience/.test(rd('src/extras.js')) && (rd('src/extras.js').match(/mdEntryBtn\(\)/g) || []).length === 2, 'entradas da personalização seguem o modo');
+ok(!/data-r="gxexp">Personalização · GLUXO Experience/.test(rd('src/extras.js')) && (rd('src/extras.js').match(/mdEntryBtn\(\)/g) || []).length === 1 && !/mdEntryBtn\(\)/.test(rd('src/extras.js').split('function viewConfig')[1] || ''), 'entrada isolada saiu das Configurações (só Lembretes mantém o atalho dos alertas)');
 ok(/if \(!gxhPers\(\)\) return gxhLockNote\(\)/.test(rd('src/inicio.js')), 'Modo Padrão não mostra o botão de personalizar a tela inicial');
 ok(/filter\(f => !gxhLocked\(f\)\)/.test(rd('src/gxhub.js')), 'restaurar categoria nunca apaga configuração de recurso travado');
 ok(rd('package.json').includes('node tests/test59.js'), 'teste na lista do npm test');

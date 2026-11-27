@@ -6,7 +6,14 @@
                  as preferências guardadas continuam intactas. É o ÚNICO ponto que decide isso: os módulos só perguntam aqui. */
 const GXH_FREE = MD_SHARED;   /* alertas e lembretes são compartilhados entre os modos: nunca travam (classificação em modos-core.js) */
 let gxhPT = { t: 0, v: true };
+/* Licença ainda não respondeu (carregando ou leitura do cofre falhou)? */
+const gxhUnsure = () => { try { return typeof LK !== 'undefined' && !!LK.cfg && (LK.loaded !== true || LK.readErr === true); } catch (e) { return false; } };
+/* gxhAuth = Premium confirmado agora (gxhAuthReal) OU, só enquanto a licença não responde, a confirmação anterior de quem escolheu o Experience (mdProvisional). */
 function gxhAuth() {
+  if (gxhAuthReal()) return true;
+  try { return gxhUnsure() && typeof mdProvisional === 'function' && mdProvisional(mdStored(), Date.now()); } catch (e) { return false; }
+}
+function gxhAuthReal() {
   try {   /* antes de o licenciamento carregar (abertura do app) as constantes dele ainda não existem: não trava nada */
     if (typeof LK === 'undefined' || typeof licPremiumNow !== 'function') return true;   /* sem licenciamento (testes isolados): sem trava */
     const now = Date.now(); if (now - gxhPT.t < 1000) return gxhPT.v;

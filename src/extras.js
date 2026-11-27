@@ -480,7 +480,7 @@ function makeAccordions(view) {
   const many = heads.length >= 3, dflt = ACC_OPEN[route];
   heads.forEach((h, i) => {
     const h2 = h.matches('h2.sec') ? h : h.firstElementChild, key = accKey(route, h2, i);
-    const body = []; for (let n = h.nextElementSibling; n && !isHead(n); n = n.nextElementSibling) body.push(n);
+    const body = []; for (let n = h.nextElementSibling; n && !isHead(n) && !(n.matches && n.matches('.acc-skip')); n = n.nextElementSibling) body.push(n);   /* .acc-skip (card Premium do Experience) fica fora das sanfonas */
     if (!body.length) return;
     const k0 = key.split('|')[1];
     const open = ACC_ALL ? true : key in S.acc ? !!S.acc[key] : route === 'bolus' && k0.startsWith('tutorial') ? false : dflt ? dflt.some(d => k0.startsWith(d)) : many ? i === 0 : true;
@@ -1403,7 +1403,7 @@ document.addEventListener('click', async e => {
 /* ================= Configurações (tudo que o usuário pode ajustar) ================= */
 function viewConfig() {
   const link = (r, t, d) => `<button class="menu-item" data-act="go" data-r="${r}">${MI[r] ? `<i class="mi-ic"><svg viewBox="0 0 24 24">${MI[r]}</svg></i>` : ''}<div>${t}<span>${d}</span></div><svg class="chv" viewBox="0 0 24 24">${IC.chev}</svg></button>`;
-  return banners() + (typeof mdEntryBtn === 'function' ? mdEntryBtn() : '') + themeCard() + scaleCard() + swipeCard() + `
+  return banners() + themeCard() + scaleCard() + swipeCard() + `
   <h2 class="sec">Metas e limites</h2><div class="card"><div class="stack" style="gap:14px">
     <div class="row" style="align-items:flex-end"><div class="field grow"><label class="fl" for="a1c-t">Meta de HbA1c (%)</label><input class="in" id="a1c-t" inputmode="decimal" value="${numAttr(S.a1cT)}"></div><button class="btn pri" data-act="a1c-save">Salvar</button></div>
     <div class="field"><label class="fl" for="rule-n">Medições usadas na classificação (últimas)</label><input class="in" id="rule-n" inputmode="numeric" value="${S.ruleN || 180}"></div>

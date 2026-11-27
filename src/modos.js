@@ -5,7 +5,8 @@
    Classificação dos recursos e dos componentes: modos-core.js. */
 const MD_LS = 'tb-modo';
 let mdMemo = { raw: undefined, st: null };
-function mdRaw() { try { return localStorage.getItem(MD_LS); } catch (e) { return null; } }
+/* undefined = a LEITURA falhou (não é "nunca escolheu"); null = realmente não existe. Falha de leitura nunca vira escolha nem sobrescreve o guardado. */
+function mdRaw() { try { return localStorage.getItem(MD_LS); } catch (e) { return undefined; } }
 function mdStored() { const raw = mdRaw(); if (!mdMemo.st || raw !== mdMemo.raw) mdMemo = { raw, st: mdParse(raw) }; return mdMemo.st; }
 function mdSave(o) { try { localStorage.setItem(MD_LS, JSON.stringify(mdClean(o))); } catch (e) { } mdMemo = { raw: undefined, st: null }; }
 /* Modo ESCOLHIDO (sem olhar a autorização). O modo EM USO é gxhPers() ? 'experience' : 'standard'. */
@@ -22,19 +23,28 @@ function mdHasSaved() {
 }
 
 /* O licenciamento já respondeu? Enquanto carrega, nada se conclui (nem perda de Premium). */
-function mdKnown() { try { return typeof LK !== 'undefined' && (!LK.cfg || LK.loaded === true); } catch (e) { return false; } }
+function mdKnown() { try { return typeof LK !== 'undefined' && (!LK.cfg || (LK.loaded === true && LK.readErr !== true)); } catch (e) { return false; } }
 /* Chamado uma vez na abertura, depois de as configurações serem restauradas e antes de a primeira tela ser desenhada. */
 function mdBoot() {
   try {
-    if (mdRaw() == null || !mdStored().mode) mdSave(mdInitial(mdStored(), mdHasSaved()));
+    const raw = mdRaw();   /* só inicializa quando a leitura funcionou e não há nada guardado; ilegível/falha: mantém o que existe e usa o Padrão só na tela */
+    if (raw === null) mdSave(mdInitial(mdStored(), mdHasSaved()));
     mdCheck();
   } catch (e) { console.error(e); }
 }
 /* Perda de autorização → Modo Padrão (uma vez, com aviso). Os dados e as preferências não são tocados. */
 function mdCheck() {
-  if (!mdKnown()) return false;
-  const r = mdReconcile(mdStored(), true, gxhAuth(), gxhStatusKey(), Date.now());
-  if (!r.changed) return false;
+  if (!mdKnown() || mdRaw() === undefined) return false;
+  const now = Date.now();
+  if (gxhAuthReal() && typeof LK !== 'undefined' && LK.cfg) {   /* Premium confirmado: carimba (no máximo 1 vez por hora) para segurar o Experience enquanto a licença é relida */
+    const st = mdStored(); if (st.mode === 'experience' && now - st.ok > 3600e3) mdSave(mdStamp(st, now));
+    return false;
+  }
+  /* Só uma perda CONFIRMADA tira o Experience (teste terminado, reembolso, revogação, em token assinado já lido, sem consulta em andamento).
+     Tolerância offline vencida, relógio fora do lugar, servidor sem resposta ou leitura falha: mantém a escolha e a licença é relida. */
+  const sure = typeof LK !== 'undefined' && !LK.busy && mdLossConfirmed(gxhStatusKey(), LK.payload, LK.loaded, LK.readErr);
+  const r = mdReconcile(mdStored(), sure, false, gxhStatusKey(), now);
+  if (!r.changed) { try { if (!sure && mdChosen() === 'experience' && !gxhAuthReal() && typeof licRefresh === 'function') licRefresh(false); } catch (e) { } return false; }
   mdSave(r.stored); return true;
 }
 /* Reaplica o que depende das preferências (classes visuais, badges, listas) depois de uma troca de modo. */
@@ -95,8 +105,22 @@ function mdCard() {
     + opt('experience', ['on', 'Premium'], 'Modo Experience', 'Desbloqueie uma experiência avançada, com personalização completa da interface e acesso ao catálogo GLUXO Experience. Exclusivo Premium.', auth)
     + `</div>${mdLostNote()}${hint}<p class="hint md-hint">Alertas, lembretes, Resumo glicêmico e Central de Métricas são iguais nos dois modos. Trocar de modo não apaga registros, favoritos, fixados nem configurações.</p>${mdExclusiveHTML()}</div>`;
 }
+/* ---------- card Premium de acesso ao GLUXO Experience (Aparência, logo depois do tema) ---------- */
+const mdExpIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/><path d="M19 2.5l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7z" fill="currentColor" stroke="none"/></svg>';
+function mdExpCard() {
+  return `<button type="button" class="gxe-card acc-skip" data-md-open aria-label="GLUXO Experience, Premium. Explorar GLUXO Experience"><span class="gxe-top"><span class="gxe-ic">${mdExpIcon}</span><span class="gxe-tag">PREMIUM</span></span><span class="gxe-t">GLUXO Experience</span><span class="gxe-s">Seu GLUXO. Suas escolhas. Uma experiência completamente personalizada.</span><span class="gxe-d">Personalize a interface, explore recursos exclusivos e configure o aplicativo de acordo com suas preferências.</span><span class="gxe-cta">EXPLORAR GLUXO EXPERIENCE <b aria-hidden="true">→</b></span></button>`;
+}
+/* Quem está no Experience abre a central de personalização; os demais veem a apresentação (sem ativar nada sem a licença). */
+function mdOpenExp() {
+  if (gxhPers()) { go('gxexp'); return; }
+  const names = {}; Object.keys(GXH).forEach(f => { names[f] = GXH[f][0]; });
+  const g = mdExclusive(GXH_CATS, names), auth = gxhAuth();
+  openSheet(`<h2>GLUXO Experience</h2><p><b>Seu GLUXO. Suas escolhas.</b> Personalize a interface, explore recursos exclusivos e configure o aplicativo de acordo com suas preferências.</p><div class="md-list">${g.map(x => `<p><b>${esc(x.t)}</b><span>${x.items.map(esc).join(' · ')}</span></p>`).join('')}</div><p class="hint">${auth ? 'Você tem o Premium ativo. Ative o Modo Experience para usar tudo isso. Suas configurações guardadas voltam junto.' : esc(gxhLockWhy()) + ' O Modo Padrão continua completo e gratuito.'}</p><div class="stack" style="gap:8px">${auth ? '<button type="button" class="btn pri full" data-md-pick="experience">Ativar Modo Experience</button>' : mdPremiumBtn('full').replace('class="btn full"', 'class="btn pri full"')}<button type="button" class="btn full" data-act="close">Agora não</button></div>`);
+}
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-md-open]')) mdOpenExp(); });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-md-pick]'); if (!b) return;
+  if (b.closest('#sheet-bg')) { try { closeSheet(); } catch (x) { } }
   const m = b.dataset.mdPick; if (m === mdActive()) return;
   const r = mdSelect(mdStored(), m, gxhAuth());   /* a autorização é conferida AQUI, na lógica, não só na tela */
   if (!r.ok) { if (r.reason === 'premium') mdPremiumSheet(); return; }

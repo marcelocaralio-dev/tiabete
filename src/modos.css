@@ -18,3 +18,18 @@
 .md-gate b { display: block; }
 .md-gate .hint { margin: 6px 0 10px; }
 .md-note { margin: 10px 0 0; }
+
+/* Card Premium de acesso ao GLUXO Experience (Aparência): fundo preto, detalhes em vermelho, só tokens do app */
+.gxe-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; min-height: 168px; margin: 14px 0; padding: 18px 18px 16px 22px; text-align: left; color: #F4F1F2; font: inherit; cursor: pointer; position: relative; overflow: hidden; border-radius: 18px; border: 1px solid rgba(227, 30, 44, .45); background: radial-gradient(120% 90% at 100% 0%, rgba(227, 30, 44, .28), transparent 60%), linear-gradient(160deg, #15090B, #08070A 70%); box-shadow: 0 8px 26px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06); -webkit-tap-highlight-color: transparent; }
+.gxe-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(180deg, var(--red), #7A0F18); }
+.gxe-card:active { transform: scale(.99); }
+.gxe-card:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.gxe-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.gxe-ic { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; color: var(--red); background: rgba(227, 30, 44, .14); border: 1px solid rgba(227, 30, 44, .4); }
+.gxe-ic svg { width: 26px; height: 26px; }
+.gxe-tag { font: 700 11px/1 var(--f-mono); letter-spacing: .14em; padding: 6px 10px; border-radius: 99px; color: #fff; background: var(--red); }
+.gxe-t { font: 700 20px/1.15 var(--f-display); letter-spacing: .01em; margin-top: 4px; }
+.gxe-s { font-weight: 700; font-size: 15px; line-height: 1.35; color: #fff; }
+.gxe-d { font-size: 13.5px; line-height: 1.45; color: rgba(244, 241, 242, .72); }
+.gxe-cta { margin-top: 6px; font: 700 12.5px/1 var(--f-mono); letter-spacing: .08em; color: var(--red); display: inline-flex; align-items: center; gap: 8px; min-height: 36px; }
+.gxe-cta b { font-size: 16px; }

@@ -46,7 +46,7 @@ ok(IC.inVisible(HB.hbLayout(volta, false)).includes('trat') && IC.inVisible(HB.h
 function dummy() { const f = function () { return dummy(); }; return new Proxy(f, { get: (t, k) => k === Symbol.toPrimitive ? () => '' : k === 'then' ? undefined : dummy(), apply: () => dummy(), construct: () => dummy(), has: () => true }); }
 const LS = {}, store = { console, Date, Math, JSON, Object, Array, String, Number, Set, Map, Promise, RegExp, parseFloat, parseInt, isNaN, Error, Symbol,
   localStorage: { getItem: k => LS[k] ?? null, setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; } }, GX_F: {}, esc: String, sheets: [], openSheet: h => store.sheets.push(h),
-  LK: { cfg: true, loaded: true, dev: false }, premium: true, licPremiumNow: () => store.premium, licStatus: () => store.status, status: 'trial_active' };
+  LK: { cfg: true, loaded: true, dev: false, payload: { st: 'x' } }, premium: true, licPremiumNow: () => store.premium, licStatus: () => store.status, status: 'trial_active' };
 const g = new Proxy(store, { has: () => true, get: (t, k) => k in t ? t[k] : (k === 'window' || k === 'globalThis' ? g : dummy()), set: (t, k, v) => (t[k] = v, true) });
 vm.createContext(g);
 for (const f of ['src/modos-core.js', 'src/homebase-core.js', 'src/homebase.js']) vm.runInContext(rd(f).replace(/^const HBC = .*$/m, 'const HBC = { IN_DEF: () => ({ v: 2, order: ["a"], hidden: [] }), inCleanPrefs: x => x, inIsDefault: x => JSON.stringify(x) === JSON.stringify({ v: 2, order: ["a"], hidden: [] }), IN_FIXED: [], IN_CARDS: [] };'), g);

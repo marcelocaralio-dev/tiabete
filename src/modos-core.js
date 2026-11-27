@@ -49,9 +49,10 @@ const mdHomeShown = (k, effective) => { const c = mdHomeClass(k); return c === '
 /* ---------- estado guardado ---------- */
 /* Limpa qualquer valor vindo do armazenamento. mode:null = nunca escolhido. */
 function mdClean(v) {
-  const o = { v: MD_VER, mode: null, lost: null };
+  const o = { v: MD_VER, mode: null, lost: null, ok: 0 };
   if (v && typeof v === 'object') {
     if (MD_MODES.includes(v.mode)) o.mode = v.mode;
+    if (Number.isFinite(v.ok) && v.ok > 0) o.ok = v.ok;   /* última vez em que o Premium foi CONFIRMADO (só para não desligar o Experience enquanto a licença é relida) */
     if (v.lost && typeof v.lost === 'object' && typeof v.lost.st === 'string') o.lost = { st: v.lost.st.slice(0, 40), at: Number.isFinite(v.lost.at) ? v.lost.at : 0, ack: v.lost.ack === true };
   }
   return o;
@@ -81,6 +82,15 @@ function mdReconcile(stored, known, auth, status, now) {
   if (known === true && auth === false && o.mode === 'experience') { o.mode = 'standard'; o.lost = { st: String(status || ''), at: now || Date.now(), ack: false }; return { changed: true, stored: o }; }
   return { changed: false, stored: o };
 }
+/* PERDA CONFIRMADA: só estas situações, lidas de um token assinado e já carregado, justificam sair do Experience e avisar:
+   teste terminado, reembolso, revogação. Carregando, falha de leitura, sem resposta do servidor, tolerância offline vencida ou relógio fora do lugar
+   NÃO são perda: o Experience escolhido é mantido e a licença é relida. */
+const MD_LOSS = ['trial_expired', 'refunded', 'revoked'];
+const mdLossConfirmed = (status, signedPayload, loaded, readErr) => loaded === true && !readErr && !!signedPayload && MD_LOSS.includes(status);
+/* Enquanto a licença não responde (carregando ou leitura falhou), quem JÁ teve o Premium confirmado e escolheu o Experience continua nele (até 7 dias). */
+const MD_GRACE_MS = 7 * 86400e3;
+const mdProvisional = (stored, now) => { const o = mdClean(stored); return o.mode === 'experience' && o.ok > 0 && (now || Date.now()) - o.ok < MD_GRACE_MS; };
+const mdStamp = (stored, now) => { const o = mdClean(stored); o.ok = now || Date.now(); return o; };
 const mdAck = stored => { const o = mdClean(stored); if (o.lost) o.lost.ack = true; return o; };
 /* O aviso da perda aparece uma vez (até a pessoa tocar em Entendi) e some quando o Experience volta a ser escolhido. */
 const mdLostPending = stored => { const o = mdClean(stored); return !!(o.lost && !o.lost.ack); };
@@ -91,4 +101,4 @@ function mdExclusive(cats, names) {
   Object.keys(cats).forEach(c => { const fs = cats[c].fs.filter(f => mdFeatureClass(f) === 'experience' && names[f]); if (fs.length) out.push({ c, t: cats[c].t, items: fs.map(f => names[f]) }); });
   return out;
 }
-if (typeof module !== 'undefined') module.exports = { MD_VER, MD_MODES, MD_LABEL, MD_CLASS, MD_SHARED, MD_ADDON, MD_HOME, mdFeatureClass, mdAddon, mdForcedOff, mdHomeClass, mdHomeShown, mdClean, mdParse, mdInitial, mdSelected, mdEffective, mdCanSelect, mdSelect, mdReconcile, mdAck, mdLostPending, mdExclusive };
+if (typeof module !== 'undefined') module.exports = { MD_VER, MD_MODES, MD_LABEL, MD_CLASS, MD_SHARED, MD_ADDON, MD_HOME, mdFeatureClass, mdAddon, mdForcedOff, mdHomeClass, mdHomeShown, mdClean, mdParse, mdInitial, mdSelected, mdEffective, mdCanSelect, mdSelect, mdReconcile, MD_LOSS, mdLossConfirmed, mdProvisional, mdStamp, mdAck, mdLostPending, mdExclusive };

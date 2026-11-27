@@ -863,7 +863,7 @@ function viewMais() {
   const q = S.maisQ || '';
   return banners() + `<div class="mais-s"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input class="in" id="mais-q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Buscar em Mais…" aria-label="Buscar em Mais" value="${esc(q)}">${q ? '<button class="mais-x" data-act="mais-clear" aria-label="Limpar busca">×</button>' : ''}</div><div class="stack" id="mais-list">${q.trim() ? maisResults(q) : maisMenu()}</div>`;
 }
-function viewAparencia() { return banners() + (typeof mdCard === 'function' ? mdCard() : '') + themeCard() + pnlCard() + scaleCard() + swipeCard(); }
+function viewAparencia() { return banners() + themeCard() + (typeof mdExpCard === 'function' ? mdExpCard() : '') + (typeof mdCard === 'function' ? mdCard() : '') + pnlCard() + scaleCard() + swipeCard(); }
 
 function viewSobre() {
   const kv = (k, v) => `<div class="row sp" style="gap:12px;padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start"><span class="dim" style="flex:none">${k}</span><b style="text-align:right;overflow-wrap:anywhere">${v}</b></div>`;
