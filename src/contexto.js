@@ -212,14 +212,18 @@ function viewCtxRes() {
 VIEWS.ctxres = viewCtxRes; TITLES.ctxres = 'Insights e resumos'; MI.ctxres = MI.padroes;
 
 /* ---------- configurações: Personalização > GLUXO Experience > Inteligência contextual ---------- */
-function viewGxCtx() {
+/* Itens dispensados, o que o GLUXO aprendeu e restaurar tudo: usados aqui e na central GLUXO Experience (Inteligência dos dados) */
+function cxGxExtras() {
   const st = cxState(), dl = Object.entries(st.dlog || {}).sort((a, b) => b[1].at - a[1].at), use = Object.entries(st.use || {}).filter(([r]) => TITLES[r]).sort((a, b) => b[1] - a[1]).slice(0, 5), hrs = Object.entries(st.hrs || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
   const cats = Object.keys(CX_CATS).filter(k => (st.acc || {})[k] || (st.rej || {})[k]);
-  return banners() + `<h2 class="sec">Inteligência contextual · GLUXO Experience</h2><p class="hint" style="margin:0 0 12px">Observações, sugestões e resumos feitos só com os seus registros, no aparelho: nada é enviado para fora. Cada categoria liga e desliga sozinha. ${CX_SAFE}</p><button type="button" class="btn full" data-act="go" data-r="ctxres" style="margin-bottom:12px">Ver insights e resumos</button>`
-    + Object.entries(GX_F).filter(([f]) => f.startsWith('ctx_')).map(([f, x]) => gxSec(f, x)).join('')
-    + `<h2 class="sec">Itens dispensados</h2><div class="card">${dl.length ? `<ul class="cx-ul">${dl.map(([id, v]) => `<li class="row sp" style="gap:8px"><span>${esc(v.t)}<br><small class="dim">${v.r ? 'Lembrete' : 'Observação ou sugestão'} · ${cxDM(v.at)}</small></span><button type="button" class="cx-b" data-cx="restore" data-id="${esc(id)}">Restaurar</button></li>`).join('')}</ul><button type="button" class="cx-b" data-cx="restore-all">Restaurar todos</button>` : '<p class="hint" style="margin:0">Nada dispensado. Quando você dispensar uma observação, sugestão ou lembrete, ele aparece aqui para ser restaurado.</p>'}</div>`
+  return `<h2 class="sec">Itens dispensados</h2><div class="card">${dl.length ? `<ul class="cx-ul">${dl.map(([id, v]) => `<li class="row sp" style="gap:8px"><span>${esc(v.t)}<br><small class="dim">${v.r ? 'Lembrete' : 'Observação ou sugestão'} · ${cxDM(v.at)}</small></span><button type="button" class="cx-b" data-cx="restore" data-id="${esc(id)}">Restaurar</button></li>`).join('')}</ul><button type="button" class="cx-b" data-cx="restore-all">Restaurar todos</button>` : '<p class="hint" style="margin:0">Nada dispensado. Quando você dispensar uma observação, sugestão ou lembrete, ele aparece aqui para ser restaurado.</p>'}</div>`
     + `<h2 class="sec">O que o GLUXO aprendeu</h2><div class="card"><p class="hint" style="margin:0 0 8px">Só serve para tornar as sugestões mais relevantes. Fica neste aparelho e não muda a sua tela inicial, preferências, metas nem configurações clínicas.</p>${use.length || cats.length || hrs.length ? `<ul class="cx-ul">${use.length ? `<li>Telas mais usadas: ${use.map(([r, n]) => esc(TITLES[r]) + ' (' + n + ')').join(', ')}</li>` : ''}${cats.map(k => `<li>${CX_CATS[k]}: ${(st.acc || {})[k] || 0} aceitas, ${(st.rej || {})[k] || 0} dispensadas</li>`).join('')}${hrs.length ? `<li>Horários de abertura mais comuns: ${hrs.map(([h]) => cxP2(+h) + 'h').join(' e ')}</li>` : ''}</ul><button type="button" class="cx-b" data-cx="clear-learn">Apagar o que foi aprendido</button>` : '<p class="hint" style="margin:0">Ainda não há nada aprendido.</p>'}</div>`
     + `<button type="button" class="btn full" style="margin-top:12px" data-cx="reset-all">Restaurar toda a inteligência contextual</button>`;
+}
+function viewGxCtx() {
+  return banners() + `<h2 class="sec">Inteligência contextual · GLUXO Experience</h2><p class="hint" style="margin:0 0 12px">Observações, sugestões e resumos feitos só com os seus registros, no aparelho: nada é enviado para fora. Cada categoria liga e desliga sozinha. ${CX_SAFE}</p><button type="button" class="btn full" data-act="go" data-r="ctxres" style="margin-bottom:12px">Ver insights e resumos</button>`
+    + Object.entries(GX_F).filter(([f]) => f.startsWith('ctx_')).map(([f, x]) => gxSec(f, x)).join('')
+    + cxGxExtras();
 }
 VIEWS.gxctx = viewGxCtx; TITLES.gxctx = 'Inteligência contextual';
 const cxBack0 = backOf; backOf = function (r) { return r === 'gxctx' ? 'gxexp' : r === 'ctxres' ? 'painel' : cxBack0(r); };

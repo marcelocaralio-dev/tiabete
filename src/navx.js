@@ -6,7 +6,7 @@ GX_F.nav_sc = { t: 'Navegação · Atalhos circulares', o: Object.assign({ on: g
 GX_F.nav_search = { t: 'Navegação · Pesquisa global', o: { on: gxSw('Botão de pesquisa no Início'), live: gxSw('Resultados enquanto digita'), hist: gxSw('Salvar pesquisas recentes'), exam: gxSw('Exames (Premium)'), hba: gxSw('HbA1c'), rec: gxSw('Glicemias e refeições'), ins: gxSw('Insulinas'), ev: gxSw('Observações e eventos'), fn: gxSw('Telas e configurações') } };
 GX_F.nav_ptr = { t: 'Navegação · Puxar para atualizar', o: { on: gxSw('Ativar gesto'), painel: gxSw('No Início'), historico: gxSw('No Histórico'), analise: gxSw('Na Análise'), relatorios: gxSw('Nos Relatórios'), style: ['normal', 'Indicador', '', [['normal', 'Normal'], ['compact', 'Compacto']]] } };
 function gxPtrOk(r) { document.documentElement.classList.toggle('gx-ptr-compact', gxGet('nav_ptr', 'style') === 'compact'); return gxGet('nav_ptr', 'on') && (!GX_F.nav_ptr.o[r] || gxGet('nav_ptr', r)); }
-function gxOrder() { const s = (gxAll().nav_sc || {}).order, all = Object.keys(GXN), o = Array.isArray(s) ? s.filter(k => all.includes(k)) : []; return o.concat(all.filter(k => !o.includes(k))); }
+function gxOrder() { const s = gxhLocked('nav_sc') ? null : (gxAll().nav_sc || {}).order, all = Object.keys(GXN), o = Array.isArray(s) ? s.filter(k => all.includes(k)) : []; return o.concat(all.filter(k => !o.includes(k))); }
 function gxNavPrev(f) {
   if (f !== 'nav_sc') return '';
   const l = gxOrder().filter(k => gxGet(f, k));
@@ -74,7 +74,7 @@ function gxMenu(m) {
   const b = (a, t) => `<button type="button" class="btn full" data-gxm="${a}">${t}</button>`; let title, h = '';
   if (m.type === 'rec') {
     const r = S.records.find(x => x.id === m.k); if (!r) return false; title = `${fmtDate(r.date)} ${r.time || ''} · ${r.glucose} mg/dL`;
-    h = (gxM('details') ? b('details', 'Consultar detalhes') : '') + (gxM('edit') ? `<button type="button" class="btn full" data-act="edit" data-id="${esc(r.id)}">Editar</button>` : '') + (gxM('share') ? b('share', 'Compartilhar') : '') + (gxM('fav') ? b('fav', gxFavs().includes(r.id) ? 'Remover dos favoritos' : 'Favoritar') : '') + (gxM('del') ? `<button type="button" class="btn danger full" data-act="del-ask" data-id="${esc(r.id)}">Excluir</button>` : '');
+    h = (gxM('details') ? b('details', 'Consultar detalhes') : '') + (gxM('edit') ? `<button type="button" class="btn full" data-act="edit" data-id="${esc(r.id)}">Editar</button>` : '') + (gxM('share') ? b('share', 'Compartilhar') : '') + (gxM('fav') && !gxhLocked('org_fav') ? b('fav', gxFavs().includes(r.id) ? 'Remover dos favoritos' : 'Favoritar') : '') + (gxM('del') ? `<button type="button" class="btn danger full" data-act="del-ask" data-id="${esc(r.id)}">Excluir</button>` : '');
   } else if (m.type === 'sc') { title = GXN[m.k][0]; h = b('left', 'Mover para a esquerda') + b('right', 'Mover para a direita') + b('remove', 'Remover do Início') + b('config', 'Configurar atalhos'); }
   else { title = inCardT(m.k); h = (gxM('details') ? b('details', 'Consultar detalhes') : '') + (IN_CARDS.some(c => c.k === m.k) ? b('expand', 'Expandir card') : '') + (gxM('share') ? b('share', 'Compartilhar') : '') + b('custom', 'Personalizar o Início'); m.text = m.el.innerText; }
   if (!h) return false;

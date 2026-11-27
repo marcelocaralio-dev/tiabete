@@ -102,6 +102,8 @@ const AN_SECS = [
   { id: 'ass', t: 'Associações entre variáveis', n: 'Associações', c: 11, sum: M => { const a = M.assoc(); return a.length ? `<span class="an-sc-i"><b class="num">${a.length}</b> relação${a.length > 1 ? 'ões' : ''} observada${a.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Dados insuficientes</span>'; }, body: anBodyAss },
   { id: 'evo', t: 'Evolução histórica', n: 'Histórico', c: 12, sum: M => { const h = M.hist(); return h ? `<span class="an-sc-i"><b class="num">${h.n}</b> medições desde ${anDay(h.first)}</span>` : ''; }, body: anBodyEvo }
 ];
+/* seções visíveis: cada recurso de Inteligência dos dados (GLUXO Experience) mostra ou oculta as suas; só a apresentação muda, os cálculos e registros não */
+const anSecsOn = () => typeof gxanOn === 'function' ? AN_SECS.filter(s => gxanOn(s.id)) : AN_SECS;
 function anSecHTML(s, M) {
   const open = anOpen().has(s.id);
   return `<section class="an-sec an-c${s.c}${open ? ' open' : ''}" id="an-${s.id}" data-an="${s.id}"><button type="button" class="an-h" data-act="an-toggle" data-k="${s.id}" aria-expanded="${open}" aria-controls="an-b-${s.id}"><span class="an-h-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${AN_ICONS[s.id]}</svg></span><span class="an-h-t"><b>${s.t}</b><span class="an-h-s">${s.sum(M)}</span></span><span class="an-h-chev" aria-hidden="true">›</span></button><div class="an-b" id="an-b-${s.id}" role="region" aria-label="${s.t}" ${open ? '' : 'hidden'}>${open ? s.body(M) : ''}</div></section>`;
@@ -391,8 +393,8 @@ function viewAnalise() {
   const span = M.cur.length ? (() => { const t = M.cur.map(r => r.ts); return fmtDM(Math.min(...t)) + '/' + new Date(Math.min(...t)).getFullYear() + ' a ' + fmtDM(Math.max(...t)) + '/' + new Date(Math.max(...t)).getFullYear(); })() : '';
   h += `<div class="card anaf an-filter"><div class="fl">Intervalo de dias</div><div class="seg an-seg" role="group" aria-label="Intervalo de dias">${[['all', 'Tudo'], ['7', '7 d'], ['14', '14 d'], ['30', '30 d'], ['90', '90 d'], ['180', '180 d']].map(([k, l]) => `<button data-act="ana-range" data-v="${k}" aria-pressed="${a.range === k}">${l}</button>`).join('')}</div><p class="hint" id="ana-span">${M.cur.length ? `Mostrando <b>${span}</b> · ${M.sum.n} medições.` : 'Sem medições neste intervalo.'} O intervalo vale para todas as seções, exceto as janelas fixas (7, 30, 90 e 180 dias) e a evolução histórica completa.</p></div>`;
   if (!M.cur.length) return h + `<div class="card" style="margin-top:12px">${emptyBlock('Sem medições', 'Não há medições neste intervalo. Escolha “Tudo” para ver todo o histórico.')}</div>`;
-  h += `<nav class="an-nav" aria-label="Seções da Análise"><div class="an-nav-in">${AN_SECS.map(s => `<button type="button" class="an-nv an-c${s.c}" data-act="an-go" data-k="${s.id}">${s.n}</button>`).join('')}</div><div class="an-nav-a"><button type="button" class="btn sm" data-act="an-all">Expandir tudo</button><button type="button" class="btn sm" data-act="an-none">Recolher tudo</button></div></nav>`;
-  return h + `<div class="an-secs">${AN_SECS.map(s => anSecHTML(s, M)).join('')}</div>`;
+  h += `<nav class="an-nav" aria-label="Seções da Análise"><div class="an-nav-in">${anSecsOn().map(s => `<button type="button" class="an-nv an-c${s.c}" data-act="an-go" data-k="${s.id}">${s.n}</button>`).join('')}</div><div class="an-nav-a"><button type="button" class="btn sm" data-act="an-all">Expandir tudo</button><button type="button" class="btn sm" data-act="an-none">Recolher tudo</button></div></nav>`;
+  return h + `<div class="an-secs">${anSecsOn().map(s => anSecHTML(s, M)).join('')}</div>`;
 }
 
 /* ---------- eventos ---------- */
