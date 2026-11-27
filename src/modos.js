@@ -23,7 +23,7 @@ function mdHasSaved() {
 }
 
 /* O licenciamento já respondeu? Enquanto carrega, nada se conclui (nem perda de Premium). */
-function mdKnown() { try { return typeof LK !== 'undefined' && (!LK.cfg || (LK.loaded === true && LK.readErr !== true)); } catch (e) { return false; } }
+function mdKnown() { try { return typeof LK !== 'undefined' && (!LK.cfg || LK.loaded === true); } catch (e) { return false; } }
 /* Chamado uma vez na abertura, depois de as configurações serem restauradas e antes de a primeira tela ser desenhada. */
 function mdBoot() {
   try {
@@ -33,6 +33,7 @@ function mdBoot() {
   } catch (e) { console.error(e); }
 }
 /* Perda de autorização → Modo Padrão (uma vez, com aviso). Os dados e as preferências não são tocados. */
+const mdReread = { n: 0, t: 0 };
 function mdCheck() {
   if (!mdKnown() || mdRaw() === undefined) return false;
   const now = Date.now();
@@ -44,7 +45,15 @@ function mdCheck() {
      Tolerância offline vencida, relógio fora do lugar, servidor sem resposta ou leitura falha: mantém a escolha e a licença é relida. */
   const sure = typeof LK !== 'undefined' && !LK.busy && mdLossConfirmed(gxhStatusKey(), LK.payload, LK.loaded, LK.readErr);
   const r = mdReconcile(mdStored(), sure, false, gxhStatusKey(), now);
-  if (!r.changed) { try { if (!sure && mdChosen() === 'experience' && !gxhAuthReal() && typeof licRefresh === 'function') licRefresh(false); } catch (e) { } return false; }
+  if (!r.changed) {
+    try {   /* sem token lido (cofre não estava pronto ou a leitura falhou): relê o cofre algumas vezes, depois consulta o servidor; nunca conclui perda */
+      if (!sure && mdChosen() === 'experience' && !gxhAuthReal()) {
+        if (LK.loaded && !LK.payload && mdReread.n < 5 && now - mdReread.t > 8000 && typeof licLoad === 'function') { mdReread.n++; mdReread.t = now; licLoad().then(() => { if (LK.payload) { gxhPT = { t: 0, v: true }; try { gxChanged(); } catch (e) { } } }).catch(() => { }); }
+        else if (typeof licRefresh === 'function') licRefresh(false);
+      }
+    } catch (e) { }
+    return false;
+  }
   mdSave(r.stored); return true;
 }
 /* Reaplica o que depende das preferências (classes visuais, badges, listas) depois de uma troca de modo. */

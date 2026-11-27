@@ -6,8 +6,8 @@
                  as preferências guardadas continuam intactas. É o ÚNICO ponto que decide isso: os módulos só perguntam aqui. */
 const GXH_FREE = MD_SHARED;   /* alertas e lembretes são compartilhados entre os modos: nunca travam (classificação em modos-core.js) */
 let gxhPT = { t: 0, v: true };
-/* Licença ainda não respondeu (carregando ou leitura do cofre falhou)? */
-const gxhUnsure = () => { try { return typeof LK !== 'undefined' && !!LK.cfg && (LK.loaded !== true || LK.readErr === true); } catch (e) { return false; } };
+/* Licença ainda não respondeu (carregando ou sem token lido)? */
+const gxhUnsure = () => { try { return typeof LK !== 'undefined' && !!LK.cfg && (LK.loaded !== true || !LK.payload); } catch (e) { return false; } };   /* sem token lido = não sabemos (cofre ainda não pronto ou leitura falhou): não é perda */
 /* gxhAuth = Premium confirmado agora (gxhAuthReal) OU, só enquanto a licença não responde, a confirmação anterior de quem escolheu o Experience (mdProvisional). */
 function gxhAuth() {
   if (gxhAuthReal()) return true;
