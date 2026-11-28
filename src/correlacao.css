@@ -1,0 +1,16 @@
+/* Associações entre variáveis: cartões, indicadores, gráficos e matriz */
+.cr-card .cr-cat { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--c); font-weight: 700; }
+.cr-c-ali { --c: var(--an3); --c-rgb: var(--an3-rgb); } .cr-c-ins { --c: var(--an6); --c-rgb: var(--an6-rgb); } .cr-c-ativ { --c: var(--an8); --c-rgb: var(--an8-rgb); }
+.cr-c-ctx { --c: var(--an11); --c-rgb: var(--an11-rgb); } .cr-c-tempo { --c: var(--an7); --c-rgb: var(--an7-rgb); } .cr-c-exame { --c: var(--an2); --c-rgb: var(--an2-rgb); }
+.cr-card.hl { box-shadow: 0 0 0 1px rgba(var(--c-rgb), .45); }
+.cr-ind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; }
+.cr-str { display: inline-flex; align-items: center; gap: 3px; } .cr-str i { width: 16px; height: 6px; border-radius: 3px; background: var(--line); } .cr-str i.on { background: var(--c); } .cr-str b { margin-left: 5px; font-weight: 700; }
+.cr-dir { color: var(--mut); } .cr-pill { padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); font-size: 12px; color: var(--mut); } .cr-pill.warn { color: var(--ds-warn); border-color: var(--ds-warn); }
+.cr-sc { width: 100%; height: auto; } .cr-sc circle { fill: rgba(var(--c-rgb), .6); stroke: var(--s2); stroke-width: .6; cursor: pointer; } .cr-sc circle.out { fill: none; stroke: var(--c); stroke-width: 1.4; }
+.cr-sc circle:focus-visible { outline: 2px solid var(--c); } .cr-trend { stroke: var(--c); stroke-width: 2; stroke-dasharray: 5 3; } .cr-box { fill: rgba(var(--c-rgb), .16); stroke: rgba(var(--c-rgb), .5); } .cr-med { stroke: var(--c); stroke-width: 2.4; }
+.cr-warn { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--s1); border: 1px dashed var(--line); font-size: 13.5px; color: var(--mut); } .cr-warn b { color: var(--fg); }
+.cr-lim { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--mut); line-height: 1.45; } .cr-lim b { color: var(--fg); }
+.cr-kv { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; } .cr-kv li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; border-bottom: 1px solid var(--line); padding: 3px 0; } .cr-kv span { color: var(--mut); } .cr-kv b { text-align: right; }
+.cr-hs { display: flex; flex-wrap: wrap; gap: 10px; } .cr-h { flex: 1 1 140px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; } .cr-h rect { fill: rgba(var(--c-rgb), .55); } .cr-h svg { width: 100%; height: auto; }
+.cr-sub { margin: 12px 0 4px; font-size: 13.5px; } .cr-det { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; } .cr-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-cats { margin: 6px 0 10px; } .cr-mx th, .cr-mx td { text-align: center; font-size: 12px; white-space: nowrap; } .cr-mx th[scope=row] { text-align: left; max-width: 190px; overflow: hidden; text-overflow: ellipsis; } .cr-mx td.na, .cr-mx td.self { color: var(--mut2); } .cr-mx sup { font-size: 8px; }

@@ -99,7 +99,7 @@ const AN_SECS = [
   { id: 'rfe', t: 'Refeições e glicemia', n: 'Refeição×glicemia', c: 14, sum: M => rfeSum(M), body: M => anBodyRfe(M) },
   { id: 'comp', t: 'Comparação entre períodos', n: 'Comparar', c: 9, sum: M => { const c = anCmpPick(M); return c && c.enough ? `<span class="an-sc-i"><b class="num">${c.good}</b> melhoraram</span><span class="an-sc-i"><b class="num">${c.bad}</b> pioraram</span>` : '<span class="an-sc-i dim">Escolha dois períodos</span>'; }, body: anBodyComp },
   { id: 'pad', t: 'Padrões recorrentes', n: 'Padrões', c: 10, sum: M => { const r = rcData(M).list; return r.length ? `<span class="an-sc-i"><b class="num">${r.length}</b> ${r.length > 1 ? 'padrões' : 'padrão'} identificado${r.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Nenhum padrão claro</span>'; }, body: rcBody },
-  { id: 'ass', t: 'Associações entre variáveis', n: 'Associações', c: 11, sum: M => { const a = M.assoc(); return a.length ? `<span class="an-sc-i"><b class="num">${a.length}</b> relação${a.length > 1 ? 'ões' : ''} observada${a.length > 1 ? 's' : ''}</span>` : '<span class="an-sc-i dim">Dados insuficientes</span>'; }, body: anBodyAss },
+  { id: 'ass', t: 'Associações entre variáveis', n: 'Associações', c: 11, sum: M => { const a = crData(M).auto, h = a.highlights.length; return a.tested ? `<span class="an-sc-i"><b class="num">${h}</b> em destaque</span><span class="an-sc-i"><b class="num">${a.tested}</b> testadas (exploratório)</span>` : '<span class="an-sc-i dim">Dados insuficientes</span>'; }, body: anBodyAss },
   { id: 'evo', t: 'Evolução histórica', n: 'Histórico', c: 12, sum: M => { const h = M.hist(); return h ? `<span class="an-sc-i"><b class="num">${h.n}</b> medições desde ${anDay(h.first)}</span>` : ''; }, body: anBodyEvo }
 ];
 /* seções visíveis: cada recurso de Inteligência dos dados (GLUXO Experience) mostra ou oculta as suas; só a apresentação muda, os cálculos e registros não */
@@ -355,17 +355,7 @@ function compareCardHTML() {
 function anBodyComp(M) { return `<div id="cmp">${compareCardHTML()}</div>`; }
 /* 10. Padrões */
 /* 11. Associações */
-function anBodyAss(M) {
-  const a = M.assoc();
-  if (!a.length) return anEmpty('Dados insuficientes para associações', 'Elas precisam de registros com carboidratos, insulina, atividade ou eventos e de uma nova medição dentro da janela de tempo (por exemplo, 1 a 4 horas depois). São necessários ao menos 8 pares por relação.');
-  return `<div class="an-cards">${a.map(x => {
-    const mx = Math.max(...x.bins.map(b => Math.abs(b.delta != null ? b.delta : b.post || 0)), 1);
-    return `<article class="an-card t-info"><h3>${esc(x.title)}</h3><p class="an-meta"><span>${x.used} pares usados</span><span>${x.universe} registros considerados</span></p><p class="an-card-t">${esc(x.text)}</p>
-    <div class="an-ab-bins">${x.bins.map(b => `<div class="an-bn"><span>${esc(b.l)}<small>n=${b.n}</small></span><span class="an-bnt" aria-hidden="true">${b.delta != null ? `<i class="${b.delta >= 0 ? 'pos' : 'neg'}" style="${b.delta >= 0 ? 'left:50%' : 'right:50%'};width:${(Math.abs(b.delta) / mx * 50).toFixed(1)}%"></i>` : `<i class="pos" style="left:0;width:${Math.min(100, (b.post || 0) / 300 * 100).toFixed(1)}%"></i>`}</span><b class="num">${b.delta != null ? fsign(b.delta, 0) + ' mg/dL' : f0(b.post) + ' mg/dL'}<small>${b.delta != null ? 'variação média' : 'glicemia depois'}</small></b></div>`).join('')}</div>
-    ${x.r != null ? `<p class="an-corr">${anCorrTxt(x.r)}</p>` : ''}${anScatter(x.points || [], x.xl, x.yl)}
-    <p class="an-limit"><b>Limitações:</b> ${esc(x.limits)}</p></article>`;
-  }).join('')}</div>${anNote('Relações observadas nos seus registros, não causas. <b>Não são recomendações</b> de dose, alimentação ou mudança de tratamento: decida com sua equipe de saúde.')}`;
-}
+function anBodyAss(M) { return crBody(M); }
 /* 12. Evolução histórica (Evolução por semana/mês, como antes, mais marcos) */
 function anBodyEvo(M) {
   const a = S.ana, recs = M.cur, wk = a.agg === 'week', g = groupBy(recs, r => wk ? weekStart(r.ts) : monthStart(r.ts));
