@@ -14,7 +14,7 @@ function anOpenSave() { try { localStorage.setItem(AN_LS, JSON.stringify([...anO
 
 /* ---------- modelo (calculado sob demanda e guardado) ---------- */
 function anModel() {
-  const R = S.records, n = R.length, a = S.ana, now = Date.now(); let cs = 0; for (let i = 0; i < n; i++) cs = (cs * 31 + Math.round(R[i].glucose * 10) + (R[i].ts % 100003)) % 1000000007;
+  const R = S.records, n = R.length, a = S.ana, now = Date.now(); let cs = 0; for (let i = 0; i < n; i++) cs = (cs * 31 + Math.round(R[i].glucose * 10) + (R[i].ts % 100003) + dsRecSig(R[i])) % 1000000007;
   const key = [n, cs, a.range, a.agg, a.A.from, a.A.to, a.B.from, a.B.to, S.events.length, isoDate(new Date(now)), LIM.low, LIM.high, JSON.stringify(anTmSet())].join('|');
   if (anMemo.key === key) return anMemo.M;
   const W = anWindows(R, a.range, now), cache = {}, lazy = (k, f) => () => (k in cache ? cache[k] : (cache[k] = f()));
@@ -88,7 +88,7 @@ const AN_ICONS = {
 };
 const AN_SECS = [
   { id: 'visao', t: 'Visão geral', n: 'Visão', c: 1, sum: M => M.sum.n ? `<span class="an-sc-i"><b class="num">${fm(M.sum.mean)}</b> mg/dL média</span><span class="an-sc-i"><b class="num">${M.sum.n}</b> medições</span><span class="an-sc-i"><b class="num">${fn(M.sum.pIn, 0)}%</b> na faixa</span>` : '', body: anBodyVisao },
-  { id: 'desc', t: 'Central de descobertas', n: 'Descobertas', c: 2, sum: M => { const d = M.disc(); return d.list.length ? `<span class="an-sc-i"><b class="num">${d.list.length}</b> descoberta${d.list.length > 1 ? 's' : ''} neste período</span>` : '<span class="an-sc-i dim">Sem destaques com estes dados</span>'; }, body: anBodyDesc },
+  { id: 'desc', t: 'Central de descobertas', n: 'Descobertas', c: 2, sum: M => dcSum(M), body: M => dcBody(M) },
   { id: 'ctrl', t: 'Controle glicêmico', n: 'Controle', c: 3, sum: M => `<span class="an-sc-i"><b class="num">${fn(M.sum.pIn, 0)}%</b> das medições na faixa</span>`, body: anBodyCtrl },
   { id: 'hipo', t: 'Hipoglicemias', n: 'Hipos', c: 4, sum: M => { const h = M.hypo(); return `<span class="an-sc-i"><b class="num">${h.lowN}</b> abaixo de ${LIM.low}</span>${h.epN ? `<span class="an-sc-i"><b class="num">${h.epN}</b> episódio${h.epN > 1 ? 's' : ''}</span>` : ''}${h.min != null ? `<span class="an-sc-i">menor <b class="num">${f0(h.min)}</b></span>` : ''}`; }, body: anBodyHipo },
   { id: 'hiper', t: 'Hiperglicemias', n: 'Hipers', c: 5, sum: M => { const h = M.hyper(); return `<span class="an-sc-i"><b class="num">${h.highN}</b> acima da faixa</span>${h.max != null ? `<span class="an-sc-i">maior <b class="num">${f0(h.max)}</b></span>` : ''}`; }, body: anBodyHiper },
@@ -125,13 +125,6 @@ function anBodyVisao(M) {
     ${anKpi({ t: 'Dias com registro', v: s.days, u: `de ${s.spanDays}`, sub: s.coverage != null ? `${fn(s.coverage, 0)}% dos dias do intervalo` : '', extra: s.spanDays ? `<span class="an-bar" aria-hidden="true"><i style="width:${Math.min(100, s.coverage || 0).toFixed(0)}%"></i></span>` : '', delta: dl('days', 0, 0, '') })}
     ${anKpi({ t: 'Em relação ao período anterior', v: hasPrev && p.mean != null && s.mean != null ? fsign(s.mean - p.mean, 1) : '—', u: 'mg/dL', sub: hasPrev ? `média anterior ${fm(p.mean)} (${p.n} medições)` : (M.range === 'all' ? 'não existe período anterior em “Tudo”' : 'sem medições no período anterior'), extra: hasPrev ? anDumb(s.mean, p.mean, 300) : '' })}</div>
     <p class="an-note">${tr ? `<b>Tendência aproximada:</b> ${fsign(tr.perWeek)} mg/dL por semana, calculada sobre ${tr.days} dias com medição. Descreve o passado e não prevê o futuro.` : '<b>Tendência:</b> dados insuficientes (precisa de ao menos 10 dias e 20 medições).'}</p>${ref}`;
-}
-/* 2. Descobertas */
-function anBodyDesc(M) {
-  const d = M.disc();
-  if (!d.list.length) return anEmpty('Nenhuma descoberta por enquanto', esc(d.why));
-  /* as recorrências não são repetidas aqui: a Central só aponta para a seção delas */
-  return `<button type="button" class="btn" data-act="an-go" data-k="pad">Ver recorrências com evidências</button><div class="an-cards">${d.list.map(x => `<article class="an-card t-${x.tone}"><h3>${esc(x.title)}</h3><p class="an-card-t">${esc(x.text)}</p><p class="an-meta"><span>Período: ${esc(x.period)}</span><span>${x.n} registros</span></p><details class="an-ev"><summary>Evidências usadas</summary><ul>${x.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></details>${anRelated(anRecs(x.recIds), x.hist)}</article>`).join('')}</div>${anNote('Descobertas descrevem números dos seus registros neste período. Não indicam causa nem orientam tratamento.')}`;
 }
 /* 3. Controle glicêmico */
 function anBodyCtrl(M) {

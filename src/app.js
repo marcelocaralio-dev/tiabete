@@ -771,6 +771,7 @@ function wipeSheet(w) {
 }
 async function wipeData(w) {
   try { if (typeof heWipe === 'function') await heWipe(); } catch (e) { }
+  try { if (typeof dcWipe === 'function') dcWipe(); } catch (e) { }
   await Store.delMany('records', S.records.map(r => r.id));
   if (w === 'all') { await Store.delMany('hba1c', S.hba.map(r => r.id)); await Store.delMany('schemes', S.schemes.map(r => r.id)); await Store.delMany('exams', S.exams.map(r => r.id)); await Store.delMany('events', S.events.map(r => r.id)); await Store.delMany('inslog', S.inslog.map(r => r.id)); S.inslog = []; S.ins = { basalTs: null, day: isoDate(new Date()), fast: null, lunch: null, dinner: null, dinnerMin: S.ins.dinnerMin }; await Store.put('meta', { id: 'insulin', ...S.ins }); }
   S.imp = null; S.rest = null; S.day = null; if (S.ex) { S.ex.sel = null; S.ex.narr = {}; S.ex.queue = []; if (w === 'all') S.ex.id = null; }

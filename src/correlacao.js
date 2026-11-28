@@ -10,7 +10,7 @@ function crData(M) {
 }
 /* temas que outras áreas da Análise já apresentam (evita repetir a mesma descoberta) */
 function crCovered(M) {
-  const c = new Set(), d = M.disc ? M.disc().list : []; d.forEach(x => { if (x.id === 'var-horario') c.add('variab-periodo'); });
+  const c = new Set(); try { dcData(M).res.list.forEach(x => { if (x.sig.startsWith('var|')) c.add('variab-periodo'); }); } catch (e) { }
   try { rcData(M).list.forEach(p => { if (/_ativ$/.test(p.id) || /e_ativ/.test(p.id)) c.add('atividade-dia'); }); } catch (e) { }
   return c;
 }

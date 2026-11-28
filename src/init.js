@@ -29,6 +29,7 @@
   try { const bm = (await Store.all('meta')).find(x => x.id === 'bolus'); if (bm) blLoad(bm.value); blReady = true; } catch (e) { blReady = false; }
   try { const pm = (await Store.all('meta')).find(x => x.id === 'plan'); if (pm) plLoad(pm.value); else if (S.inslog.length || S.ins.basalTs) { S.plan.types = ['insulina']; await plSave(); } } catch (e) { }
   try { const im = (await Store.all('meta')).find(x => x.id === 'ins-rem'); if (im) irLoad(im.value); const rr = irReconcile(S.ir, S.plan), pr = irPrune(S.ir, Date.now()); if (rr.changed || pr) await irSave(); irTzCheck(); } catch (e) { console.error(e); }
+  try { const dm = (await Store.all('meta')).find(x => x.id === 'discoveries'); dcLoad(dm ? dm.value : null); } catch (e) { }
   try { const mc = (await Store.all('meta')).find(x => x.id === 'metrics-cfg'); if (mc && typeof mtLoadCfg === 'function') mtLoadCfg(mc.value); } catch (e) { }
   try { const ad = (await Store.all('meta')).find(x => x.id === 'alert-day'); if (ad) adLoad(ad.value); } catch (e) { }
   S.adReady = true; S.irReady = true; try { acSync(); } catch (e) { }
